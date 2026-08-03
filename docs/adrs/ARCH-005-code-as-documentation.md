@@ -33,14 +33,14 @@ Code structure (functions, methods, classes) must convey meaning. If a comment e
 **✅ Do this:**
 
 ```python
-user_principal = "0000000@tmc.twfr.toyota.co.jp"
+user_principal = "0000000@example.com"
 user_info = get_user_info(user_principal=user_principal)
 ```
 
 **❌ Don't do this:**
 
 ```python
-info = get_info("0000000@tmc.twfr.toyota.co.jp")  # get user information from user principal
+info = get_info("0000000@example.com")  # get user information from user principal
 ```
 
 **✅ Do this (extract blocks into functions):**

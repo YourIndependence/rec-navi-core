@@ -1,11 +1,3 @@
-# Copyright (c) 2025 TOYOTA MOTOR CORPORATION. All rights reserved.
-#
-# This software is the confidential and proprietary information of
-# TOYOTA MOTOR CORPORATION. Unauthorized copying, distribution,
-# modification, or use outside the organization is strictly prohibited.
-#
-# For internal use only.
-# TRUST developer team.
 
 """Client Exceptions classes."""
 

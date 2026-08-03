@@ -12,14 +12,14 @@ If any explanation is needed, it means the code is the **spaghetti**.
 Do this:
 
 ```python
-user_principal = "0000000@tmc.twfr.toyota.co.jp"
+user_principal = "0000000@example.com"
 user_info = get_user_info(user_princibal=user_princibal)
 ```
 
 Do NOT do this:
 
 ```python
-info = get_info("0000000@tmc.twfr.toyota.co.jp")  # get user information from user principal
+info = get_info("0000000@example.com")  # get user information from user principal
 ```
 
 ### Do NOT introduce unnecessary comments.
