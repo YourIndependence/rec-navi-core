@@ -1,0 +1,133 @@
+name: Integration Tests
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-test:
+    name: Integration Tests (Full Stack)
+    runs-on: ubuntu-latest
+
+    services:
+      localstack:
+        image: localstack/localstack:3.7
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,dynamodb,secretsmanager
+          LOCALSTACK_HOST: localhost
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+
+      mysql:
+        image: mysql:8.0
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_DATABASE: trust_session
+          MYSQL_USER: trust
+          MYSQL_PASSWORD: trust
+          MYSQL_ROOT_PASSWORD: rootpassword
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -u trust -ptrust"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 30s
+
+      opensearch:
+        image: opensearchproject/opensearch:2.13.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${{ secrets.OPENSEARCH_TEST_PASSWORD || 'TestPassword1!' }}
+          OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+        options: >-
+          --health-cmd "curl -ksf -u admin:${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-TestPassword1!} https://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"
+          --health-interval 10s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 60s
+
+      cognito:
+        image: jagregory/cognito-local:latest
+        ports:
+          - 9229:9229
+        options: >-
+          --health-cmd "node -e 'require(\"net\").createConnection({port:9229,host:\"localhost\"}).on(\"connect\",()=>process.exit(0)).on(\"error\",()=>process.exit(1))'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+          --health-start-period 10s
+
+    env:
+      ENV: CI
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: ap-northeast-1
+      DATABASE_HOST: localhost
+      DATABASE_PORT: "3306"
+      DATABASE_NAME: trust_session
+      DATABASE_USER: trust
+      DATABASE_PASSWORD: trust
+      OPENSEARCH_ENDPOINT: localhost
+      OPENSEARCH_PORT: "9200"
+      OPENSEARCH_PASS: ${{ secrets.OPENSEARCH_TEST_PASSWORD || 'TestPassword1!' }}
+      OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${{ secrets.OPENSEARCH_TEST_PASSWORD || 'TestPassword1!' }}
+      COGNITO_IDP_ENDPOINT_URL: http://localhost:9229
+      TEST_USER_EMAIL: test@example.com
+      TEST_USER_PASSWORD: Test1234!
+      # Optional: Azure OpenAI
+      # Leave unset (or empty) to keep those tests skipped.
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      # Optional: Azure Document Intelligence
+      EASTUS_ENDPOINT: ${{ secrets.EASTUS_ENDPOINT }}
+      EASTUS_API_KEY: ${{ secrets.EASTUS_API_KEY }}
+      # Optional: Google Custom Search
+      GOOGLE_CX: ${{ secrets.GOOGLE_CX }}
+      GOOGLE_KEY: ${{ secrets.GOOGLE_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen --extra dev
+
+      - name: Initialize LocalStack resources
+        env:
+          AWS_ENDPOINT_URL: http://localhost:4566
+          OPENSEARCH_INITIAL_ADMIN_PASSWORD: ${{ secrets.OPENSEARCH_TEST_PASSWORD || 'TestPassword1!' }}
+        run: bash .devcontainer/local/localstack/init.sh
+
+      - name: Initialize Cognito (user pool + test user)
+        env:
+          COGNITO_ENDPOINT_URL: http://localhost:9229
+          OUTPUT_FILE: /tmp/cognito.env
+          TEST_USER_EMAIL: test@example.com
+          TEST_USER_PASSWORD: Test1234!
+        run: |
+          bash .devcontainer/local/cognito/init.sh
+          # Pass Cognito-generated IDs to subsequent steps
+          grep -E '^(COGNITO_USER_POOL_ID|COGNITO_CLIENT_ID)=' /tmp/cognito.env >> "$GITHUB_ENV" || true
+
+      - name: Run integration tests
+        run: uv run pytest --disable-warnings -q --durations=10 -p no:xdist tests/integration/

@@ -1,0 +1,36 @@
+
+"""api response schemas."""
+
+from enum import Enum
+
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
+from pydantic import alias_generators
+
+from recnavi.core.types.x_user import XUser
+
+
+class ResponseStatus(str, Enum):
+    """Response status enumeration."""
+
+    OK = "ok"
+    ERROR = "error"
+
+
+class BaseApiResponseModel(BaseModel):
+    """Base API response model."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    status: ResponseStatus = Field(default=ResponseStatus.OK, description="Response status")
+    message: str | None = Field(default=None, description="Optional message")
+
+
+class GreetingResponse(BaseApiResponseModel):
+    """Greeting API response model."""
+
+    x_user: XUser
