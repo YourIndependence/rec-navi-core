@@ -312,49 +312,6 @@ export default {
     },
 
     /**
-     * Unit tests that call real SharePoint Online URLs must guard access with
-     * @pytest.mark.skipif based on MS_TENANT_ID.
-     *
-     * In CI and LOCAL_CONTAINER the secret "MS_TENANT_ID" is set to
-     * "local-tenant-id", so real Graph API calls fail at auth time.
-     */
-    "spo-real-url-must-have-skipif": {
-      description:
-        "Unit tests containing real SharePoint Online URLs (toyotajp.sharepoint.com) must have @pytest.mark.skipif guarded by MS_TENANT_ID. Without the guard, auth fails in CI and LOCAL_CONTAINER.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/unittests/**/*.py");
-        for (const file of testFiles) {
-          const content = await ctx.readFile(file);
-          if (!content.includes("toyotajp.sharepoint.com")) continue;
-          if (content.includes("MS_TENANT_ID") && content.includes("skipif")) continue;
-
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes("toyotajp.sharepoint.com")) {
-              ctx.report.violation({
-                message:
-                  "Real SharePoint Online URL found in unit test without MS_TENANT_ID skipif guard — the test will fail with auth errors in CI and LOCAL_CONTAINER",
-                file,
-                line: i + 1,
-                fix: [
-                  "Add a credential guard at the top of the file or the test class:",
-                  '  _SPO_AVAILABLE = os.environ.get("MS_TENANT_ID", "local-tenant-id") != "local-tenant-id"',
-                  "",
-                  "  @pytest.mark.skipif(not _SPO_AVAILABLE,",
-                  '                      reason="Requires real SharePoint credentials (set MS_TENANT_ID)")',
-                  "  class TestSpoIntegration:",
-                  "      ...",
-                ].join("\n"),
-              });
-              break;
-            }
-          }
-        }
-      },
-    },
-
-    /**
      * Unit tests that call real Box APIs must guard access with
      * @pytest.mark.skipif based on BOX_CLIENT_ID.
      */

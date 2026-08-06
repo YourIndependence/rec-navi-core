@@ -258,13 +258,7 @@ Use these shared fixtures before adding test-local setup:
 
 | Fixture | Owns | When to use |
 | ------- | ---- | ----------- |
-| `seed_trust_root_agent` | Minimal `TRUST` root agent in AgentAtelier | API/agent tests that expect the root agent to exist |
 | `mock_x_user` | Mock authenticated user + `__related__` permission | Tests that need permission lookup for the standard test user |
-| `create_mock_agent` | AgentAtelier record + read permission + cleanup | Dynamic-agent or tool-transfer integration tests |
-| `store_setup` | Local OpenSearch test store | Tests requiring an existing store |
-| `require_task_records` | Synthetic task row | Status/list APIs that normally depend on ECS worker output |
-| `test_conversation` | Synthetic conversation log row | Share/load history APIs that need an existing log |
-| `require_synonym_words_index` / `require_toyota_words_index` | Optional OpenSearch corpus availability | Tests that depend on separately loaded production-like search data |
 
 **Migration rule:** when a new integration test needs data that exists in dev/staging but not in a fresh LocalStack stack, add the missing schema or seed fixture in the same PR as the test.
 

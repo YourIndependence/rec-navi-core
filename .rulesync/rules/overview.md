@@ -7,12 +7,11 @@ globs: ["**/*"]
 
 # Project Overview
 
-TRUST Core is an enterprise AI-agent backend (FastAPI + Google ADK) developed by Toyota Motor Corporation. It provides multi-agent conversation, document processing, and knowledge retrieval over multiple data sources and LLM backends.
 
 ## Repository Layout
 
 ```
-src/trust/
+src/recnavi/
   apis/             # FastAPI routers & Pydantic I/O schemas
   application/      # Use-case orchestration (chat, analysis, cms, dashboard, features, user, validation)
   core/             # Domain logic: agents, preprocessors, stores, types

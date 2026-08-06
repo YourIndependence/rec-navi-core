@@ -1,0 +1,51 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: latest
+  privileged: true
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo "Preparing to build Docker image..."
+      - REPOSITORY_URI=$BACKEND_REPO_URI
+      - echo "Repository URI is $REPOSITORY_URI"
+      - echo "Getting the Git commit hash..."
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - echo "Commit hash is $COMMIT_HASH"
+
+  build:
+    commands:
+      - echo "Attempting to pull cache from $REPOSITORY_URI:latest"
+      - docker pull $REPOSITORY_URI:latest || echo "No cache found"
+      - echo "Building the Docker image..."
+      - >
+        docker build \
+          --cache-from $REPOSITORY_URI:latest \
+          --build-arg BUILDKIT_INLINE_CACHE=1 \
+          -t $REPOSITORY_URI:$IMAGE_TAG \
+          -t $REPOSITORY_URI:$COMMIT_HASH \
+          .
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_URI:$COMMIT_HASH
+
+  post_build:
+    commands:
+      - echo "Writing image definitions file..."
+      - echo '[{"imageUri":"'"$REPOSITORY_URI:$COMMIT_HASH"'"}]' > imagedefinitions.json
+      - echo "Update the service with the new image..."
+      - echo "Target CLUSTER_NAME $CLUSTER_NAME, SERVICE_NAME $SERVICE_NAME"
+      - aws ecs update-service --cluster "$CLUSTER_NAME" --service "$SERVICE_NAME" --force-new-deployment
+      - echo "ECS service deployed!"
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+    - '/root/.cache/uv/**/*'
+
+artifacts:
+  files:
+    - imagedefinitions.json

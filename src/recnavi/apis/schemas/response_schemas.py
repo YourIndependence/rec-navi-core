@@ -1,3 +1,12 @@
+# Copyright (c) 2025 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
 
 """api response schemas."""
 
@@ -26,7 +35,9 @@ class BaseApiResponseModel(BaseModel):
         populate_by_name=True,
     )
 
-    status: ResponseStatus = Field(default=ResponseStatus.OK, description="Response status")
+    status: ResponseStatus = Field(
+        default=ResponseStatus.OK, description="Response status"
+    )
     message: str | None = Field(default=None, description="Optional message")
 
 

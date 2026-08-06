@@ -9,43 +9,26 @@ If you not have developer permission for this project. [Let us know](https://tea
 2. Set up AWS Configure. See [AWS SSO configuration](#aws-sso-configuration).
 3. Clone this repo
     ```commandline
-    git clone https://github.com/tmc-ccoe/trust-core.git
+    git clone https://github.com/YourIndependence/rec-navi-core.git
     ```
 4. Make venv
     ```commandline
     cd trust-core
-    uv venv --python "python3.10" ".venv"
+    uv venv --python "python3.12" ".venv"
     ```
 5. Install dependency
     ```commandline
     uv sync --frozen --extra dev
     ```
-    **NOTICE**
-    If you are using WINDOWS environment.
-    1. Install with `win` extra
-        ```commandline
-        uv sync --frozen --extra dev --extra win
-        ```
-    2. Install `LibreOffice` and set PATH
-       (default: `C:\Program Files\LibreOffice\program`)
-       To check `soffice` registered in PATH
-        ```commandline
-        soffice -h
-        ```
-        Note: TRUST is using **Customized** Google ADK. See [here](https://github.com/hachiya-takuya/adk-python).
 6. Install dev tools.
-    1. Install [lefthook](https://github.com/evilmartians/lefthook) (git hooks manager).
-        ```commandline
-        lefthook install
-        ```
-    2. [archgate](https://github.com/archgate/cli) (ADR manager) is invoked via `npx` in git hooks - no explicit installation is required.
+   1. [archgate](https://github.com/archgate/cli) (ADR manager) is invoked via `npx` in git hooks - no explicit installation is required.
        **NOTICE**: archgate does not support `linux/arm64`. On that platform the hooks will automatically skip the check.
 
-    3. And set up rulesync
-        ```commandline
-        .rulesync/rulesync.sh
-        ```
-    4. Install [gitleaks](https://github.com/gitleaks/gitleaks) (SAT for secrets).
+   2. And set up rulesync
+       ```commandline
+       .rulesync/rulesync.sh
+       ```
+   3. Install [gitleaks](https://github.com/gitleaks/gitleaks) (SAT for secrets).
     - Linux
         ```commandline
         apt install gitleaks
@@ -60,10 +43,6 @@ If you not have developer permission for this project. [Let us know](https://tea
         3. Set Path.
 
 7. Run in local as trial.
-    ```commandline
-    uv run python -m cli local_test run
-    ```
-8. Run in local-server as port:8000.
     ```commandline
     uv run python -m cli local_server run
     ```
@@ -131,7 +110,7 @@ If you not have developer permission for this project. [Let us know](https://tea
     ```
 8. Format the code
     ```commandline
-    pre-commit run --all-files
+    uv run pre-commit run --all-files
     uv run ruff check --fix src/ tests/
     uv run ruff format src/ tests/
     npx archgate check

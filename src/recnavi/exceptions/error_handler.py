@@ -1,3 +1,12 @@
+# Copyright (c) 2025 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
 """error handler for API."""
 
 import asyncio
@@ -14,7 +23,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from recnavi.config.variables import ENV
-from recnavi.config.variables import TRUST_ALERT_MAIL_TABLE  # TODO: Change to hook discord or something...
+from recnavi.config.variables import (
+    TRUST_ALERT_MAIL_TABLE,  # TODO: Change to hook discord or something...
+)
 from recnavi.config.variables import s3
 
 from .exceptions import BaseClientExceptionError
@@ -77,7 +88,9 @@ def log_s3(func: Callable[..., Any], e, kwargs):
     """Log s3."""
     messages = traceback.format_exception_only(type(e), e)
     e_obj = {
-        "functionName": func.__name__ if hasattr(func, "__name__") else str(func),
+        "functionName": func.__name__
+        if hasattr(func, "__name__")
+        else str(func),
         "environment": ENV,
         "timestamp": datetime.now().isoformat(),
         "kwargs": kwargs,
@@ -126,7 +139,9 @@ async def send_error_alert(
             task_id=task_id,
         )
     except Exception as notify_err:
-        logger.error(f"Fail to send error alert!: {notify_err!r}\n{traceback.format_exc()}\n")
+        logger.error(
+            f"Fail to send error alert!: {notify_err!r}\n{traceback.format_exc()}\n"
+        )
 
 
 async def send_notice(
@@ -147,7 +162,9 @@ async def send_notice(
         if task_id:
             error_msg = f"Failed to send alert email: {notify_err}"
         else:
-            error_msg = f"Failed to send alert email for task {task_id}: {notify_err}"
+            error_msg = (
+                f"Failed to send alert email for task {task_id}: {notify_err}"
+            )
         logger.error(error_msg)
 
 
@@ -165,9 +182,13 @@ def _send_notice_sync(
         )
         return None
     if to_mail_list is None:
-        to_mail_list = TRUST_ALERT_MAIL_TABLE.get_item(Key={"toEmail": "toEmail"}).get("Item", {}).get("address", [])
+        to_mail_list = (
+            TRUST_ALERT_MAIL_TABLE.get_item(Key={"toEmail": "toEmail"})
+            .get("Item", {})
+            .get("address", [])
+        )
     return ses_client.send_email(
-        Source="alert@mail.recnavitoyota",
+        Source="alert@mail.rec-navi.com",
         Destination={"ToAddresses": to_mail_list},
         Message={
             "Subject": {"Data": subject},

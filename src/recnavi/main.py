@@ -1,3 +1,12 @@
+# Copyright (c) 2025 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
 
 """Starting server."""
 
@@ -14,10 +23,9 @@ from starlette.middleware.errors import ServerErrorMiddleware
 
 from recnavi.apis.schemas.response_schemas import GreetingResponse
 from recnavi.config.variables import ENV
-from recnavi.exceptions.error_handler import send_notice, custom_exception_handler
+from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import send_error_alert
-
-
+from recnavi.exceptions.error_handler import send_notice
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -31,14 +39,18 @@ async def lifespan(_app: FastAPI):
     """Lifespan function."""
     logger.info("start booting server.")
     try:
-
-        await send_notice(subject=f"{ENV}: ECS Task started!", message=f"{ENV}: ECS task started.")
+        await send_notice(
+            subject=f"{ENV}: ECS Task started!",
+            message=f"{ENV}: ECS task started.",
+        )
         logger.info("server initialize succeed.")
         yield
 
     except Exception as e:
         logger.critical("Server startup failed", exc_info=True)
-        await send_error_alert("lifespan_startup", e, kwargs={"phase": "startup"})
+        await send_error_alert(
+            "lifespan_startup", e, kwargs={"phase": "startup"}
+        )
         raise
 
     finally:
