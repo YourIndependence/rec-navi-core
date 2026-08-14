@@ -18,6 +18,7 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.core.types.x_user import XUser
+from recnavi.core.types.project_item import ProjectItem
 
 
 class ResponseStatus(str, Enum):
@@ -45,3 +46,7 @@ class GreetingResponse(BaseApiResponseModel):
     """Greeting API response model."""
 
     x_user: XUser
+
+
+class ProjectsListResponse(BaseApiResponseModel):
+    projects: list(ProjectItem)
