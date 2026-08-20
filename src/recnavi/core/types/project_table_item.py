@@ -10,7 +10,7 @@
 
 """ProjectTableItem"""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -18,14 +18,14 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
-class ProjectStatus(str, Enum):
+class ProjectStatus(StrEnum):
     """Project progress status."""
 
     IN_PROGRESS = "in_progress"
     SUBMITTED = "submitted"
 
 
-class SceneStatus(str, Enum):
+class SceneStatus(StrEnum):
     """Scene recording status."""
 
     NOT_RECORDED = "not_recorded"

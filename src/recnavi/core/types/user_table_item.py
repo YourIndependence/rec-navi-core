@@ -10,7 +10,7 @@
 
 """UserTableItem"""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -18,7 +18,7 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
-class UserRole(str, Enum):
+class UserRole(StrEnum):
     """user role enum."""
 
     ADMIN = "admin"
