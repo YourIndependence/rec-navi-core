@@ -13,8 +13,8 @@
 import pytest
 from pydantic import ValidationError
 
-from recnavi.core.types.user_teble_item import UserRole
-from recnavi.core.types.user_teble_item import UserTableItem
+from recnavi.core.types.user_table_item import UserRole
+from recnavi.core.types.user_table_item import UserTableItem
 
 
 ITEM = {
