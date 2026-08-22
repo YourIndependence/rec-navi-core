@@ -68,9 +68,7 @@ def post_discord(
         payload: dict[str, Any] = {
             "username": user_name,
             "content": (
-                f"{ME if mention else ''}\n"
-                f"Environment: `{ENV}`\n\n"
-                f"{message}"
+                f"{ME if mention else ''}\nEnvironment: `{ENV}`\n\n{message}"
             ),
         }
 
@@ -175,8 +173,7 @@ def post_error_discord(
 
     error_trace = traceback.format_exc()
     attached_file_str = (
-        f"# kwargs: {kwargs_str}\n\n"
-        f"# TraceBack:\n{error_trace}"
+        f"# kwargs: {kwargs_str}\n\n# TraceBack:\n{error_trace}"
     )
 
     trace_file = io.BytesIO(
@@ -198,9 +195,7 @@ def post_error_discord(
     )
 
     if additional_message:
-        message += (
-            f"additional_message: {additional_message}\n"
-        )
+        message += f"additional_message: {additional_message}\n"
 
     post_discord(
         title="Detected ERROR in system!",

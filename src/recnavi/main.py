@@ -21,9 +21,9 @@ from starlette.middleware.errors import ServerErrorMiddleware
 from recnavi.apis.root.root_router import root_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
+from recnavi.core.utils.discord_handler import post_notify_discord
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
-from recnavi.core.utils.discord_handler import post_notify_discord
 
 
 BASE_DIR = Path(__file__).resolve().parent

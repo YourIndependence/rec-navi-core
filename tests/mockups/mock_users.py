@@ -1,11 +1,11 @@
-# Copyright (c) 2025 TOYOTA MOTOR CORPORATION. All rights reserved.
+# Copyright (c) 2026 YourIndependence. All rights reserved.
 #
 # This software is the confidential and proprietary information of
-# TOYOTA MOTOR CORPORATION. Unauthorized copying, distribution,
+# YourIndependence. Unauthorized copying, distribution,
 # modification, or use outside the organization is strictly prohibited.
 #
 # For internal use only.
-# TRUST developer team.
+# developer team.
 
 import pytest
 
