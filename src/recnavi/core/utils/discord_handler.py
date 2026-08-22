@@ -15,7 +15,7 @@ import logging
 import traceback
 from typing import Any
 
-import requests
+import httpx
 
 from recnavi.config.variables import ENV
 
@@ -31,6 +31,8 @@ DISCORD_COLOR = {
 ME = "<@1019242781853614111>"
 logger = logging.getLogger(__name__)
 
+HTTP_TIMEOUT = 8.0
+
 
 def post_discord(
     *,
@@ -43,7 +45,8 @@ def post_discord(
     files: dict | None = None,
     webhook_url: str | None = None,
 ):
-    """Post discord
+    """Post discord.
+
     Args:
         title:
         user_name:
@@ -54,37 +57,62 @@ def post_discord(
         files:
         webhook_url:
 
-    Returns:
-
     """
     try:
         if webhook_url is None:
             webhook_url = WEBHOOK_URL
+
         if files is None:
             files = {}
+
         payload: dict[str, Any] = {
             "username": user_name,
-            "content": f"{(ME if mention else '')}\nEnvironment: `{ENV}`\n\n{message}",
+            "content": (
+                f"{ME if mention else ''}\n"
+                f"Environment: `{ENV}`\n\n"
+                f"{message}"
+            ),
         }
+
         if additional_content:
             payload["embeds"] = [
                 {
                     "title": title,
-                    "color": DISCORD_COLOR[color],
+                    "color": DISCORD_COLOR[color or "blue"],
                     "description": additional_content,
                 },
             ]
 
-        response = requests.post(
+        response = httpx.post(
             webhook_url,
             headers={"User-Agent": "curl/7.64.1"},
-            data={"payload_json": json.dumps(payload)},
+            data={
+                "payload_json": json.dumps(payload),
+            },
             files=files,
+            timeout=HTTP_TIMEOUT,
         )
-        logger.info("discord message posted", response.text)
+
+        response.raise_for_status()
+
+        logger.info(
+            "discord message posted: %s",
+            response.text,
+        )
+
         return response
+
+    except httpx.HTTPError as e:
+        logger.error(
+            "LOG: Failed to send Discord notification. Error: %s",
+            e,
+        )
+        return None, str(e)
+
     except Exception as e:
-        logger.error(f"LOG: Failed to send Discord notification. Error: {e}")
+        logger.exception(
+            "LOG: Unexpected error while sending Discord notification.",
+        )
         return None, str(e)
 
 
@@ -124,7 +152,7 @@ def post_error_discord(
     env: str | None = None,
     additional_message: str | None = None,
 ) -> None:
-    """Send error notification to discord webhook.
+    """Send error notification to Discord webhook.
 
     Args:
         function_name:
@@ -134,27 +162,45 @@ def post_error_discord(
         additional_message: optional
 
     """
+    logger.error(f"ERROR DETECTED!  {traceback.format_exc()}\n")
     if env is None:
         env = ENV
+
     kwargs_str = json.dumps(
         kwargs,
         ensure_ascii=False,
         indent=4,
         default=lambda o: str(o),
     )
+
     error_trace = traceback.format_exc()
     attached_file_str = (
-        f"# kwargs: {kwargs_str}\n\n# TraceBack:\n{error_trace}"
+        f"# kwargs: {kwargs_str}\n\n"
+        f"# TraceBack:\n{error_trace}"
     )
-    trace_file = io.BytesIO()
-    trace_file.write(attached_file_str.encode("utf8"))
-    trace_file.seek(0)
+
+    trace_file = io.BytesIO(
+        attached_file_str.encode("utf-8"),
+    )
+
     files = {
-        "file": ("traceback.txt", trace_file),
+        "file": (
+            "traceback.txt",
+            trace_file,
+        ),
     }
-    message = f"Error detected.\nenvironment: `{env}`\n\nfunction: {function_name}\n{e.__class__.__name__}: {e!s}\n"
+
+    message = (
+        "Error detected.\n"
+        f"environment: `{env}`\n\n"
+        f"function: {function_name}\n"
+        f"{e.__class__.__name__}: {e!s}\n"
+    )
+
     if additional_message:
-        message += f"additional_message: {additional_message}\n"
+        message += (
+            f"additional_message: {additional_message}\n"
+        )
 
     post_discord(
         title="Detected ERROR in system!",
