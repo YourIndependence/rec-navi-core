@@ -6,8 +6,8 @@ dependencies = [
     "boto3>=1.43.62",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
-    "jose>=1.0.0",
     "pydantic>=2.13.4",
+    "python-jose[cryptography]>=3.5.0",
 ]
 
 [project.optional-dependencies]
