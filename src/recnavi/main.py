@@ -49,7 +49,9 @@ async def lifespan(_app: FastAPI):
     except Exception as e:
         logger.critical("Server startup failed", exc_info=True)
         await send_error_alert(
-            "lifespan_startup", e, kwargs={"phase": "startup"}
+            "lifespan_startup",
+            e,
+            kwargs={"phase": "startup"},
         )
         raise
 

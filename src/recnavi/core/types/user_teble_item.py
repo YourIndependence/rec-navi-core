@@ -1,8 +1,15 @@
+# Copyright (c) 2025 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
 
 
 """UserTableItem"""
 
-import uuid
 from enum import Enum
 
 from pydantic import BaseModel
@@ -13,6 +20,7 @@ from pydantic import alias_generators
 
 class UserRole(str, Enum):
     """user role enum."""
+
     ADMIN = "admin"
     STAFF = "staff"
 

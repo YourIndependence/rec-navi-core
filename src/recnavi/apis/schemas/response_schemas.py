@@ -36,7 +36,8 @@ class BaseApiResponseModel(BaseModel):
     )
 
     status: ResponseStatus = Field(
-        default=ResponseStatus.OK, description="Response status"
+        default=ResponseStatus.OK,
+        description="Response status",
     )
     message: str | None = Field(default=None, description="Optional message")
 

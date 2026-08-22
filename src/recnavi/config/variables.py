@@ -15,7 +15,8 @@ import os
 
 # general
 ENV = os.environ.get(
-    "ENV", "LOCAL"
+    "ENV",
+    "LOCAL",
 )  # main, staging, dev, LOCAL, LOCAL_CONTAINER, CI
 REGION = "ap-northeast-1"
 
