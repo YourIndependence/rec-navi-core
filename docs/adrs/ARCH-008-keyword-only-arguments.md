@@ -38,6 +38,7 @@ def some_function(
     """Process agent with prompts."""
     # impl
 
+
 # When calling
 result = some_function(
     agent_name="trust",
@@ -57,6 +58,7 @@ def send_email(
 ) -> None:
     """Send email with explicit parameters."""
     # impl
+
 
 # When calling — parameter names are required
 send_email(
@@ -124,12 +126,11 @@ Without enforcement, codebases drift. Some functions use positional, others use 
 
 ```python
 def function_name(
-    required_param: str,           # Positional or keyword (OK for 1-parameter functions)
-    *,                             # Everything after this is keyword-only
-    keyword_only: int,             # Required keyword-only
-    optional: str | None = None,   # Optional keyword-only
-) -> ReturnType:
-    ...
+    required_param: str,  # Positional or keyword (OK for 1-parameter functions)
+    *,  # Everything after this is keyword-only
+    keyword_only: int,  # Required keyword-only
+    optional: str | None = None,  # Optional keyword-only
+) -> ReturnType: ...
 ```
 
 **When to allow positional arguments:**

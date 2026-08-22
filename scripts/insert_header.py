@@ -1,4 +1,4 @@
-# Copyright (c) 2025 YourIndependence. All rights reserved.
+# Copyright (c) 2026 YourIndependence. All rights reserved.
 #
 # This software is the confidential and proprietary information of
 # YourIndependence. Unauthorized copying, distribution,
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 
-HEADER = """# Copyright (c) 2025 YourIndependence. All rights reserved.
+HEADER = """# Copyright (c) 2026 YourIndependence. All rights reserved.
 #
 # This software is the confidential and proprietary information of
 # YourIndependence. Unauthorized copying, distribution,
@@ -30,7 +30,9 @@ TARGET_SUFFIXES = {".py"}
 
 
 def _has_header(text: str) -> bool:
-    return text.startswith("# Copyright (c) 2025 YourIndependence. All rights reserved.")
+    return text.startswith(
+        "# Copyright (c) 2026 YourIndependence. All rights reserved.",
+    )
 
 
 def _insert_header(text: str) -> str:

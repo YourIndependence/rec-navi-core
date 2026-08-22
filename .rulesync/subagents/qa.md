@@ -53,7 +53,11 @@ class FakeS3Client:
     def get_object(self, *, Bucket: str, Key: str):
         return {"Body": io.BytesIO(b"hello")}
 
-with patch("trust.infrastructure.dataloader.s3_dataloader.boto3.client", return_value=FakeS3Client()):
+
+with patch(
+    "trust.infrastructure.dataloader.s3_dataloader.boto3.client",
+    return_value=FakeS3Client(),
+):
     result = await S3Dataloader().get_content("s3://trust-tmp/hello.txt")
 ```
 
@@ -64,11 +68,13 @@ import pytest
 from moto import mock_aws
 import boto3
 
+
 @pytest.fixture
 def aws_credentials(monkeypatch):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+
 
 @mock_aws
 def test_dynamodb_operation(aws_credentials):

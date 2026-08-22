@@ -41,8 +41,7 @@ coroutine without executing its body.
 
 ```python
 @pytest.mark.asyncio
-async def test_get_user(client):
-    ...
+async def test_get_user(client): ...
 ```
 
 This requirement is enforced as an `error` by

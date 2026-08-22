@@ -39,16 +39,23 @@ In 2026, the Python typing community consensus is:
 ```python
 from collections.abc import Mapping, Sequence
 
+
 def process_config(config: Mapping[str, object]) -> dict[str, str]:
     """Process configuration dictionary."""
     return {k: str(v) for k, v in config.items()}
 
-def filter_items(items: Sequence[str], predicate: Callable[[str], bool]) -> list[str]:
+
+def filter_items(
+    items: Sequence[str], predicate: Callable[[str], bool]
+) -> list[str]:
     """Filter items by predicate."""
     return [item for item in items if predicate(item)]
 
+
 # At external boundary (boto3 response has no type stub)
-def get_s3_object(bucket: str, key: str) -> Any:  # boto3 GetObject response lacks type stub
+def get_s3_object(
+    bucket: str, key: str
+) -> Any:  # boto3 GetObject response lacks type stub
     """Fetch S3 object. Returns boto3 response dict."""
     response = s3_client.get_object(Bucket=bucket, Key=key)
     return response
@@ -59,6 +66,7 @@ def get_s3_object(bucket: str, key: str) -> Any:  # boto3 GetObject response lac
 ```python
 def process_config(config: Any) -> Any:  # Too loose — defeats type checking
     return {k: str(v) for k, v in config.items()}
+
 
 def filter_items(items: Any, predicate: Any) -> Any:  # No type safety
     return [item for item in items if predicate(item)]
@@ -106,7 +114,9 @@ This is too specific. When accepting arguments, abstract types (`Mapping`, `Sequ
 **External boundary justification template:**
 
 ```python
-def fetch_external_data(endpoint: str) -> Any:  # Third-party API returns unstructured JSON
+def fetch_external_data(
+    endpoint: str,
+) -> Any:  # Third-party API returns unstructured JSON
     """Fetch data from external API."""
     ...
 ```
@@ -114,7 +124,9 @@ def fetch_external_data(endpoint: str) -> Any:  # Third-party API returns unstru
 **Gradual migration template:**
 
 ```python
-def legacy_function(data: Any) -> Any:  # TODO(issue-123): Add proper types during validation refactor
+def legacy_function(
+    data: Any,
+) -> Any:  # TODO(issue-123): Add proper types during validation refactor
     """Legacy function pending type migration."""
     ...
 ```

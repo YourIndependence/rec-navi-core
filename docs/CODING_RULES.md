@@ -19,7 +19,9 @@ user_info = get_user_info(user_princibal=user_princibal)
 Do NOT do this:
 
 ```python
-info = get_info("0000000@example.com")  # get user information from user principal
+info = get_info(
+    "0000000@example.com"
+)  # get user information from user principal
 ```
 
 ### Do NOT introduce unnecessary comments.
@@ -71,7 +73,6 @@ def read_message(user_mail: str):
 
     # return message content as list of string
     return [message.content for message in messages]
-
 ```
 
 ### Do not swallow errors.
@@ -134,12 +135,11 @@ Do this:
 
 ```python
 def some_function(
-    agent_name: str,
-    prompts: list[str],
-    config: Config | None = None
+    agent_name: str, prompts: list[str], config: Config | None = None
 ) -> int:
     """docstring..."""
     # impl
+
 
 # when call
 result = some_function(
@@ -166,9 +166,12 @@ Do this:
 
 ```python
 from pydantic import BaseModel
+
+
 class User(BaseModel):
     name: str
     email: str
+
 
 def send_greeting_mail(user: User):
     message = f"Hi {user.name}. How are you?"
@@ -177,6 +180,7 @@ def send_greeting_mail(user: User):
         title="greeting",
         message=message,
     )
+
 
 # when call
 user = User(
@@ -191,7 +195,9 @@ Do NOT do this:
 ```python
 def send_greeting_mail(user: dict):
     user_name = user["name"]
-    user_email = user["email"]  # sometime someone access user["mail"] and meet KeyError.
+    user_email = user[
+        "email"
+    ]  # sometime someone access user["mail"] and meet KeyError.
     message = f"Hi {user_name}. How are you?"
     send_mail(
         to=user_email,
@@ -199,11 +205,9 @@ def send_greeting_mail(user: dict):
         message=message,
     )
 
+
 # when call
-user = {
-    "name": "lin",
-    "email": "lin_nikaido@mail.example.com"
-}
+user = {"name": "lin", "email": "lin_nikaido@mail.example.com"}
 send_greeting_mail(user)
 ```
 
@@ -230,7 +234,11 @@ class FakeS3Client:
     def get_object(self, *, Bucket: str, Key: str):
         return {"Body": io.BytesIO(b"hello")}
 
-with patch("trust.infrastructure.dataloader.s3_dataloader.boto3.client", return_value=FakeS3Client()):
+
+with patch(
+    "trust.infrastructure.dataloader.s3_dataloader.boto3.client",
+    return_value=FakeS3Client(),
+):
     content = await S3Dataloader().get_content("s3://trust-tmp/hello.txt")
 ```
 
@@ -243,7 +251,10 @@ Also acceptable:
 Do NOT do this:
 
 ```python
-@pytest.mark.skipif(bool(os.environ.get("AWS_ENDPOINT_URL")), reason="bucket missing in LocalStack")
+@pytest.mark.skipif(
+    bool(os.environ.get("AWS_ENDPOINT_URL")),
+    reason="bucket missing in LocalStack",
+)
 async def test_s3_walk_real_bucket():
     await S3Dataloader().walk("s3://trust-tmp/")
 ```
