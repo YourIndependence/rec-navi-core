@@ -49,6 +49,9 @@ exclude = [
     "build",
     "dist",
     "*.egg-info",
+    # Markdown is documentation. Formatting the Python blocks inside ADRs
+    # rewrites examples that are laid out for reading.
+    "*.md",
 ]
 force-exclude = true
 line-length = 79
@@ -85,6 +88,10 @@ ignore = [
     "D414",
     "D415",
     "D417",
+    # ruff warns that COM812 conflicts with its own formatter: the formatter
+    # collapses a call that fits on one line and drops the comma, then the
+    # rule asks for it back.
+    "COM812",
 ]
 
 

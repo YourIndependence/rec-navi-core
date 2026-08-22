@@ -46,7 +46,9 @@ def _iter_command_module_names() -> Iterable[str]:
 
 def _register_subcommands() -> None:
     for mod_name in _iter_command_module_names():
-        mod = importlib.import_module(f"{__package__}.{mod_name}")  # cli.<mod_name>
+        mod = importlib.import_module(
+            f"{__package__}.{mod_name}"
+        )  # cli.<mod_name>
         sub_app = getattr(mod, "app", None)
         if sub_app is None:
             continue
