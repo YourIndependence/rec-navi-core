@@ -28,6 +28,9 @@ Comments are forbidden in the following cases:
 
 Code structure (functions, methods, classes) must convey meaning. If a comment explains what a block does, that block should become a function or method with a descriptive name.
 
+Comments must use ASCII characters and English. Non-ASCII user-facing text is
+allowed in string literals; this rule applies to comments only.
+
 ### Examples
 
 **✅ Do this:**

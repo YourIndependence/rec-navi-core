@@ -49,14 +49,14 @@ export default {
     "no-core-imports-infrastructure": {
       description:
         "core/ should not import concrete implementations from infrastructure/. Use ABCs and rely on Registry injection.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const matches = await ctx.grepFiles(
           /from trust\.infrastructure\b/,
           "src/trust/core/**/*.py",
         );
         for (const match of matches) {
-          ctx.report.warning({
+          ctx.report.violation({
             message:
               "core/ imports from infrastructure/ — use the abstract base class and let the Registry inject the concrete implementation",
             file: match.file,

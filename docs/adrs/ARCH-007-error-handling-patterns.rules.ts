@@ -59,8 +59,8 @@ export default {
     },
 
     'no-broad-exception-in-library': {
-      description: 'Warn about catching Exception in non-boundary functions (library code)',
-      severity: 'warning',
+      description: 'Forbid catching Exception in non-boundary functions (library code)',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Skip test files
@@ -91,7 +91,7 @@ export default {
             const isTopLevelAsync = /async\s+def\s+\w+.*:\s*$/.test(functionContext)
 
             if (!isTopLevelAsync || (!hasLogging && !hasAlert)) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Catching broad 'Exception' — use specific exceptions or add logging + alerting if this is an error boundary`,
                 file: match.file,
                 line: match.line,
@@ -104,7 +104,7 @@ export default {
     },
 
     'require-raise-from': {
-      description: 'Recommend using "raise ... from e" to preserve exception context',
+      description: 'Require using "raise ... from e" to preserve exception context',
       severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {

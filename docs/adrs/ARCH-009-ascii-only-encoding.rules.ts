@@ -76,7 +76,7 @@ export default {
     },
 
     'warn-non-ascii-content': {
-      description: 'Warn about non-ASCII characters in files (prefer English for all content)',
+      description: 'Forbid non-ASCII characters in files (prefer English for all content)',
       severity: 'error',
       check: async (ctx) => {
         // Process regular scopedFiles
@@ -272,13 +272,6 @@ export default {
       },
     },
 
-    'allow-non-ascii-in-strings': {
-      description: 'Non-ASCII characters are allowed in string literals (documentation only)',
-      severity: 'info',
-      check: async (_ctx) => {
-        // This is a documentation-only rule — no violations reported
-        // Non-ASCII in string literals is explicitly allowed per ADR-009
-      },
-    },
+    
   },
 } satisfies RuleSet

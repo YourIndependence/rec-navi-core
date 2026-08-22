@@ -5,14 +5,14 @@ export default {
     "no-domain-model-in-application": {
       description:
         "Pydantic BaseModel subclasses representing domain concepts must be defined in core/types/, not in application/.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const matches = await ctx.grepFiles(
           /^class\s+\w+\s*\(\s*BaseModel\s*\)/,
           "src/trust/application/**/*.py",
         );
         for (const match of matches) {
-          ctx.report.warning({
+          ctx.report.violation({
             message:
               "Pydantic BaseModel subclass found in application/ — domain types should be defined in core/types/ and imported here",
             file: match.file,

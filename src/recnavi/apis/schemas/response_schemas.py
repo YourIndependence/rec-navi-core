@@ -10,7 +10,7 @@
 
 """api response schemas."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -20,7 +20,7 @@ from pydantic import alias_generators
 from recnavi.core.types.x_user import XUser
 
 
-class ResponseStatus(str, Enum):
+class ResponseStatus(StrEnum):
     """Response status enumeration."""
 
     OK = "ok"

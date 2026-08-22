@@ -4,7 +4,7 @@ export default {
   rules: {
     'redundant-comment-increment': {
       description: 'Forbid obvious comments like "# increment" or "# normalize"',
-      severity: 'warning',
+      severity: 'error',
       check: async (ctx) => {
         // Patterns for obvious comments
         const obviousPatterns = [
@@ -20,7 +20,7 @@ export default {
           for (const pattern of obviousPatterns) {
             const matches = await ctx.grep(file, pattern)
             for (const match of matches) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Redundant comment explaining what code obviously does: "${match.content.trim()}"`,
                 file: match.file,
                 line: match.line,
@@ -34,7 +34,7 @@ export default {
 
     'separator-comment-blocks': {
       description: 'Forbid separator comments that divide code blocks within a function',
-      severity: 'warning',
+      severity: 'error',
       check: async (ctx) => {
         // Patterns for separator comments (English only, as Japanese comments will be caught separately)
         const separatorPatterns = [
@@ -55,7 +55,7 @@ export default {
                 continue
               }
 
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Separator comment found: "${match.content.trim()}" — extract this block into a function instead`,
                 file: match.file,
                 line: match.line,
@@ -69,7 +69,7 @@ export default {
 
     'non-ascii-comment': {
       description: 'Detect non-ASCII characters in comments (Japanese, etc.)',
-      severity: 'warning',  // Warning only, as per requirement
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match lines with comments containing non-ASCII characters
@@ -78,7 +78,7 @@ export default {
             // Skip lines that are entirely non-ASCII (likely docstrings in other encodings)
             const commentPart = match.content.split('#').slice(1).join('#')
             if (commentPart && /[^\x00-\x7F]/.test(commentPart)) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Non-ASCII characters detected in comment (prefer English for code comments)`,
                 file: match.file,
                 line: match.line,
@@ -92,7 +92,7 @@ export default {
 
     'inline-comment-duplication': {
       description: 'Detect inline comments that duplicate code logic',
-      severity: 'warning',
+      severity: 'error',
       check: async (ctx) => {
         // This is a heuristic check — look for patterns like "x = y  # set x to y"
         const duplicationPatterns = [
@@ -105,7 +105,7 @@ export default {
           for (const pattern of duplicationPatterns) {
             const matches = await ctx.grep(file, pattern)
             for (const match of matches) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Inline comment appears to duplicate code logic: "${match.content.trim()}"`,
                 file: match.file,
                 line: match.line,
