@@ -4,7 +4,7 @@ export default {
   rules: {
     'no-bare-any-in-signatures': {
       description: 'Forbid typing.Any in function signatures without justification',
-      severity: 'warning',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function definitions with Any in type hints
@@ -23,7 +23,7 @@ export default {
               /#.*(?:boto3|third-party|external|API|untyped|boundary|TODO|issue)/i.test(previousLine)
 
             if (!hasJustification) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Function signature uses 'Any' without justification — use Mapping, Sequence, or object instead`,
                 file: match.file,
                 line: match.line,
@@ -37,7 +37,7 @@ export default {
 
     'no-any-return-type': {
       description: 'Forbid Any as return type without justification',
-      severity: 'warning',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function definitions with -> Any
@@ -55,7 +55,7 @@ export default {
               /#.*(?:boto3|third-party|external|API|untyped|boundary|TODO|issue)/i.test(previousLine)
 
             if (!hasJustification) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Return type 'Any' without justification — use a concrete type (list[T], dict[K, V], or Pydantic model)`,
                 file: match.file,
                 line: match.line,
@@ -68,7 +68,7 @@ export default {
     },
 
     'prefer-mapping-over-dict-args': {
-      description: 'Recommend Mapping for function arguments instead of dict',
+      description: 'Require Mapping for function arguments instead of dict',
       severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
@@ -93,8 +93,8 @@ export default {
     },
 
     'prefer-sequence-over-list-args': {
-      description: 'Recommend Sequence for function arguments instead of list',
-      severity: 'warning',
+      description: 'Require Sequence for function arguments instead of list',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function arguments with list[...] type hint
@@ -106,7 +106,7 @@ export default {
               continue
             }
 
-            ctx.report.warning({
+            ctx.report.violation({
               message: `Function argument uses 'list' — consider 'Sequence' for better flexibility`,
               file: match.file,
               line: match.line,
@@ -118,8 +118,8 @@ export default {
     },
 
     'use-object-not-any': {
-      description: 'Recommend object instead of Any when truly accepting any value',
-      severity: 'warning',
+      description: 'Require object instead of Any when truly accepting any value',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match variable annotations or simple parameters with : Any
@@ -141,7 +141,7 @@ export default {
               continue
             }
 
-            ctx.report.warning({
+            ctx.report.violation({
               message: `Consider using 'object' instead of 'Any' if the value can truly be anything`,
               file: match.file,
               line: match.line,

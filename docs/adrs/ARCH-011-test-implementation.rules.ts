@@ -11,7 +11,7 @@ export default {
     "no-patch-in-integration-tests": {
       description:
         "Integration tests must not patch application collaborators. Deterministic boundary doubles are allowed for LLM model resolution, notification sending, ECS handoff setup, and startup registry isolation.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const matches = await ctx.grepFiles(
           /@patch\s*\(|with\s+patch\s*\(/,
@@ -28,7 +28,7 @@ export default {
             match.content.includes("initialize_agent_registry");
           if (allowedBoundaryPatch) continue;
 
-          ctx.report.warning({
+          ctx.report.violation({
             message:
               "unittest.mock.patch used in integration test — patching application collaborators turns this into a unit test",
             file: match.file,
@@ -57,7 +57,7 @@ export default {
     "no-monkeypatch-setattr-component-in-integration": {
       description:
         "monkeypatch.setattr() must not replace services, agents, stores, or I/O in integration tests. It is allowed only for environment configuration (setenv, setitem).",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const testFiles = await ctx.glob("tests/integration/**/*.py");
         for (const file of testFiles) {
@@ -68,7 +68,7 @@ export default {
           const lines = content.split("\n");
           for (let i = 0; i < lines.length; i++) {
             if (lines[i].includes("monkeypatch.setattr")) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message:
                   "monkeypatch.setattr() in integration test replaces a real component — this defeats the purpose of integration testing",
                 file,
@@ -88,230 +88,15 @@ export default {
       },
     },
 
-    /**
-     * Root conftest is imported by unit tests and before trust.* modules are
-     * safely configured. It must not own LocalStack/service-backed integration
-     * seed data. Put that data in tests/integration/conftest.py instead.
-     */
-    "root-conftest-must-not-own-integration-seed-data": {
-      description:
-        "Root tests/conftest.py must not create LocalStack-backed integration seed data. Shared integration data belongs in tests/integration/conftest.py.",
-      severity: "error",
-      check: async (ctx) => {
-        const file = "tests/conftest.py";
-        const content = await ctx.readFile(file);
-        const forbiddenPatterns = [
-          "seed_trust_root_agent",
-          "create_mock_agent",
-          "require_task_records",
-          "test_conversation",
-          "VectorStore.create_store",
-          ".put_item(",
-          ".create_table(",
-        ];
 
-        for (const token of forbiddenPatterns) {
-          if (!content.includes(token)) continue;
-          ctx.report.violation({
-            message:
-              `Root tests/conftest.py contains integration seed/setup pattern '${token}' — this can affect unit collection and should live in tests/integration/conftest.py`,
-            file,
-            line: 1,
-            fix: [
-              "Move LocalStack/service-backed seed data to tests/integration/conftest.py.",
-              "Keep root conftest limited to pytest plugin registration and unit-safe global setup.",
-            ].join("\n"),
-          });
-        }
-      },
-    },
 
-    /**
-     * Tool-transfer and dynamic-agent integration tests should use the shared
-     * create_mock_agent fixture. It creates AgentAtelier data, permission data,
-     * unique names, and cleanup consistently across LocalStack and real-AWS modes.
-     */
-    "dynamic-agent-integration-tests-use-create-mock-agent": {
-      description:
-        "Dynamic-agent/tool-transfer integration tests must use create_mock_agent so AgentAtelier and PermissionTable seed data are created consistently with cleanup.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/chat_usecase/**/*.py");
-        for (const file of testFiles) {
-          const content = await ctx.readFile(file);
-          const needsDynamicAgent =
-            content.includes("transfer_to_agent") ||
-            content.includes('"agents"') ||
-            content.includes("'agents'");
-          if (!needsDynamicAgent) continue;
-          if (content.includes("create_mock_agent")) continue;
 
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (
-              lines[i].includes("transfer_to_agent") ||
-              lines[i].includes('"agents"') ||
-              lines[i].includes("'agents'")
-            ) {
-              ctx.report.violation({
-                message:
-                  "Dynamic-agent integration test does not use create_mock_agent — AgentAtelier/PermissionTable seed data may be missing or leak across runs",
-                file,
-                line: i + 1,
-                fix: [
-                  "Add the create_mock_agent fixture and use it to create per-test agent metadata:",
-                  "  async def test_tool_calling_agent(client, auth_headers, create_mock_agent):",
-                  "      agent_name = create_mock_agent('it_tool_use_agent', tools=['calculator'])",
-                  "",
-                  "The fixture creates AgentAtelier, PermissionTable, unique names, and cleanup.",
-                ].join("\n"),
-              });
-              break;
-            }
-          }
-        }
-      },
-    },
 
-    /**
-     * Agent CRUD integration tests may write AgentAtelier directly, but direct
-     * writes must have cleanup because real-AWS mode uses shared dev tables.
-     */
-    "direct-agent-table-writes-must-clean-up": {
-      description:
-        "Integration tests that write AgentAtelier directly must delete their records or use create_mock_agent. Real-AWS mode uses shared dev tables.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/**/*.py");
-        for (const file of testFiles) {
-          if (file.endsWith("conftest.py")) continue;
-          const content = await ctx.readFile(file);
-          const touchesAgentTable =
-            content.includes("DDB_AGENT_ATELIER_TABLE") ||
-            content.includes("AgentAtelier-dev");
-          if (!touchesAgentTable) continue;
 
-          const writesAgentData =
-            content.includes(".put_item(") ||
-            content.includes('"/cms/createAgent"') ||
-            content.includes("'/cms/createAgent'");
-          if (!writesAgentData) continue;
-          if (content.includes("create_mock_agent")) continue;
-          if (content.includes(".delete_item(") && content.includes("finally")) continue;
 
-          ctx.report.violation({
-            message:
-              "Integration test writes AgentAtelier data without obvious finally/delete_item cleanup — this can leak records in real-AWS mode",
-            file,
-            line: 1,
-            fix: [
-              "Wrap the write/API call in try/finally and delete the agent record:",
-              "  try:",
-              "      response = client.post('/cms/createAgent', json=payload, headers=auth_headers)",
-              "      assert response.status_code == 200",
-              "  finally:",
-              "      agent_atelier_table.delete_item(Key={'name': test_agent_name})",
-              "",
-              "For dynamic-agent chat tests, prefer create_mock_agent instead.",
-            ].join("\n"),
-          });
-        }
-      },
-    },
 
-    /**
-     * Service fixtures in unit tests that retrieve optional external connections
-     * (e.g. OpensearchDatabase.get_database_instance()) must use pytest.skip when
-     * the result is None, not assert. Using assert causes ERROR instead of SKIP,
-     * which breaks the test run when the service is unavailable.
-     */
-    "service-fixture-must-use-pytest-skip": {
-      description:
-        "Fixtures that obtain optional external service connections must use pytest.skip (not assert) when the connection is None.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/unittests/**/*.py");
-        for (const file of testFiles) {
-          const content = await ctx.readFile(file);
-          if (!content.includes("get_database_instance")) continue;
 
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (
-              /assert\s+\w+\s+is\s+not\s+None/.test(lines[i]) &&
-              i > 0
-            ) {
-              const context = lines.slice(Math.max(0, i - 5), i + 1).join("\n");
-              if (context.includes("get_database_instance")) {
-                ctx.report.violation({
-                  message:
-                    "assert on a service fixture return value — use pytest.skip instead to avoid ERROR when the service is unavailable",
-                  file,
-                  line: i + 1,
-                  fix: [
-                    "Replace the assert with a conditional pytest.skip:",
-                    "  db = await SomeDatabase.get_database_instance()",
-                    "  if db is None:",
-                    '      pytest.skip("Service not available. Set OPENSEARCH_ENDPOINT to run.")',
-                    "  return db",
-                  ].join("\n"),
-                });
-              }
-            }
-          }
-        }
-      },
-    },
 
-    /**
-     * Unit tests that call get_sentence_transformer_model must mock it.
-     *
-     * The function downloads models from HuggingFace on first use. CI runners
-     * have no internet access (or no pre-cached models), so any test that
-     * triggers this call hangs indefinitely.
-     */
-    "sentence-transformer-must-be-mocked": {
-      description:
-        "Unit tests that call get_sentence_transformer_model must patch it with MockSentenceTransformer. The function downloads from HuggingFace and hangs indefinitely in CI without internet access.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/unittests/**/*.py");
-        for (const file of testFiles) {
-          const content = await ctx.readFile(file);
-          if (!content.includes("get_sentence_transformer_model")) continue;
-          const isMocked =
-            (content.includes("patch") &&
-              content.includes("get_sentence_transformer_model")) ||
-            content.includes("MockSentenceTransformer") ||
-            content.includes("mock_sentence_transformer");
-          if (isMocked) continue;
-
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes("get_sentence_transformer_model")) {
-              ctx.report.violation({
-                message:
-                  "get_sentence_transformer_model called in unit test without mocking — downloads from HuggingFace and hangs in CI (no internet)",
-                file,
-                line: i + 1,
-                fix: [
-                  "Mock the function at the import binding in the module under test:",
-                  "  from tests.mockups.mock_sentence_transformer import MockSentenceTransformer",
-                  '  _mock = MockSentenceTransformer("paraphrase-multilingual-mpnet-base-v2")',
-                  '  with patch("<module>.get_sentence_transformer_model", return_value=_mock):',
-                  "      # run the test",
-                  "",
-                  "Or register the mock model before the test:",
-                  "  from trust.core.model_registry.sentence_transformer_registry import register_model",
-                  '  register_model(model_name="...", model=MockSentenceTransformer("..."))',
-                ].join("\n"),
-              });
-              break;
-            }
-          }
-        }
-      },
-    },
 
     /**
      * Async fixtures must use @pytest_asyncio.fixture, not @pytest.fixture.
@@ -379,7 +164,7 @@ export default {
     "mock-abc-class-must-be-in-mockups-dir": {
       description:
         "Classes implementing Base* ABCs defined inline in test files must be moved to tests/mockups/. Inline mock classes cannot be shared and duplicate across modules.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const testFiles = await ctx.glob("tests/**/*.py");
         for (const file of testFiles) {
@@ -396,7 +181,7 @@ export default {
               const className = classMatch[1];
               // Exclude if it's a test class (TestFoo pattern)
               if (/^Test/.test(className)) continue;
-              ctx.report.warning({
+              ctx.report.violation({
                 message:
                   `Inline mock class '${className}' implements a Base* ABC — move it to tests/mockups/ so it can be shared and registered as a pytest plugin`,
                 file,
@@ -426,7 +211,7 @@ export default {
     "expensive-fixture-must-not-use-function-scope": {
       description:
         "Fixtures that create database tables, HTTP clients, or search indexes must use module or session scope. Function-scoped setup for expensive resources slows the test suite significantly.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const testFiles = await ctx.glob("tests/**/*.py");
         for (const file of testFiles) {
@@ -459,7 +244,7 @@ export default {
               const nameMatch = nextDef?.match(/def (\w+)/);
               const fixtureName = nameMatch ? nameMatch[1] : "this fixture";
 
-              ctx.report.warning({
+              ctx.report.violation({
                 message:
                   `'${fixtureName}' creates an expensive resource (DB table, HTTP client, or index) in function scope — use scope='module' or scope='session' to avoid per-test recreation`,
                 file,
@@ -479,130 +264,9 @@ export default {
       },
     },
 
-    /**
-     * Integration tests that call Azure Document Intelligence must guard access
-     * with @pytest.mark.skipif based on both EASTUS_ENDPOINT and EASTUS_API_KEY.
-     *
-     * Both EASTUS_ENDPOINT and EASTUS_API_KEY are required. Any integration test
-     * that exercises real Document Intelligence calls must declare:
-     *
-     *   _DI_AVAILABLE = bool(EASTUS_ENDPOINT and EASTUS_API_KEY)
-     *   @pytest.mark.skipif(not _DI_AVAILABLE, reason="...")
-     *
-     * Note: exec_impl should also fail-fast with ValueError when the endpoint is
-     * not configured so that ProcessTaskWithFallback can skip to the next strategy.
-     */
-    "azure-document-intelligence-must-have-skipif-in-integration": {
-      description:
-        "Integration tests that call Azure Document Intelligence must have @pytest.mark.skipif guarded by both EASTUS_ENDPOINT and EASTUS_API_KEY. Without the guard, the test fails or times out in CI.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/**/*.py");
-        for (const file of testFiles) {
-          if (file.endsWith("conftest.py")) continue;
-          const content = await ctx.readFile(file);
 
-          const usesDI =
-            content.includes("DocumentIntelligence") ||
-            content.includes("document_intelligence") ||
-            content.includes("DOCUMENT_INTELLIGENCE") ||
-            content.includes("EASTUS_ENDPOINT");
 
-          if (!usesDI) continue;
-          if (
-            content.includes("EASTUS_ENDPOINT") &&
-            content.includes("EASTUS_API_KEY") &&
-            content.includes("skipif")
-          ) continue;
 
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (
-              lines[i].includes("DocumentIntelligence") ||
-              lines[i].includes("document_intelligence") ||
-              lines[i].includes("DOCUMENT_INTELLIGENCE")
-            ) {
-              ctx.report.violation({
-                message:
-                  "Integration test uses Azure Document Intelligence without EASTUS_ENDPOINT and EASTUS_API_KEY skipif guard — will fail or time out in CI",
-                file,
-                line: i + 1,
-                fix: [
-                  "Add a credential guard at the top of the file:",
-                  "  from trust.config.variables import EASTUS_API_KEY, EASTUS_ENDPOINT",
-                  "  _DI_AVAILABLE = bool(EASTUS_ENDPOINT and EASTUS_API_KEY)",
-                  "",
-                  "  @pytest.mark.skipif(not _DI_AVAILABLE,",
-                  '                      reason="Azure Document Intelligence not configured (set EASTUS_ENDPOINT and EASTUS_API_KEY)")',
-                  "  def test_analysis_document_with_document_intelligence(client): ...",
-                ].join("\n"),
-              });
-              break;
-            }
-          }
-        }
-      },
-    },
-
-    /**
-     * Integration tests that call Google Custom Search must guard access
-     * with @pytest.mark.skipif based on the CX (Custom Search Engine ID) variable.
-     *
-     * CX is empty in CI and LOCAL_CONTAINER. Any integration test that exercises
-     * real Google Custom Search calls must declare:
-     *
-     *   from trust.config.variables import CX as GOOGLE_CX
-     *   @pytest.mark.skipif(not GOOGLE_CX, reason="...")
-     */
-    "google-custom-search-must-have-skipif-in-integration": {
-      description:
-        "Integration tests that call Google Custom Search must have @pytest.mark.skipif guarded by the CX variable. Without the guard, the test fails in CI where CX is empty.",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/**/*.py");
-        for (const file of testFiles) {
-          if (file.endsWith("conftest.py")) continue;
-          const content = await ctx.readFile(file);
-
-          const usesGCS =
-            content.includes("google_custom_search") ||
-            content.includes("GoogleCustomSearch") ||
-            content.includes("GOOGLE_CUSTOM_SEARCH");
-
-          if (!usesGCS) continue;
-          // Acceptable if skipif guards CX or GOOGLE_CUSTOM_SEARCH
-          if (
-            (content.includes("CX") || content.includes("GOOGLE_CUSTOM_SEARCH")) &&
-            content.includes("skipif")
-          ) continue;
-
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (
-              lines[i].includes("google_custom_search") ||
-              lines[i].includes("GoogleCustomSearch") ||
-              lines[i].includes("GOOGLE_CUSTOM_SEARCH")
-            ) {
-              ctx.report.violation({
-                message:
-                  "Integration test uses Google Custom Search without CX skipif guard — will fail in CI where CX is empty",
-                file,
-                line: i + 1,
-                fix: [
-                  "Add a credential guard at the top of the file:",
-                  "  from trust.config.variables import CX as GOOGLE_CX",
-                  "",
-                  "  @pytest.mark.skipif(not GOOGLE_CX,",
-                  '                      reason="Google Custom Search not configured (set GOOGLE_CUSTOM_SEARCH_CX)")',
-                  "  async def test_web_search(client): ...",
-                ].join("\n"),
-              });
-              break;
-            }
-          }
-        }
-      },
-    },
 
     /**
      * Unit tests must not contain real outbound HTTP URLs without mocking.
@@ -711,7 +375,7 @@ export default {
     "monkeypatch-setattr-underscore-attribute": {
       description:
         "monkeypatch.setattr(obj, '_attr', ...) with a private attribute name starting with '_' is likely wrong — the attribute may not exist on the target, masking the real failure with AttributeError. Verify existence first; for async-context-manager clients, patch the class at its import binding instead.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const testFiles = await ctx.glob("tests/**/*.py");
         // Match: monkeypatch.setattr(<anything>, "_<name>", ...)

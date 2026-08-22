@@ -10,7 +10,7 @@ export default {
     "no-base-mock-class-in-test-file": {
       description:
         "Classes implementing core Base* ABCs must be defined in tests/mockups/, not inline in test files.",
-      severity: "warning",
+      severity: "error",
       check: async (ctx) => {
         const matches = await ctx.grepFiles(
           /^class\s+\w+\s*\(\s*Base\w+\s*\)/,
@@ -20,7 +20,7 @@ export default {
           if (match.file.includes("tests/mockups/")) continue;
           if (match.file.endsWith("conftest.py")) continue;
 
-          ctx.report.warning({
+          ctx.report.violation({
             message:
               "Mock class implementing a Base* ABC found in test file — move to tests/mockups/ and register in tests/conftest.py pytest_plugins",
             file: match.file,

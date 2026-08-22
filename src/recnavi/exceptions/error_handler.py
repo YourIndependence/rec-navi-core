@@ -140,7 +140,7 @@ async def send_error_alert(
         )
     except Exception as notify_err:
         logger.error(
-            f"Fail to send error alert!: {notify_err!r}\n{traceback.format_exc()}\n"
+            f"Fail to send error alert!: {notify_err!r}\n{traceback.format_exc()}\n",
         )
 
 

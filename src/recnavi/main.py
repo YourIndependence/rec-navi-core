@@ -11,17 +11,16 @@
 """Starting server."""
 
 import logging
-import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.errors import ServerErrorMiddleware
 
-from recnavi.apis.schemas.response_schemas import GreetingResponse
+from recnavi.apis.root.root_router import root_router
+from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import send_error_alert
@@ -49,7 +48,9 @@ async def lifespan(_app: FastAPI):
     except Exception as e:
         logger.critical("Server startup failed", exc_info=True)
         await send_error_alert(
-            "lifespan_startup", e, kwargs={"phase": "startup"}
+            "lifespan_startup",
+            e,
+            kwargs={"phase": "startup"},
         )
         raise
 
@@ -78,8 +79,6 @@ app.add_middleware(
 
 
 app.include_router(root_router)
-app.include_router(cms_router)
-app.include_router(pub_router)
 
 
 @app.middleware("http")
@@ -89,29 +88,3 @@ async def cache_request_body(request: Request, call_next):
     request.state.body = body_bytes
     response = await call_next(request)
     return response
-
-
-@app.get("/health")
-def health_check():
-    """Health check api."""
-    return {"status": "ok"}
-
-
-@app.get("/greeting")
-async def greeting():
-    """Test API endpoint **without** authentication."""
-    return {
-        "status": "ok",
-        "timestamp": int(time.time()),
-        "environment": ENV,
-    }
-
-
-@app.post("/greetingMe", response_model=GreetingResponse)
-async def greeting_me(
-    request: Request,
-    x_user: XUser = Depends(verify_user),
-) -> GreetingResponse:
-    """Task status check API for pooling."""
-    _ = request
-    return GreetingResponse(x_user=x_user)

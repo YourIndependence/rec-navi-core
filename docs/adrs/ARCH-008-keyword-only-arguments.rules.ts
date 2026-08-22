@@ -3,8 +3,8 @@
 export default {
   rules: {
     'recommend-keyword-only-params': {
-      description: 'Recommend keyword-only parameters (*) for functions with 2+ parameters',
-      severity: 'warning',
+      description: 'Require keyword-only parameters (*) for functions with 2+ parameters',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function definitions
@@ -42,7 +42,7 @@ export default {
               continue
             }
 
-            ctx.report.warning({
+            ctx.report.violation({
               message: `Function has ${paramCount} parameters but no keyword-only separator (*) — consider making parameters explicit`,
               file: match.file,
               line: match.line,
@@ -54,8 +54,8 @@ export default {
     },
 
     'detect-positional-function-calls': {
-      description: 'Detect function calls with multiple positional arguments (could be more explicit)',
-      severity: 'info',
+      description: 'Forbid function calls with multiple positional arguments',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function calls with 2+ positional arguments (very rough heuristic)
@@ -84,7 +84,7 @@ export default {
               continue
             }
 
-            ctx.report.info({
+            ctx.report.violation({
               message: `Function call with multiple positional arguments — consider using keyword arguments for clarity`,
               file: match.file,
               line: match.line,
@@ -96,8 +96,8 @@ export default {
     },
 
     'no-single-letter-params': {
-      description: 'Discourage single-letter parameter names (except for math operations)',
-      severity: 'warning',
+      description: 'Forbid single-letter parameter names except for math operations',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function definitions with single-letter parameters (excluding x, y, z for math)
@@ -114,7 +114,7 @@ export default {
             // Extract single-letter parameter names
             const singleLetterParams = functionDef.match(/\b([a-wA-W])\s*:/g)
             if (singleLetterParams && singleLetterParams.length > 0) {
-              ctx.report.warning({
+              ctx.report.violation({
                 message: `Single-letter parameter name found — use descriptive names for clarity`,
                 file: match.file,
                 line: match.line,
@@ -127,8 +127,8 @@ export default {
     },
 
     'enforce-keyword-only-for-optional': {
-      description: 'Recommend keyword-only for optional parameters with defaults',
-      severity: 'warning',
+      description: 'Require keyword-only for optional parameters with defaults',
+      severity: 'error',
       check: async (ctx) => {
         for (const file of ctx.scopedFiles) {
           // Match function definitions with default parameters but no * separator
@@ -152,7 +152,7 @@ export default {
               continue
             }
 
-            ctx.report.warning({
+            ctx.report.violation({
               message: `Function has optional parameters (with defaults) but no keyword-only separator — add '*,' for clarity`,
               file: match.file,
               line: match.line,
