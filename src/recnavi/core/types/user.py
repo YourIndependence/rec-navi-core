@@ -7,7 +7,8 @@
 # For internal use only.
 # developer team.
 
-"""UserTableItem"""
+
+"""User"""
 
 from enum import StrEnum
 
@@ -18,22 +19,25 @@ from pydantic import alias_generators
 
 
 class UserRole(StrEnum):
-    """user role enum."""
+    """What a user is allowed to do."""
 
     ADMIN = "admin"
     OWNER = "owner"
     STAFF = "staff"
 
 
-class UserTableItem(BaseModel):
-    """users table item."""
+class User(BaseModel):
+    """A member of a group."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
     )
 
-    user_id: str = Field(..., description="partition key")
-    group_id: str = Field(..., description="tenant boundary, GSI1 PK")
-    user_name: str = Field(..., description="display name")
-    role: UserRole = Field(..., description="authorization role")
+    user_id: str = Field(..., description="Identifier of the user")
+    group_id: str = Field(
+        ...,
+        description="Identifier of the group the user belongs to",
+    )
+    user_name: str = Field(..., description="Name shown to the members")
+    role: UserRole = Field(..., description="What the user is allowed to do")

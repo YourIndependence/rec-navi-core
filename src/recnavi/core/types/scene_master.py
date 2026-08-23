@@ -8,7 +8,7 @@
 # developer team.
 
 
-"""SceneTableItem"""
+"""SceneMaster"""
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -16,25 +16,28 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
-class SceneTableItem(BaseModel):
-    """scenes table item. Scene definition master."""
+class SceneMaster(BaseModel):
+    """How a kind of scene is meant to be shot."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
     )
 
-    scene_principal: str = Field(..., description="partition key")
-    title: str = Field(..., description="display title")
+    scene_principal: str = Field(
+        ...,
+        description="Identifier of the scene master",
+    )
+    title: str = Field(..., description="Name shown to the staff")
     thumbnail_uri: str = Field(
         ...,
-        description="S3 object key of the example photo",
+        description="Location of the example photo to imitate",
     )
     guide_uri: str = Field(
         ...,
-        description="S3 object key of the transparent PNG guide",
+        description="Location of the framing guide laid over the camera",
     )
     max_duration_seconds: int = Field(
         ...,
-        description="max recording duration in seconds",
+        description="How long the staff may record",
     )

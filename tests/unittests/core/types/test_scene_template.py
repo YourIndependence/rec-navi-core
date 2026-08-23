@@ -7,15 +7,16 @@
 # For internal use only.
 # developer team.
 
-"""SceneTemplateTableItem tests"""
+
+"""SceneTemplate tests"""
 
 import pytest
 from pydantic import ValidationError
 
-from recnavi.core.types.scene_template_table_item import SceneTemplateTableItem
+from recnavi.core.types.scene_template import SceneTemplate
 
 
-ITEM = {
+TEMPLATE = {
     "templateId": "tpl_cafe",
     "title": "Cafe",
     "scenePrincipals": ["shop_gaikan", "main_dish", "main_dish"],
@@ -23,8 +24,8 @@ ITEM = {
 }
 
 
-def test_load_from_table_item():
-    template = SceneTemplateTableItem.model_validate(ITEM)
+def test_load():
+    template = SceneTemplate.model_validate(TEMPLATE)
 
     assert template.template_id == "tpl_cafe"
     assert template.scene_principals == [
@@ -34,14 +35,16 @@ def test_load_from_table_item():
     ]
 
 
-def test_dump_to_table_item():
-    template = SceneTemplateTableItem.model_validate(ITEM)
+def test_dump_keeps_camel_case():
+    template = SceneTemplate.model_validate(TEMPLATE)
 
-    assert template.model_dump(by_alias=True, mode="json") == ITEM
+    assert template.model_dump(by_alias=True, mode="json") == TEMPLATE
 
 
-def test_reject_missing_partition_key():
-    item = {key: value for key, value in ITEM.items() if key != "templateId"}
+def test_reject_missing_identifier():
+    item = {
+        key: value for key, value in TEMPLATE.items() if key != "templateId"
+    }
 
     with pytest.raises(ValidationError):
-        SceneTemplateTableItem.model_validate(item)
+        SceneTemplate.model_validate(item)
