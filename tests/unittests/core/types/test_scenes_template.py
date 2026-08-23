@@ -8,12 +8,12 @@
 # developer team.
 
 
-"""SceneTemplate tests"""
+"""ScenesTemplate tests"""
 
 import pytest
 from pydantic import ValidationError
 
-from recnavi.core.types.scene_template import SceneTemplate
+from recnavi.core.types.scenes_template import ScenesTemplate
 
 
 TEMPLATE = {
@@ -25,7 +25,7 @@ TEMPLATE = {
 
 
 def test_load():
-    template = SceneTemplate.model_validate(TEMPLATE)
+    template = ScenesTemplate.model_validate(TEMPLATE)
 
     assert template.template_id == "tpl_cafe"
     assert template.scene_principals == [
@@ -36,7 +36,7 @@ def test_load():
 
 
 def test_dump_keeps_camel_case():
-    template = SceneTemplate.model_validate(TEMPLATE)
+    template = ScenesTemplate.model_validate(TEMPLATE)
 
     assert template.model_dump(by_alias=True, mode="json") == TEMPLATE
 
@@ -47,4 +47,4 @@ def test_reject_missing_identifier():
     }
 
     with pytest.raises(ValidationError):
-        SceneTemplate.model_validate(item)
+        ScenesTemplate.model_validate(item)

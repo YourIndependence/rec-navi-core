@@ -8,7 +8,7 @@
 # developer team.
 
 
-"""SceneTemplate"""
+"""ScenesTemplate"""
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -16,7 +16,7 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
-class SceneTemplate(BaseModel):
+class ScenesTemplate(BaseModel):
     """A named set of scene masters an owner can start a project from."""
 
     model_config = ConfigDict(
@@ -26,7 +26,7 @@ class SceneTemplate(BaseModel):
 
     template_id: str = Field(
         ...,
-        description="Identifier of the scene template",
+        description="Identifier of the scenes template",
     )
     title: str = Field(..., description="Name shown to the account owner")
     scene_principals: list[str] = Field(
