@@ -18,10 +18,13 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError
 from jose.exceptions import JWTError
 
+from recnavi.apis.auth.claims import build_authenticated_user
 from recnavi.config.variables import COGNITO_CLIENT_ID
 from recnavi.config.variables import COGNITO_USER_POOL_ID
 from recnavi.config.variables import REGION
+from recnavi.core.types.authenticated_user import AuthenticatedUser
 from recnavi.core.types.x_user import XUser
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientPermissionError
 
 
@@ -43,8 +46,39 @@ async def verify_user(request: Request) -> XUser:
         ) from e
 
 
+async def get_authenticated_user(request: Request) -> AuthenticatedUser:
+    """Resolve the signed-in user, or refuse the request."""
+    try:
+        claims = await decode_token(request)
+    except ClientPermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=str(e),
+        ) from e
+
+    try:
+        authenticated_user = build_authenticated_user(claims=claims)
+    except ClientAuthorizationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        ) from e
+
+    request.state.authenticated_user = authenticated_user
+    return authenticated_user
+
+
 async def get_verified_user(request: Request) -> XUser:
     """Verify jwe token"""
+    payload = await decode_token(request)
+    return XUser(
+        id=payload.get("id"),
+        email=payload.get("email"),
+    )
+
+
+async def decode_token(request: Request) -> dict[str, object]:
+    """Verify the bearer token and return its claims."""
     authorization = request.headers.get("authorization")
     client_id = request.headers.get("client-Id", COGNITO_CLIENT_ID)
     if not authorization:
@@ -75,10 +109,7 @@ async def get_verified_user(request: Request) -> XUser:
             options={"verify_at_hash": False},
         )
 
-        return XUser(
-            id=payload.get("id"),
-            email=payload.get("email"),
-        )
+        return payload
 
     except httpx.HTTPError as e:
         raise JWTError(f"Failed to fetch JWKs: {e!s}") from e

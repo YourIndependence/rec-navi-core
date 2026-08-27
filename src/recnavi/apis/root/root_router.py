@@ -15,9 +15,12 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Request
 
+from recnavi.apis.auth.auth import get_authenticated_user
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.response_schemas import GreetingResponse
+from recnavi.apis.schemas.user_schemas import GetMeResponse
 from recnavi.config.variables import ENV
+from recnavi.core.types.authenticated_user import AuthenticatedUser
 from recnavi.core.types.x_user import XUser
 
 
@@ -48,3 +51,14 @@ async def greeting_me(
     """Task status check API for pooling."""
     _ = request
     return GreetingResponse(x_user=x_user)
+
+
+@root_router.get("/getMe", response_model=GetMeResponse)
+async def get_me(
+    authenticated_user: AuthenticatedUser = Depends(get_authenticated_user),
+) -> GetMeResponse:
+    """Return the signed-in user and the tenant they belong to."""
+    return GetMeResponse(
+        user=authenticated_user.user,
+        group_id=authenticated_user.group_id,
+    )
