@@ -50,6 +50,9 @@ exclude = [
     "build",
     "dist",
     "*.egg-info",
+    # ruff reformats the python code blocks inside markdown files.
+    # documentation is not source, so keep it out of reach.
+    "*.md",
 ]
 force-exclude = true
 line-length = 79
