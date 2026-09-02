@@ -9,6 +9,9 @@
 
 import pytest
 
+from recnavi.core.types.authenticated_user import AuthenticatedUser
+from recnavi.core.types.group_user import GroupUser
+from recnavi.core.types.group_user import UserRole
 from recnavi.core.types.x_user import XUser
 
 
@@ -33,3 +36,20 @@ def get_mock_user():
         "email": "test.mail@mail.example.com",
         "role": "admin",
     }
+
+
+@pytest.fixture
+def mock_authenticated_user():
+    return get_mock_authenticated_user()
+
+
+def get_mock_authenticated_user() -> AuthenticatedUser:
+    """Get the caller behind a request in tests"""
+    return AuthenticatedUser(
+        user=GroupUser(
+            user_id="7f1c0f2e-0a3d-4a1b-9c2e-2b7a6d5e4f30",
+            user_name="Koki Ueno",
+            role=UserRole.OWNER,
+        ),
+        group_id="grp_sushi_taro",
+    )
