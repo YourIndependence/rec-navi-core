@@ -19,6 +19,11 @@ ENV = os.environ.get(
 )  # main, staging, dev, LOCAL, LOCAL_CONTAINER, CI
 REGION = "ap-northeast-1"
 
+DDB_SCENES_TABLE = os.environ.get(
+    "DDB_SCENES_TABLE",
+    "recnavi-dev-scenes",
+)
+
 COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "dummy")
 

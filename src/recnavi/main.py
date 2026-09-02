@@ -18,6 +18,7 @@ from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.errors import ServerErrorMiddleware
 
+from recnavi.apis.master.master_router import master_router
 from recnavi.apis.root.root_router import root_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
@@ -78,6 +79,7 @@ app.add_middleware(
 
 
 app.include_router(root_router)
+app.include_router(master_router)
 
 
 @app.middleware("http")
