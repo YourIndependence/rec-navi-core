@@ -19,3 +19,22 @@ def get_table(table_name: str):
     """Get a handle on one DynamoDB table."""
     resource = boto3.resource("dynamodb", region_name=REGION)
     return resource.Table(table_name)
+
+
+def scan_all(table_name: str) -> list[dict]:
+    """Read every item of a table.
+
+    A scan stops at one megabyte, so a table larger than that comes back
+    in pages. Following LastEvaluatedKey is what stops the caller from
+    silently seeing only the first page.
+    """
+    table = get_table(table_name)
+    items: list[dict] = []
+    arguments: dict = {}
+    while True:
+        response = table.scan(**arguments)
+        items.extend(response["Items"])
+        last_key = response.get("LastEvaluatedKey")
+        if not last_key:
+            return items
+        arguments["ExclusiveStartKey"] = last_key

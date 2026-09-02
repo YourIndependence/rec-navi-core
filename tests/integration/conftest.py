@@ -17,11 +17,15 @@ from fastapi.testclient import TestClient
 from recnavi.apis.auth.auth import get_authenticated_user
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.dependencies import get_scene_master_repository
+from recnavi.apis.dependencies import get_scenes_template_repository
 from recnavi.core.types.authenticated_user import AuthenticatedUser
 from recnavi.core.types.x_user import XUser
 from recnavi.main import app
 from tests.mockups.mock_scene_master_repository import (
     MockSceneMasterRepository,
+)
+from tests.mockups.mock_scenes_template_repository import (
+    MockScenesTemplateRepository,
 )
 from tests.mockups.mock_users import get_mock_authenticated_user
 from tests.mockups.mock_users import get_mock_x_user
@@ -36,6 +40,9 @@ def client():
     )
     app.dependency_overrides[get_scene_master_repository] = (
         MockSceneMasterRepository
+    )
+    app.dependency_overrides[get_scenes_template_repository] = (
+        MockScenesTemplateRepository
     )
 
     with TestClient(app, raise_server_exceptions=False) as client:

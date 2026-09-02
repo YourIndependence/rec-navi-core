@@ -16,7 +16,7 @@ from recnavi.core.repositories.scene_master_repository import (
     BaseSceneMasterRepository,
 )
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.infrastructure.dynamodb.client import get_table
+from recnavi.infrastructure.dynamodb.client import scan_all
 
 
 class DynamoDbSceneMasterRepository(BaseSceneMasterRepository):
@@ -31,18 +31,5 @@ class DynamoDbSceneMasterRepository(BaseSceneMasterRepository):
         The masters are a few dozen rows shared by every tenant and there
         is no key to query them by, so the whole table is scanned.
         """
-        return await asyncio.to_thread(self._scan_all)
-
-    def _scan_all(self) -> list[SceneMaster]:
-        """Scan the table, following the pages boto3 hands back."""
-        table = get_table(self._table_name)
-        items = []
-        arguments = {}
-        while True:
-            response = table.scan(**arguments)
-            items.extend(response["Items"])
-            last_key = response.get("LastEvaluatedKey")
-            if not last_key:
-                break
-            arguments["ExclusiveStartKey"] = last_key
+        items = await asyncio.to_thread(scan_all, self._table_name)
         return [SceneMaster.model_validate(item) for item in items]

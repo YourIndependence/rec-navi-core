@@ -17,6 +17,7 @@ from pydantic import Field
 from recnavi.apis.schemas.request_schemas import BaseItemModel
 from recnavi.apis.schemas.response_schemas import BaseApiResponseModel
 from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.scenes_template import ScenesTemplate
 
 
 class SceneMasterView(BaseItemModel):
@@ -63,5 +64,57 @@ class GetSceneMastersResponse(BaseApiResponseModel):
         return cls(
             scenes=[
                 SceneMasterView.from_scene_master(master) for master in masters
+            ],
+        )
+
+
+class ScenesTemplateView(BaseItemModel):
+    """A scenes template as the client sees it.
+
+    The tile image key is left out for the same reason as in
+    SceneMasterView: the client asks for the image by identifier.
+    """
+
+    template_id: str = Field(
+        ...,
+        description="Identifier of the scenes template",
+    )
+    title: str = Field(..., description="Name shown to the account owner")
+    scene_principals: list[str] = Field(
+        default_factory=list,
+        description="Scene masters to lay out, in shooting order",
+    )
+
+    @classmethod
+    def from_scenes_template(
+        cls,
+        template: ScenesTemplate,
+    ) -> "ScenesTemplateView":
+        """Show only what the client is meant to see."""
+        return cls(
+            template_id=template.template_id,
+            title=template.title,
+            scene_principals=list(template.scene_principals),
+        )
+
+
+class GetTemplatesResponse(BaseApiResponseModel):
+    """getTemplates API response model."""
+
+    templates: list[ScenesTemplateView] = Field(
+        default_factory=list,
+        description="Every scenes template",
+    )
+
+    @classmethod
+    def from_scenes_templates(
+        cls,
+        templates: Sequence[ScenesTemplate],
+    ) -> "GetTemplatesResponse":
+        """Build the response from the domain objects."""
+        return cls(
+            templates=[
+                ScenesTemplateView.from_scenes_template(template)
+                for template in templates
             ],
         )

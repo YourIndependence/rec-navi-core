@@ -24,6 +24,11 @@ DDB_SCENES_TABLE = os.environ.get(
     "recnavi-dev-scenes",
 )
 
+DDB_SCENE_TEMPLATES_TABLE = os.environ.get(
+    "DDB_SCENE_TEMPLATES_TABLE",
+    "recnavi-dev-scene-templates",
+)
+
 COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "dummy")
 
