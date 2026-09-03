@@ -40,4 +40,4 @@ def test_no_object_key_reaches_the_client(client, auth_headers):
     assert response.status_code == 200
     assert "thumbnailUri" not in response.text
     assert "guideUri" not in response.text
-    assert "masters/" not in response.text
+    assert "assets/" not in response.text

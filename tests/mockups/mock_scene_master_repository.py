@@ -24,6 +24,12 @@ class MockSceneMasterRepository(BaseSceneMasterRepository):
     async def list_all(self) -> list[SceneMaster]:
         return self.masters
 
+    async def get(self, *, scene_principal: str) -> SceneMaster | None:
+        for master in self.masters:
+            if master.scene_principal == scene_principal:
+                return master
+        return None
+
 
 @pytest.fixture
 def mock_scene_master_repository():
@@ -36,15 +42,15 @@ def get_mock_scene_masters() -> list[SceneMaster]:
         SceneMaster(
             scene_principal="shop_gaikan",
             title="Shop exterior",
-            thumbnail_uri="masters/shop_gaikan/example.jpg",
-            guide_uri="masters/shop_gaikan/guide.png",
+            thumbnail_uri="assets/scenes/shop_gaikan/example.jpg",
+            guide_uri="assets/scenes/shop_gaikan/guide.png",
             max_duration_seconds=5,
         ),
         SceneMaster(
             scene_principal="main_dish",
             title="Signature dish",
-            thumbnail_uri="masters/main_dish/example.jpg",
-            guide_uri="masters/main_dish/guide.png",
+            thumbnail_uri="assets/scenes/main_dish/example.jpg",
+            guide_uri="assets/scenes/main_dish/guide.png",
             max_duration_seconds=3,
         ),
     ]

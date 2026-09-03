@@ -16,6 +16,7 @@ from recnavi.core.repositories.scene_master_repository import (
     BaseSceneMasterRepository,
 )
 from recnavi.core.types.scene_master import SceneMaster
+from recnavi.infrastructure.dynamodb.client import get_item
 from recnavi.infrastructure.dynamodb.client import scan_all
 
 
@@ -33,3 +34,12 @@ class DynamoDbSceneMasterRepository(BaseSceneMasterRepository):
         """
         items = await asyncio.to_thread(scan_all, self._table_name)
         return [SceneMaster.model_validate(item) for item in items]
+
+    async def get(self, *, scene_principal: str) -> SceneMaster | None:
+        """Return one scene master, or nothing when there is none."""
+        item = await asyncio.to_thread(
+            get_item,
+            self._table_name,
+            {"scenePrincipal": scene_principal},
+        )
+        return None if item is None else SceneMaster.model_validate(item)

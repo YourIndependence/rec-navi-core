@@ -43,4 +43,4 @@ def test_no_object_key_reaches_the_client(client, auth_headers):
 
     assert response.status_code == 200
     assert "thumbnailUri" not in response.text
-    assert "templates/tpl_" not in response.text
+    assert "assets/" not in response.text

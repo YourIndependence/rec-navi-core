@@ -39,12 +39,12 @@ def get_mock_scenes_templates() -> list[ScenesTemplate]:
             template_id="tpl_cafe",
             title="Cafe",
             scene_principals=["shop_gaikan", "main_dish", "main_dish"],
-            thumbnail_uri="templates/tpl_cafe/tile.jpg",
+            thumbnail_uri="assets/templates/tpl_cafe.jpg",
         ),
         ScenesTemplate(
             template_id="tpl_hotel",
             title="Hotel",
             scene_principals=["shop_gaikan", "room"],
-            thumbnail_uri="templates/tpl_hotel/tile.jpg",
+            thumbnail_uri="assets/templates/tpl_hotel.jpg",
         ),
     ]

@@ -27,13 +27,13 @@ CAFE = {
     "templateId": "tpl_cafe",
     "title": "Cafe",
     "scenePrincipals": ["shop_gaikan", "main_dish", "main_dish"],
-    "thumbnailUri": "templates/tpl_cafe/tile.jpg",
+    "thumbnailUri": "assets/templates/tpl_cafe.jpg",
 }
 HOTEL = {
     "templateId": "tpl_hotel",
     "title": "Hotel",
     "scenePrincipals": ["shop_gaikan", "room"],
-    "thumbnailUri": "templates/tpl_hotel/tile.jpg",
+    "thumbnailUri": "assets/templates/tpl_hotel.jpg",
 }
 
 
@@ -67,7 +67,7 @@ async def test_lists_every_stored_template():
     by_id = {t.template_id: t for t in templates}
     assert set(by_id) == {"tpl_cafe", "tpl_hotel"}
     assert by_id["tpl_cafe"].title == "Cafe"
-    assert by_id["tpl_hotel"].thumbnail_uri == "templates/tpl_hotel/tile.jpg"
+    assert by_id["tpl_hotel"].thumbnail_uri == "assets/templates/tpl_hotel.jpg"
 
 
 @pytest.mark.asyncio

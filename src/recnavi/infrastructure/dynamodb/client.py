@@ -38,3 +38,9 @@ def scan_all(table_name: str) -> list[dict]:
         if not last_key:
             return items
         arguments["ExclusiveStartKey"] = last_key
+
+
+def get_item(table_name: str, key: dict) -> dict | None:
+    """Read one item by its key, or nothing when there is none."""
+    response = get_table(table_name).get_item(Key=key)
+    return response.get("Item")

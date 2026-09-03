@@ -16,11 +16,13 @@ from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import get_authenticated_user
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.dependencies import get_asset_storage
 from recnavi.apis.dependencies import get_scene_master_repository
 from recnavi.apis.dependencies import get_scenes_template_repository
 from recnavi.core.types.authenticated_user import AuthenticatedUser
 from recnavi.core.types.x_user import XUser
 from recnavi.main import app
+from tests.mockups.mock_asset_storage import MockAssetStorage
 from tests.mockups.mock_scene_master_repository import (
     MockSceneMasterRepository,
 )
@@ -44,6 +46,7 @@ def client():
     app.dependency_overrides[get_scenes_template_repository] = (
         MockScenesTemplateRepository
     )
+    app.dependency_overrides[get_asset_storage] = MockAssetStorage
 
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client

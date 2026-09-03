@@ -53,7 +53,7 @@ def test_keeps_the_object_keys_on_the_server():
 
     assert "thumbnailUri" not in body
     assert "guideUri" not in body
-    assert "masters/" not in body
+    assert "assets/" not in body
 
 
 def test_accepts_an_empty_list():
@@ -102,7 +102,7 @@ def test_templates_keep_the_object_keys_on_the_server():
     body = str(response.model_dump(by_alias=True))
 
     assert "thumbnailUri" not in body
-    assert "templates/" not in body
+    assert "assets/" not in body
 
 
 def test_templates_accept_an_empty_list():

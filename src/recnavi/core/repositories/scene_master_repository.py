@@ -22,3 +22,7 @@ class BaseSceneMasterRepository(ABC):
     @abstractmethod
     async def list_all(self) -> list[SceneMaster]:
         """Return every scene master."""
+
+    @abstractmethod
+    async def get(self, *, scene_principal: str) -> SceneMaster | None:
+        """Return one scene master, or nothing when there is none."""

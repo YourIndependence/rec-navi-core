@@ -29,6 +29,11 @@ DDB_SCENE_TEMPLATES_TABLE = os.environ.get(
     "recnavi-dev-scene-templates",
 )
 
+MEDIA_BUCKET_NAME = os.environ.get(
+    "MEDIA_BUCKET_NAME",
+    "recnavi-dev-media",
+)
+
 COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "dummy")
 
@@ -50,3 +55,7 @@ def _get_cors_origins() -> list[str]:
 CORS_ORIGINS = _get_cors_origins()
 
 LOG_BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "recnavi-dev-log-data")
+
+# An asset is a shared instruction, not customer data, and it barely ever
+# changes. Without this the browser pulls dozens of images on every launch.
+ASSET_CACHE_CONTROL = "public, max-age=86400"
