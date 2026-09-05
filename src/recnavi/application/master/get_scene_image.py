@@ -14,8 +14,8 @@ from recnavi.core.repositories.asset_storage import BaseAssetStorage
 from recnavi.core.repositories.scene_master_repository import (
     BaseSceneMasterRepository,
 )
-from recnavi.core.types.scene_image import SceneImage
-from recnavi.core.types.scene_image import SceneImageKind
+from recnavi.core.types.image_asset import ImageAsset
+from recnavi.core.types.scene_master import SceneImageKind
 
 
 async def get_scene_image(
@@ -24,7 +24,7 @@ async def get_scene_image(
     kind: SceneImageKind,
     repository: BaseSceneMasterRepository,
     storage: BaseAssetStorage,
-) -> SceneImage | None:
+) -> ImageAsset | None:
     """Return one image of a scene master, or nothing when there is none.
 
     The client asks by principal, so the object key is resolved here and
@@ -43,4 +43,4 @@ async def get_scene_image(
     if content is None:
         return None
 
-    return SceneImage.of(content=content, uri=uri)
+    return ImageAsset.of(content=content, uri=uri)

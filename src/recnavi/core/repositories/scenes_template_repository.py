@@ -22,3 +22,7 @@ class BaseScenesTemplateRepository(ABC):
     @abstractmethod
     async def list_all(self) -> list[ScenesTemplate]:
         """Return every scenes template."""
+
+    @abstractmethod
+    async def get(self, *, template_id: str) -> ScenesTemplate | None:
+        """Return one scenes template, or nothing when there is none."""

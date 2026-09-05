@@ -24,6 +24,7 @@ from recnavi.apis.dependencies import get_scenes_template_repository
 from recnavi.apis.schemas.master_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.master_schemas import GetTemplatesResponse
 from recnavi.application.master.get_scene_image import get_scene_image
+from recnavi.application.master.get_template_image import get_template_image
 from recnavi.application.master.list_scene_masters import list_scene_masters
 from recnavi.application.master.list_scenes_templates import (
     list_scenes_templates,
@@ -36,7 +37,8 @@ from recnavi.core.repositories.scene_master_repository import (
 from recnavi.core.repositories.scenes_template_repository import (
     BaseScenesTemplateRepository,
 )
-from recnavi.core.types.scene_image import SceneImageKind
+from recnavi.core.types.image_asset import ImageAsset
+from recnavi.core.types.scene_master import SceneImageKind
 
 
 master_router = APIRouter(tags=["Master"])
@@ -97,10 +99,46 @@ async def get_scene_thumbnail(
         repository=repository,
         storage=storage,
     )
+    return _image_response(image, missing="No image is stored for that scene.")
+
+
+@master_router.get(
+    "/getTemplateThumbnail",
+    response_class=Response,
+    responses={200: {"content": {"image/*": {}}}},
+)
+async def get_template_thumbnail(
+    template_id: str = Query(..., alias="templateId"),
+    repository: BaseScenesTemplateRepository = Depends(
+        get_scenes_template_repository,
+    ),
+    storage: BaseAssetStorage = Depends(get_asset_storage),
+) -> Response:
+    """Serve the tile image of a scenes template.
+
+    Carries no token for the same reason as getSceneThumbnail.
+    """
+    image = await get_template_image(
+        template_id=template_id,
+        repository=repository,
+        storage=storage,
+    )
+    return _image_response(
+        image,
+        missing="No image is stored for that template.",
+    )
+
+
+def _image_response(image: ImageAsset | None, *, missing: str) -> Response:
+    """Serve an image, or say it is not there.
+
+    A record naming an object that is no longer stored is an operational
+    mistake, so it answers 404 rather than being reported as a fault.
+    """
     if image is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No image is stored for that scene.",
+            detail=missing,
         )
 
     return Response(

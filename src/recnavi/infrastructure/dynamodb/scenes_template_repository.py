@@ -16,6 +16,7 @@ from recnavi.core.repositories.scenes_template_repository import (
     BaseScenesTemplateRepository,
 )
 from recnavi.core.types.scenes_template import ScenesTemplate
+from recnavi.infrastructure.dynamodb.client import get_item
 from recnavi.infrastructure.dynamodb.client import scan_all
 
 
@@ -33,3 +34,12 @@ class DynamoDbScenesTemplateRepository(BaseScenesTemplateRepository):
         """
         items = await asyncio.to_thread(scan_all, self._table_name)
         return [ScenesTemplate.model_validate(item) for item in items]
+
+    async def get(self, *, template_id: str) -> ScenesTemplate | None:
+        """Return one scenes template, or nothing when there is none."""
+        item = await asyncio.to_thread(
+            get_item,
+            self._table_name,
+            {"templateId": template_id},
+        )
+        return None if item is None else ScenesTemplate.model_validate(item)

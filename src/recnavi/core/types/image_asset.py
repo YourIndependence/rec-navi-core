@@ -8,10 +8,9 @@
 # developer team.
 
 
-"""SceneImage"""
+"""ImageAsset"""
 
 import mimetypes
-from enum import StrEnum
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -22,14 +21,7 @@ from pydantic import alias_generators
 FALLBACK_MEDIA_TYPE = "application/octet-stream"
 
 
-class SceneImageKind(StrEnum):
-    """Which of a scene master's two images is wanted."""
-
-    EXAMPLE = "example"
-    GUIDE = "guide"
-
-
-class SceneImage(BaseModel):
+class ImageAsset(BaseModel):
     """An image served as the body of a response."""
 
     model_config = ConfigDict(
@@ -41,12 +33,16 @@ class SceneImage(BaseModel):
     media_type: str = Field(..., description="What the bytes are")
 
     @classmethod
-    def of(cls, *, content: bytes, uri: str) -> "SceneImage":
+    def of(cls, *, content: bytes, uri: str) -> "ImageAsset":
         """Build an image, naming the bytes after the stored object."""
         return cls(content=content, media_type=media_type_of(uri))
 
 
 def media_type_of(uri: str) -> str:
-    """Name the bytes after the extension the object was stored under."""
+    """Name the bytes after the extension the object was stored under.
+
+    The ContentType S3 reports depends on how the object was uploaded and
+    is often binary/octet-stream. The extension is what we control.
+    """
     guessed, _ = mimetypes.guess_type(uri)
     return guessed or FALLBACK_MEDIA_TYPE

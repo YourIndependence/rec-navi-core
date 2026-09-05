@@ -10,10 +10,19 @@
 
 """SceneMaster"""
 
+from enum import StrEnum
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+
+
+class SceneImageKind(StrEnum):
+    """Which of a scene master's two images is wanted."""
+
+    EXAMPLE = "example"
+    GUIDE = "guide"
 
 
 class SceneMaster(BaseModel):

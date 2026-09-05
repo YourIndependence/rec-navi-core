@@ -12,7 +12,7 @@
 import pytest
 
 from recnavi.application.master.get_scene_image import get_scene_image
-from recnavi.core.types.scene_image import SceneImageKind
+from recnavi.core.types.scene_master import SceneImageKind
 from tests.mockups.mock_asset_storage import MockAssetStorage
 from tests.mockups.mock_scene_master_repository import (
     MockSceneMasterRepository,

@@ -117,6 +117,36 @@ async def test_reads_beyond_a_single_scan_page():
     assert len(templates) == 30
 
 
+@pytest.mark.asyncio
+async def test_gets_one_template_by_id():
+    """A single template is fetched by key, not by scanning."""
+    with mock_aws():
+        table = _create_table()
+        table.put_item(Item=CAFE)
+        table.put_item(Item=HOTEL)
+
+        template = await DynamoDbScenesTemplateRepository(
+            table_name=TABLE_NAME,
+        ).get(template_id="tpl_hotel")
+
+    assert template is not None
+    assert template.title == "Hotel"
+    assert template.thumbnail_uri == "assets/templates/tpl_hotel.jpg"
+
+
+@pytest.mark.asyncio
+async def test_answers_nothing_for_an_unknown_id():
+    """An unknown identifier is not an error the caller has to catch."""
+    with mock_aws():
+        _create_table()
+
+        template = await DynamoDbScenesTemplateRepository(
+            table_name=TABLE_NAME,
+        ).get(template_id="tpl_nowhere")
+
+    assert template is None
+
+
 def test_implements_the_core_abstraction():
     """The application layer only ever sees the abstraction."""
     assert issubclass(

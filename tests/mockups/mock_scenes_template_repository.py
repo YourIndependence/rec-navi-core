@@ -26,6 +26,12 @@ class MockScenesTemplateRepository(BaseScenesTemplateRepository):
     async def list_all(self) -> list[ScenesTemplate]:
         return self.templates
 
+    async def get(self, *, template_id: str) -> ScenesTemplate | None:
+        for template in self.templates:
+            if template.template_id == template_id:
+                return template
+        return None
+
 
 @pytest.fixture
 def mock_scenes_template_repository():
