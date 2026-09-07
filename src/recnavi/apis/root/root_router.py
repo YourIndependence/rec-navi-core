@@ -20,7 +20,7 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.response_schemas import GreetingResponse
 from recnavi.apis.schemas.user_schemas import GetMeResponse
 from recnavi.config.variables import ENV
-from recnavi.core.types.authenticated_user import AuthenticatedUser
+from recnavi.core.types.group_user import GroupUser
 from recnavi.core.types.x_user import XUser
 
 
@@ -55,10 +55,7 @@ async def greeting_me(
 
 @root_router.get("/getMe", response_model=GetMeResponse)
 async def get_me(
-    authenticated_user: AuthenticatedUser = Depends(get_authenticated_user),
+    authenticated_user: GroupUser = Depends(get_authenticated_user),
 ) -> GetMeResponse:
     """Return the signed-in user and the tenant they belong to."""
-    return GetMeResponse(
-        user=authenticated_user.user,
-        group_id=authenticated_user.group_id,
-    )
+    return GetMeResponse.from_group_user(authenticated_user)

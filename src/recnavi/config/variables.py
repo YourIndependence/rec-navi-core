@@ -29,6 +29,11 @@ DDB_SCENE_TEMPLATES_TABLE = os.environ.get(
     "recnavi-dev-scene-templates",
 )
 
+DDB_USERS_TABLE = os.environ.get(
+    "DDB_USERS_TABLE",
+    "recnavi-dev-users",
+)
+
 MEDIA_BUCKET_NAME = os.environ.get(
     "MEDIA_BUCKET_NAME",
     "recnavi-dev-media",

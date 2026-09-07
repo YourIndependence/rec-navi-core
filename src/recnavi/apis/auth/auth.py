@@ -11,6 +11,7 @@
 
 import boto3
 import httpx
+from fastapi import Depends
 from fastapi import HTTPException
 from fastapi import Request
 from fastapi import status
@@ -18,11 +19,13 @@ from jose import jwt
 from jose.exceptions import ExpiredSignatureError
 from jose.exceptions import JWTError
 
-from recnavi.apis.auth.claims import build_authenticated_user
+from recnavi.apis.auth.claims import read_user_id
+from recnavi.apis.dependencies import get_user_repository
 from recnavi.config.variables import COGNITO_CLIENT_ID
 from recnavi.config.variables import COGNITO_USER_POOL_ID
 from recnavi.config.variables import REGION
-from recnavi.core.types.authenticated_user import AuthenticatedUser
+from recnavi.core.repositories.user_repository import BaseUserRepository
+from recnavi.core.types.group_user import GroupUser
 from recnavi.core.types.x_user import XUser
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientPermissionError
@@ -46,8 +49,15 @@ async def verify_user(request: Request) -> XUser:
         ) from e
 
 
-async def get_authenticated_user(request: Request) -> AuthenticatedUser:
-    """Resolve the signed-in user, or refuse the request."""
+async def get_authenticated_user(
+    request: Request,
+    repository: BaseUserRepository = Depends(get_user_repository),
+) -> GroupUser:
+    """Resolve the signed-in user, or refuse the request.
+
+    Cognito says who is calling. The users table says what they may do
+    and which tenant they belong to.
+    """
     try:
         claims = await decode_token(request)
     except ClientPermissionError as e:
@@ -57,12 +67,19 @@ async def get_authenticated_user(request: Request) -> AuthenticatedUser:
         ) from e
 
     try:
-        authenticated_user = build_authenticated_user(claims=claims)
+        user_id = read_user_id(claims=claims)
     except ClientAuthorizationError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e),
         ) from e
+
+    authenticated_user = await repository.get(user_id=user_id)
+    if authenticated_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account has not been set up for the service.",
+        )
 
     request.state.authenticated_user = authenticated_user
     return authenticated_user

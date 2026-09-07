@@ -27,7 +27,12 @@ class UserRole(StrEnum):
 
 
 class GroupUser(BaseModel):
-    """A user as a member of a group."""
+    """A user as a member of a group.
+
+    Cognito holds the identity: who this is and how they sign in. What
+    they may do and where they belong is stored here, so a change takes
+    effect on the next request rather than on the next sign-in.
+    """
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
@@ -37,3 +42,4 @@ class GroupUser(BaseModel):
     user_id: str = Field(..., description="Identifier of the user")
     user_name: str = Field(..., description="Name shown to other members")
     role: UserRole = Field(..., description="What the user may do")
+    group_id: str = Field(..., description="Tenant the user belongs to")

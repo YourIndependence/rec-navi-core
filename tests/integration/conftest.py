@@ -19,7 +19,7 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.dependencies import get_asset_storage
 from recnavi.apis.dependencies import get_scene_master_repository
 from recnavi.apis.dependencies import get_scenes_template_repository
-from recnavi.core.types.authenticated_user import AuthenticatedUser
+from recnavi.core.types.group_user import GroupUser
 from recnavi.core.types.x_user import XUser
 from recnavi.main import app
 from tests.mockups.mock_asset_storage import MockAssetStorage
@@ -29,7 +29,7 @@ from tests.mockups.mock_scene_master_repository import (
 from tests.mockups.mock_scenes_template_repository import (
     MockScenesTemplateRepository,
 )
-from tests.mockups.mock_users import get_mock_authenticated_user
+from tests.mockups.mock_user_repository import get_mock_group_user
 from tests.mockups.mock_users import get_mock_x_user
 
 
@@ -37,9 +37,7 @@ from tests.mockups.mock_users import get_mock_x_user
 def client():
     """FastAPI test client with mocked authentication."""
     app.dependency_overrides[verify_user] = get_mock_x_user
-    app.dependency_overrides[get_authenticated_user] = (
-        get_mock_authenticated_user
-    )
+    app.dependency_overrides[get_authenticated_user] = get_mock_group_user
     app.dependency_overrides[get_scene_master_repository] = (
         MockSceneMasterRepository
     )
@@ -71,6 +69,6 @@ def mock_x_user() -> XUser:
 
 
 @pytest.fixture
-def mock_authenticated_user() -> AuthenticatedUser:
-    """Mock AuthenticatedUser for integration tests."""
-    return get_mock_authenticated_user()
+def mock_group_user() -> GroupUser:
+    """Mock signed-in user for integration tests."""
+    return get_mock_group_user()

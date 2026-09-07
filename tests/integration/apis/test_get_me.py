@@ -25,3 +25,10 @@ def test_get_me(client, auth_headers):
         },
         "groupId": "grp_sushi_taro",
     }
+
+
+def test_names_the_tenant_once(client, auth_headers):
+    """The group is not repeated inside the member."""
+    response = client.get("/getMe", headers=auth_headers)
+
+    assert "groupId" not in response.json()["user"]

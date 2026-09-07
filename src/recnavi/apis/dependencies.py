@@ -12,6 +12,7 @@
 
 from recnavi.config.variables import DDB_SCENE_TEMPLATES_TABLE
 from recnavi.config.variables import DDB_SCENES_TABLE
+from recnavi.config.variables import DDB_USERS_TABLE
 from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.core.repositories.asset_storage import BaseAssetStorage
 from recnavi.core.repositories.scene_master_repository import (
@@ -20,11 +21,15 @@ from recnavi.core.repositories.scene_master_repository import (
 from recnavi.core.repositories.scenes_template_repository import (
     BaseScenesTemplateRepository,
 )
+from recnavi.core.repositories.user_repository import BaseUserRepository
 from recnavi.infrastructure.dynamodb.scene_master_repository import (
     DynamoDbSceneMasterRepository,
 )
 from recnavi.infrastructure.dynamodb.scenes_template_repository import (
     DynamoDbScenesTemplateRepository,
+)
+from recnavi.infrastructure.dynamodb.user_repository import (
+    DynamoDbUserRepository,
 )
 from recnavi.infrastructure.s3.asset_storage import S3AssetStorage
 
@@ -44,3 +49,8 @@ def get_scenes_template_repository() -> BaseScenesTemplateRepository:
 def get_asset_storage() -> BaseAssetStorage:
     """Get where the application assets are kept."""
     return S3AssetStorage(bucket_name=MEDIA_BUCKET_NAME)
+
+
+def get_user_repository() -> BaseUserRepository:
+    """Get where the users are kept."""
+    return DynamoDbUserRepository(table_name=DDB_USERS_TABLE)
