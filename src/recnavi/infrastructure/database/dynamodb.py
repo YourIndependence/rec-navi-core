@@ -18,7 +18,6 @@ import aioboto3
 from recnavi.core.database.base_database import BaseDatabase
 
 
-
 class DynamoDb(BaseDatabase):
     """DynamoDB"""
 
@@ -118,7 +117,7 @@ def _convert_from_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
     """Convert DynamoDB Decimal values to Python numbers."""
     return json.loads(
         json.dumps(
-            item, default=_decimal_to_num,
+            item,
+            default=_decimal_to_num,
         ),
     )
-
