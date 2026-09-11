@@ -22,7 +22,7 @@ from recnavi.core.types.user import User
 
 def test_get_me_returns_user_when_authenticated(client):
     """Test GET /getMe returns user when properly authenticated."""
-    from recnavi.apis.dependencies.auth import verify_user
+    from recnavi.apis.auth.auth import verify_user
 
     mock_user = User(
         user_id="test-user-123",

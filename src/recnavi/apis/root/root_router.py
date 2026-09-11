@@ -14,7 +14,7 @@ import time
 from fastapi import APIRouter
 from fastapi import Depends
 
-from recnavi.apis.dependencies.auth import verify_user
+from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.user_schemas import GetMeResponse
 from recnavi.config.variables import ENV
 from recnavi.core.types.user import User
@@ -40,7 +40,9 @@ async def greeting():
 
 
 @root_router.get("/getMe")
-async def get_me(user: User = Depends(verify_user)) -> GetMeResponse:
+async def get_me(
+    user: User = Depends(verify_user),
+) -> GetMeResponse:
     """Get current authenticated user.
 
     Returns the currently signed-in user's information based on their
