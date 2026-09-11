@@ -3,7 +3,7 @@ name = "rec-navi-core"
 version = "0.1.0"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "boto3>=1.43.62",
+    "aioboto3>=15.5.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "pydantic>=2.13.4",
@@ -108,6 +108,10 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "real_aws: mark test as requiring real AWS access (deselect with '-m \"not real_aws\"')",
+    "ecs: mark test as ECS dispatch test",
+]
 
 [dependency-groups]
 dev = [

@@ -1,0 +1,123 @@
+# Copyright (c) 2026 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
+"""DynamoDB implementation with Decimal conversion."""
+
+import json
+from decimal import Decimal
+from typing import Any
+
+import aioboto3
+
+from recnavi.core.database.base_database import BaseDatabase
+
+
+class DynamoDb(BaseDatabase):
+    """DynamoDB"""
+
+    def __init__(self, table_name: str):
+        """Initialize DynamoDb with table name.
+
+        Args:
+            table_name: Name of the DynamoDB table.
+
+        """
+        self.table_name = table_name
+        self.session = aioboto3.Session()
+
+    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
+        """Get an item by primary key.
+
+        Args:
+            key: Primary key as a dictionary.
+
+        Returns:
+            Item as a dictionary with Python native types if found, None otherwise.
+
+        """
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            response = await table.get_item(Key=key)
+            item = response.get("Item")
+            return _convert_from_dynamodb_format(item) if item else None
+
+    async def put_item(self, item: dict[str, Any]) -> None:
+        """Put an item into the table.
+
+        Args:
+            item: Item to store with Python native types.
+
+        """
+        converted_item = _convert_to_dynamodb_format(item)
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            await table.put_item(Item=converted_item)
+
+    async def query(
+        self,
+        key_condition: dict[str, Any],
+        _filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query items by key condition.
+
+        Args:
+            key_condition: Key condition for the query.
+            _filter_expression: Optional filter expression (reserved for future use).
+            index: Optional global or local secondary index name.
+
+        Returns:
+            List of items with Python native types matching the query.
+
+        """
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            query_kwargs = dict(key_condition)
+            if index is not None:
+                query_kwargs["IndexName"] = index
+            response = await table.query(**query_kwargs)
+            items = response.get("Items", [])
+            return [_convert_from_dynamodb_format(item) for item in items]
+
+    async def delete_item(self, key: dict[str, Any]) -> None:
+        """Delete an item by primary key.
+
+        Args:
+            key: Primary key as a dictionary.
+
+        """
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            await table.delete_item(Key=key)
+
+
+def _decimal_to_num(obj: Any) -> int | float | object | None:
+    """Convert Decimal values to Python numbers."""
+    if isinstance(obj, Decimal):
+        return int(obj) if float(obj).is_integer() else float(obj)
+    return None
+
+
+def _convert_to_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
+    """Convert Python numbers to DynamoDB Decimal values."""
+    return json.loads(
+        json.dumps(item, default=_decimal_to_num),
+        parse_float=Decimal,
+        parse_int=Decimal,
+    )
+
+
+def _convert_from_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
+    """Convert DynamoDB Decimal values to Python numbers."""
+    return json.loads(
+        json.dumps(
+            item,
+            default=_decimal_to_num,
+        ),
+    )

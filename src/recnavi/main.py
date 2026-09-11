@@ -21,9 +21,11 @@ from starlette.middleware.errors import ServerErrorMiddleware
 from recnavi.apis.root.root_router import root_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.utils.discord_handler import post_notify_discord
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
+from recnavi.infrastructure.database.dynamodb import DynamoDb
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -37,7 +39,12 @@ async def lifespan(_app: FastAPI):
     """Lifespan function."""
     logger.info("start booting server.")
     try:
-        if ENV != "LOCAL":
+        _app.state.database = {
+            USERS_TABLE_NAME: DynamoDb(table_name=USERS_TABLE_NAME),
+        }
+        logger.info("database instances initialized.")
+
+        if ENV not in ["LOCAL", "CI"]:
             post_notify_discord(
                 title=f"{ENV}: ECS Task started!",
                 message=f"{ENV}: ECS task started.",

@@ -11,9 +11,7 @@
 
 import boto3
 import httpx
-from fastapi import HTTPException
 from fastapi import Request
-from fastapi import status
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError
 from jose.exceptions import JWTError
@@ -21,7 +19,9 @@ from jose.exceptions import JWTError
 from recnavi.config.variables import COGNITO_CLIENT_ID
 from recnavi.config.variables import COGNITO_USER_POOL_ID
 from recnavi.config.variables import REGION
-from recnavi.core.types.x_user import XUser
+from recnavi.config.variables import USERS_TABLE_NAME
+from recnavi.core.types.user import User
+from recnavi.core.user.user import get_user_by_id
 from recnavi.exceptions.exceptions import ClientPermissionError
 
 
@@ -29,22 +29,22 @@ client = boto3.client("cognito-idp", region_name="ap-northeast-1")
 COGNITO_JWK_URL = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
 
 
-async def verify_user(request: Request) -> XUser:
-    """Verify user"""
-    try:
-        x_user = await get_verified_user(request)
-        request.state.x_user = x_user
-        return x_user
+async def verify_user(request: Request) -> User:
+    """Verify JWT token and return authenticated user from database."""
+    payload = await decode_token(request)
+    sub = str(payload["sub"])
 
-    except ClientPermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e),
-        ) from e
+    user_database = request.app.state.database[USERS_TABLE_NAME]
+    user = await get_user_by_id(
+        user_id=sub,
+        user_database=user_database,
+    )
+
+    return user
 
 
-async def get_verified_user(request: Request) -> XUser:
-    """Verify jwe token"""
+async def decode_token(request: Request) -> dict[str, object]:
+    """Verify the bearer token and return its claims."""
     authorization = request.headers.get("authorization")
     client_id = request.headers.get("client-Id", COGNITO_CLIENT_ID)
     if not authorization:
@@ -62,7 +62,10 @@ async def get_verified_user(request: Request) -> XUser:
         jwks = response.json()["keys"]
         headers = jwt.get_unverified_header(token)
         kid = headers.get("kid")
-        key = next((key for key in jwks if key["kid"] == kid), None)
+        key = next(
+            (key for key in jwks if key["kid"] == kid),
+            None,
+        )
 
         if key is None:
             raise ClientPermissionError("Invalid token")
@@ -75,10 +78,7 @@ async def get_verified_user(request: Request) -> XUser:
             options={"verify_at_hash": False},
         )
 
-        return XUser(
-            id=payload.get("id"),
-            email=payload.get("email"),
-        )
+        return payload
 
     except httpx.HTTPError as e:
         raise JWTError(f"Failed to fetch JWKs: {e!s}") from e

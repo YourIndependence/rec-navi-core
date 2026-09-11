@@ -7,7 +7,9 @@
 # For internal use only.
 # developer team.
 
-"""user model."""
+"""api response schemas."""
+
+from enum import StrEnum
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -15,14 +17,23 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
-class XUser(BaseModel):
-    """load shared history item."""
+class ResponseStatus(StrEnum):
+    """Response status enumeration."""
+
+    OK = "ok"
+    ERROR = "error"
+
+
+class BaseApiResponseModel(BaseModel):
+    """Base API response model."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
-        extra="allow",
     )
-    id: str = Field(..., description="user unique ID")
-    mail: str = Field(..., description="mail string")
-    is_admin: bool = Field(..., description="is admin")
+
+    status: ResponseStatus = Field(
+        default=ResponseStatus.OK,
+        description="Response status",
+    )
+    message: str | None = Field(default=None, description="Optional message")

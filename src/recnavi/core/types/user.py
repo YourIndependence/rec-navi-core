@@ -7,7 +7,8 @@
 # For internal use only.
 # developer team.
 
-"""api response schemas."""
+
+"""User"""
 
 from enum import StrEnum
 
@@ -16,32 +17,24 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
-from recnavi.core.types.x_user import XUser
+
+class UserRole(StrEnum):
+    """What a user is allowed to do."""
+
+    ADMIN = "admin"
+    OWNER = "owner"
+    STAFF = "staff"
 
 
-class ResponseStatus(StrEnum):
-    """Response status enumeration."""
-
-    OK = "ok"
-    ERROR = "error"
-
-
-class BaseApiResponseModel(BaseModel):
-    """Base API response model."""
+class User(BaseModel):
+    """user"""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
     )
 
-    status: ResponseStatus = Field(
-        default=ResponseStatus.OK,
-        description="Response status",
-    )
-    message: str | None = Field(default=None, description="Optional message")
-
-
-class GreetingResponse(BaseApiResponseModel):
-    """Greeting API response model."""
-
-    x_user: XUser
+    user_id: str = Field(..., description="Identifier of the user")
+    user_name: str = Field(..., description="Name shown to other members")
+    role: UserRole = Field(..., description="What the user may do")
+    group_id: str = Field(..., description="Tenant the user belongs to")
