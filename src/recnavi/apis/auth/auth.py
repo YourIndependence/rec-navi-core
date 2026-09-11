@@ -62,8 +62,9 @@ async def decode_token(request: Request) -> dict[str, object]:
         jwks = response.json()["keys"]
         headers = jwt.get_unverified_header(token)
         kid = headers.get("kid")
-        key: str | None = next(
-            (key for key in jwks if key["kid"] == kid), None
+        key = next(
+            (key for key in jwks if key["kid"] == kid),
+            None,
         )
 
         if key is None:

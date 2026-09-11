@@ -102,6 +102,8 @@ async def test_get_user_by_id_accepts_all_valid_roles():
         }
         mock_db = MockUserDatabase(users={f"user-{role}": user_data})
 
-        result = await get_user_by_id(user_id=f"user-{role}", user_database=mock_db)
+        result = await get_user_by_id(
+            user_id=f"user-{role}", user_database=mock_db
+        )
 
         assert result.role == role

@@ -62,4 +62,4 @@ async def get_me(
             or user has invalid role.
 
     """
-    return GetMeResponse(user=user, group_id=user.group_id)
+    return GetMeResponse(user=user)

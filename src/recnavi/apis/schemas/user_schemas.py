@@ -18,16 +18,10 @@ from recnavi.core.types.user import User
 class GetMeResponse(BaseApiResponseModel):
     """Response schema for GET /getMe endpoint.
 
-    Returns the currently authenticated user and their group ID. The groupId
-    is placed at the top level (not duplicated inside user) so the frontend
-    can immediately determine which screen to display.
+    Returns the currently authenticated user, including their group ID.
     """
 
     user: User = Field(
         ...,
         description="Current authenticated user information",
-    )
-    group_id: str = Field(
-        ...,
-        description="Group/tenant ID the user belongs to",
     )

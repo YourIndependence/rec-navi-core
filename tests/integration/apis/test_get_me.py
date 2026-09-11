@@ -48,7 +48,7 @@ def test_get_me_returns_user_when_authenticated(client):
         assert data["user"]["userId"] == "test-user-123"
         assert data["user"]["userName"] == "Test User"
         assert data["user"]["role"] == "admin"
-        assert data["groupId"] == "group-999"
+        assert data["user"]["groupId"] == "group-999"
     finally:
         client.app.dependency_overrides.clear()
 
@@ -87,6 +87,6 @@ def test_get_me_with_real_aws(client, auth_headers):
         data = response.json()
         assert data["status"] == "ok"
         assert "user" in data
-        assert "groupId" in data
         assert "userId" in data["user"]
+        assert "groupId" in data["user"]
         assert "role" in data["user"]
