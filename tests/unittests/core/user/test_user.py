@@ -33,6 +33,7 @@ class MockUserDatabase:
         self,
         key_condition: dict,
         filter_expression: dict | None = None,
+        index: str | None = None,
     ) -> list[dict]:
         return []
 
@@ -103,7 +104,8 @@ async def test_get_user_by_id_accepts_all_valid_roles():
         mock_db = MockUserDatabase(users={f"user-{role}": user_data})
 
         result = await get_user_by_id(
-            user_id=f"user-{role}", user_database=mock_db
+            user_id=f"user-{role}",
+            user_database=mock_db,
         )
 
         assert result.role == role

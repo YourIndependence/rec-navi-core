@@ -137,12 +137,14 @@ class DynamoDb(BaseDatabase):
         self,
         key_condition: dict[str, Any],
         _filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query items by key condition.
 
         Args:
             key_condition: Key condition for the query.
             _filter_expression: Optional filter expression (reserved for future use).
+            index: Optional global or local secondary index name.
 
         Returns:
             List of items with Python native types matching the query.
@@ -150,7 +152,10 @@ class DynamoDb(BaseDatabase):
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.query(**key_condition)
+            query_kwargs = dict(key_condition)
+            if index is not None:
+                query_kwargs["IndexName"] = index
+            response = await table.query(**query_kwargs)
             items = response.get("Items", [])
             return [_convert_from_dynamodb_format(item) for item in items]
 

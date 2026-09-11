@@ -51,12 +51,14 @@ class BaseDatabase(ABC):
         self,
         key_condition: dict[str, Any],
         filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query items by key condition.
 
         Args:
             key_condition: Key condition for the query.
             filter_expression: Optional filter expression.
+            index: Optional global or local secondary index name.
 
         Returns:
             List of items matching the query.
