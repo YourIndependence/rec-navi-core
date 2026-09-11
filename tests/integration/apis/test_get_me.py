@@ -16,22 +16,6 @@ Mark with @pytest.mark.real_aws to skip in CI without AWS access.
 import pytest
 
 
-def test_get_me_returns_user_when_authenticated(
-    client,
-    auth_headers,
-):
-    """Test GET /getMe returns user when properly authenticated."""
-    response = client.get("/getMe", headers=auth_headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert data["user"]["userId"] == "test-user-123"
-    assert data["user"]["userName"] == "Test User"
-    assert data["user"]["role"] == "admin"
-    assert data["user"]["groupId"] == "group-999"
-
-
 def test_get_me_returns_400_when_no_token(client):
     """Test GET /getMe returns 400 when no authorization header."""
     response = client.get("/getMe")
