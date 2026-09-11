@@ -28,11 +28,13 @@ class SceneMasterView(BaseModel):
     )
 
     scene_principal: str = Field(
-        ..., description="Identifier of the scene master",
+        ...,
+        description="Identifier of the scene master",
     )
     title: str = Field(..., description="Name shown to the staff")
     max_duration_seconds: int = Field(
-        ..., description="How long the staff may record",
+        ...,
+        description="How long the staff may record",
     )
 
 
