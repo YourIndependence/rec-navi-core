@@ -12,13 +12,8 @@
 import time
 
 from fastapi import APIRouter
-from fastapi import Depends
-from fastapi import Request
 
-from recnavi.apis.auth.auth import verify_user
-from recnavi.apis.schemas.response_schemas import GreetingResponse
 from recnavi.config.variables import ENV
-from recnavi.core.types.x_user import XUser
 
 
 root_router = APIRouter(tags=["Root"])
@@ -38,13 +33,3 @@ async def greeting():
         "timestamp": int(time.time()),
         "environment": ENV,
     }
-
-
-@root_router.post("/greetingMe", response_model=GreetingResponse)
-async def greeting_me(
-    request: Request,
-    x_user: XUser = Depends(verify_user),
-) -> GreetingResponse:
-    """Task status check API for pooling."""
-    _ = request
-    return GreetingResponse(x_user=x_user)

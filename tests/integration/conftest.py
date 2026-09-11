@@ -14,16 +14,12 @@ Detected automatically by pytest, so no need to import it in the test code.
 import pytest
 from fastapi.testclient import TestClient
 
-from recnavi.apis.auth.auth import verify_user
-from recnavi.core.types.x_user import XUser
 from recnavi.main import app
-from tests.mockups.mock_users import get_mock_x_user
 
 
 @pytest.fixture(scope="session", autouse=True)
 def client():
     """FastAPI test client with mocked authentication."""
-    app.dependency_overrides[verify_user] = get_mock_x_user
 
     with TestClient(app, raise_server_exceptions=False) as client:
         yield client
@@ -39,9 +35,3 @@ def auth_headers():
         "Authorization": f"Bearer {token}",
         "Client-Id": "dummy_client_id",
     }
-
-
-@pytest.fixture
-def mock_x_user() -> XUser:
-    """Mock XUser for integration tests."""
-    return get_mock_x_user()

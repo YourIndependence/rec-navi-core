@@ -16,8 +16,6 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
-from recnavi.core.types.x_user import XUser
-
 
 class ResponseStatus(StrEnum):
     """Response status enumeration."""
@@ -39,9 +37,3 @@ class BaseApiResponseModel(BaseModel):
         description="Response status",
     )
     message: str | None = Field(default=None, description="Optional message")
-
-
-class GreetingResponse(BaseApiResponseModel):
-    """Greeting API response model."""
-
-    x_user: XUser

@@ -11,9 +11,7 @@
 
 import boto3
 import httpx
-from fastapi import HTTPException
 from fastapi import Request
-from fastapi import status
 from jose import jwt
 from jose.exceptions import ExpiredSignatureError
 from jose.exceptions import JWTError
@@ -21,7 +19,6 @@ from jose.exceptions import JWTError
 from recnavi.config.variables import COGNITO_CLIENT_ID
 from recnavi.config.variables import COGNITO_USER_POOL_ID
 from recnavi.config.variables import REGION
-from recnavi.core.types.x_user import XUser
 from recnavi.exceptions.exceptions import ClientPermissionError
 
 
@@ -29,22 +26,8 @@ client = boto3.client("cognito-idp", region_name="ap-northeast-1")
 COGNITO_JWK_URL = f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}/.well-known/jwks.json"
 
 
-async def verify_user(request: Request) -> XUser:
-    """Verify user"""
-    try:
-        x_user = await get_verified_user(request)
-        request.state.x_user = x_user
-        return x_user
-
-    except ClientPermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=str(e),
-        ) from e
-
-
-async def get_verified_user(request: Request) -> XUser:
-    """Verify jwe token"""
+async def decode_token(request: Request) -> dict[str, object]:
+    """Verify the bearer token and return its claims."""
     authorization = request.headers.get("authorization")
     client_id = request.headers.get("client-Id", COGNITO_CLIENT_ID)
     if not authorization:
@@ -75,10 +58,7 @@ async def get_verified_user(request: Request) -> XUser:
             options={"verify_at_hash": False},
         )
 
-        return XUser(
-            id=payload.get("id"),
-            email=payload.get("email"),
-        )
+        return payload
 
     except httpx.HTTPError as e:
         raise JWTError(f"Failed to fetch JWKs: {e!s}") from e
