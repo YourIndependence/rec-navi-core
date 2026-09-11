@@ -22,14 +22,11 @@ async def get_user_by_id(
     """Get user from database and validate.
 
     Args:
-        user_id: User ID to fetch.
         user_database: Database instance for user table.
+        user_id:
 
     Returns:
         Validated User object.
-
-    Raises:
-        ClientAuthorizationError: If user not found or has invalid role.
 
     """
     item = await user_database.get_item(key={"userId": user_id})
