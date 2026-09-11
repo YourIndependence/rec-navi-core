@@ -1,0 +1,75 @@
+# Copyright (c) 2026 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
+"""Base database interface for all table operations."""
+
+from abc import ABC
+from abc import abstractmethod
+from typing import Any
+
+
+class BaseDatabase(ABC):
+    """Abstract base class for database table operations.
+
+    This interface defines common operations for interacting with database
+    tables. Concrete implementations handle specific database technologies
+    (e.g., DynamoDB, PostgreSQL).
+    """
+
+    @abstractmethod
+    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
+        """Get a single item by primary key.
+
+        Args:
+            key: Primary key (and sort key if applicable) as a dictionary.
+                 Example: {"userId": "abc123"}
+
+        Returns:
+            Item as a dictionary if found, None otherwise.
+
+        """
+        pass
+
+    @abstractmethod
+    async def put_item(self, item: dict[str, Any]) -> None:
+        """Put an item into the table.
+
+        Args:
+            item: Item to store as a dictionary. Must include primary key.
+
+        """
+        pass
+
+    @abstractmethod
+    async def query(
+        self,
+        key_condition: dict[str, Any],
+        filter_expression: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Query items by key condition.
+
+        Args:
+            key_condition: Key condition for the query.
+            filter_expression: Optional filter expression.
+
+        Returns:
+            List of items matching the query.
+
+        """
+        pass
+
+    @abstractmethod
+    async def delete_item(self, key: dict[str, Any]) -> None:
+        """Delete an item by primary key.
+
+        Args:
+            key: Primary key (and sort key if applicable) as a dictionary.
+
+        """
+        pass
