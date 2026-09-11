@@ -38,18 +38,25 @@ async def lifespan(_app: FastAPI):
     }
     yield
 
+# dependencies/auth.py
+async def verify_user(request: Request) -> User:
+    """Verify JWT token and return authenticated user from database."""
+    payload = await decode_token(request)
+    sub = str(payload["sub"])
+    user_db = request.app.state.database[USERS_TABLE_NAME]
+    user = await get_user_by_id(user_id=sub, user_db=user_db)
+    return user
+
 # root_router.py
 @root_router.get("/getMe")
-async def get_me(request: Request) -> GetMeResponse:
-    user_db = request.app.state.database[USERS_TABLE_NAME]
-    user = await get_me_use_case(sub=sub, user_db=user_db)
+async def get_me(user: User = Depends(verify_user)) -> GetMeResponse:
     return GetMeResponse(user=user, group_id=user.group_id)
 ```
 
 **Abstraction Layers:**
 - **Core**: `BaseDatabase` (ABC) defines common operations (`get_item`, `put_item`, `query`, `delete_item`)
 - **Infrastructure**: Concrete implementation `DynamoDb` with automatic Decimal conversion for all DynamoDB tables
-- **Application**: Use cases receive `BaseDatabase` instances
+- **API**: Endpoints and dependencies receive `BaseDatabase` instances from `request.app.state.database`
 
 ## Rationale
 
@@ -91,7 +98,7 @@ async def get_me(request: Request) -> GetMeResponse:
 
 ## Alternatives Considered
 
-### Alternative 1: FastAPI Depends with factory functions
+### Alternative 1: Dependency factories for each table
 ```python
 def get_user_database(request: Request) -> BaseDatabase:
     return request.app.state.database[USERS_TABLE_NAME]
@@ -101,25 +108,25 @@ async def get_me(
     request: Request,
     user_db: BaseDatabase = Depends(get_user_database)
 ):
+    user = await get_user_by_id(user_id=sub, user_db=user_db)
     ...
 ```
 
 **Positive:**
-- Cleaner endpoint signatures
-- Type hints in function parameters
+- Explicit database dependency in endpoint signatures
 
 **Negative:**
-- Additional boilerplate (dependency factory functions)
-- More indirection for simple state access
-- **Rejected** because direct `request.app.state` access is simpler for this use case
+- Additional boilerplate (dependency factory per table)
+- More indirection when database access is already wrapped in domain-specific dependencies (like `verify_user`)
+- **Rejected** because domain-specific dependencies (e.g., `verify_user`) provide better abstraction than table-specific factories
 
 ### Alternative 2: Global singletons
 ```python
-user_database = UserDatabase(table_name=USERS_TABLE_NAME)
+user_database = DynamoDb(table_name=USERS_TABLE_NAME)
 
 @root_router.get("/getMe")
 async def get_me(request: Request):
-    user = await get_me_use_case(sub=sub, user_db=user_database)
+    user = await get_user_by_id(user_id=sub, user_db=user_database)
 ```
 
 **Positive:**
@@ -135,8 +142,8 @@ async def get_me(request: Request):
 ```python
 @root_router.get("/getMe")
 async def get_me(request: Request):
-    user_db = UserDatabase(table_name=USERS_TABLE_NAME)  # Created every request
-    user = await get_me_use_case(sub=sub, user_db=user_db)
+    user_db = DynamoDb(table_name=USERS_TABLE_NAME)  # Created every request
+    user = await get_user_by_id(user_id=sub, user_db=user_db)
 ```
 
 **Positive:**
@@ -152,14 +159,14 @@ async def get_me(request: Request):
 **Do:**
 - Initialize all database instances in `main.py` `lifespan` function
 - Add new tables to `app.state.database` dictionary with environment-based table names
-- Access databases via `request.app.state.database[TABLE_NAME]` in API endpoints
-- Pass `BaseDatabase` instances to Application layer use cases
+- Access databases via `request.app.state.database[TABLE_NAME]` in API dependencies (e.g., `verify_user`)
+- Pass `BaseDatabase` instances to Core layer functions
 - Use fakes or mocks implementing `BaseDatabase` in unit tests
 
 **Don't:**
 - Create database instances inside endpoint functions
 - Use global database singletons
-- Skip `BaseDatabase` abstraction and use concrete classes directly in Application layer
+- Skip `BaseDatabase` abstraction and use concrete classes directly in Core layer
 - Hardcode table names (always use environment variables)
 
 ## References
