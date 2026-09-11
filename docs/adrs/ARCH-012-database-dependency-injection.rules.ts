@@ -170,5 +170,31 @@ export default {
         }
       },
     },
+
+    "no-infrastructure-imports-in-apis": {
+      description:
+        "APIs layer must not import from infrastructure/ — prevents tight coupling to concrete implementations",
+      severity: "error",
+      check: async (ctx) => {
+        const matches = await ctx.grepFiles(
+          /from recnavi\.infrastructure\b/,
+          "src/recnavi/apis/**/*.py",
+        );
+        for (const match of matches) {
+          // Skip main.py where infrastructure is initialized in lifespan
+          if (match.file.includes("main.py")) {
+            continue;
+          }
+
+          ctx.report.violation({
+            message:
+              "APIs layer imports from infrastructure/ — API endpoints should access databases via app.state.database, not import infrastructure directly",
+            file: match.file,
+            line: match.line,
+            fix: "Access database via request.app.state.database[TABLE_NAME] instead of importing from infrastructure/",
+          });
+        }
+      },
+    },
   },
 } satisfies RuleSet;
