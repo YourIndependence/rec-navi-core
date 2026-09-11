@@ -108,6 +108,10 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+markers = [
+    "real_aws: mark test as requiring real AWS access (deselect with '-m \"not real_aws\"')",
+    "ecs: mark test as ECS dispatch test",
+]
 
 [dependency-groups]
 dev = [

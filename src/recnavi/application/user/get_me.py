@@ -7,41 +7,27 @@
 # For internal use only.
 # developer team.
 
-"""Get current authenticated user use case."""
+"""Get current user use case."""
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
-from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.core.user.user import get_user_by_id
 
 
 async def get_me_use_case(sub: str, user_db: BaseDatabase) -> User:
-    """Get current authenticated user by Cognito sub.
+    """Get current authenticated user.
 
-    This use case retrieves the user from the users table using the Cognito
-    sub (subject) claim from the verified JWT token. The user's role and
-    group membership are stored in DynamoDB, not in Cognito, so that changes
-    take effect immediately without requiring the user to re-authenticate.
+    Application layer orchestration: simply calls core domain logic.
 
     Args:
-        sub: Cognito user sub (subject identifier from JWT token).
-        user_db: Database instance for accessing users table.
+        sub: User ID from authentication token.
+        user_db: Database instance for users table.
 
     Returns:
-        User object with userId, userName, role, and groupId.
+        User object.
 
     Raises:
-        ClientAuthorizationError: User not found in database (403).
-        ClientAuthorizationError: User has invalid or unknown role (403).
+        ClientAuthorizationError: If user not found or invalid.
 
     """
-    item = await user_db.get_item(key={"userId": sub})
-
-    if not item:
-        raise ClientAuthorizationError("User not found in database")
-
-    role = item.get("role")
-    if role not in [r.value for r in UserRole]:
-        raise ClientAuthorizationError(f"Invalid role: {role}")
-
-    return User.model_validate(item)
+    return await get_user_by_id(user_id=sub, user_db=user_db)
