@@ -36,14 +36,10 @@ async def test_get_me_use_case_calls_core_with_correct_args(
     # Create mock database
     mock_db = AsyncMock()
 
-    # Call use case
     result = await get_me_use_case(sub="user-123", user_db=mock_db)
 
-    # Verify core function was called with correct arguments
     mock_get_user_by_id.assert_called_once_with(
         user_id="user-123",
         user_db=mock_db,
     )
-
-    # Verify result is returned from core
     assert result == mock_user
