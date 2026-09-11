@@ -25,7 +25,7 @@ from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.utils.discord_handler import post_notify_discord
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
-from recnavi.infrastructure.database.user_database import UserDatabase
+from recnavi.infrastructure.database.dynamodb import DynamoDb
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -40,7 +40,7 @@ async def lifespan(_app: FastAPI):
     logger.info("start booting server.")
     try:
         _app.state.database = {
-            USERS_TABLE_NAME: UserDatabase(table_name=USERS_TABLE_NAME),
+            USERS_TABLE_NAME: DynamoDb(table_name=USERS_TABLE_NAME),
         }
         logger.info("database instances initialized.")
 

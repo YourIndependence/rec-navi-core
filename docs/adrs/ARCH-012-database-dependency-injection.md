@@ -33,7 +33,7 @@ Use **FastAPI application state** (`app.state.database`) as a dictionary holding
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     _app.state.database = {
-        USERS_TABLE_NAME: UserDatabase(table_name=USERS_TABLE_NAME),
+        USERS_TABLE_NAME: DynamoDb(table_name=USERS_TABLE_NAME),
         # Future tables can be added here
     }
     yield
@@ -48,7 +48,7 @@ async def get_me(request: Request) -> GetMeResponse:
 
 **Abstraction Layers:**
 - **Core**: `BaseDatabase` (ABC) defines common operations (`get_item`, `put_item`, `query`, `delete_item`)
-- **Infrastructure**: Concrete implementations like `UserDatabase` (DynamoDB)
+- **Infrastructure**: Concrete implementation `DynamoDb` with automatic Decimal conversion for all DynamoDB tables
 - **Application**: Use cases receive `BaseDatabase` instances
 
 ## Rationale
@@ -68,6 +68,13 @@ async def get_me(request: Request) -> GetMeResponse:
 - **Testability**: Unit tests use lightweight fakes without real DynamoDB
 - **Reusability**: All DynamoDB tables can share common interface
 - **Decoupling**: Application and Core layers don't depend on specific database technology
+
+**Why DynamoDb with Decimal conversion?**
+- **DynamoDB limitation**: DynamoDB doesn't support native int/float, requires Decimal
+- **Clean separation**: Conversion logic isolated in Infrastructure layer
+- **Application simplicity**: Application and Core layers work with native Python types (int/float)
+- **Automatic conversion**: `put_item` converts int/float → Decimal, `get_item`/`query` convert Decimal → int/float
+- **Transparency**: Application code doesn't need to know about Decimal handling
 
 ## Consequences
 

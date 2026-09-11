@@ -24,8 +24,10 @@ class GetMeResponse(BaseApiResponseModel):
     """
 
     user: User = Field(
-        ..., description="Current authenticated user information",
+        ...,
+        description="Current authenticated user information",
     )
     group_id: str = Field(
-        ..., description="Group/tenant ID the user belongs to",
+        ...,
+        description="Group/tenant ID the user belongs to",
     )

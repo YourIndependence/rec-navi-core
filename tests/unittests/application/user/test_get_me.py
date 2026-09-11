@@ -30,7 +30,9 @@ class FakeUserDatabase:
         pass
 
     async def query(
-        self, key_condition: dict, filter_expression: dict | None = None,
+        self,
+        key_condition: dict,
+        filter_expression: dict | None = None,
     ) -> list[dict]:
         return []
 
@@ -64,7 +66,8 @@ async def test_get_me_raises_when_user_not_found():
     fake_db = FakeUserDatabase(users={})
 
     with pytest.raises(
-        ClientAuthorizationError, match="User not found in database",
+        ClientAuthorizationError,
+        match="User not found in database",
     ):
         await get_me_use_case(sub="nonexistent", user_db=fake_db)
 
@@ -81,7 +84,8 @@ async def test_get_me_raises_when_role_invalid():
     fake_db = FakeUserDatabase(users={"user-789": user_data})
 
     with pytest.raises(
-        ClientAuthorizationError, match="Invalid role: superadmin",
+        ClientAuthorizationError,
+        match="Invalid role: superadmin",
     ):
         await get_me_use_case(sub="user-789", user_db=fake_db)
 

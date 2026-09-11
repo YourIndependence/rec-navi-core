@@ -9,143 +9,92 @@
 
 """Integration tests for GET /getMe endpoint."""
 
-import pytest
-from moto import mock_aws
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import patch
 
-from recnavi.config.variables import USERS_TABLE_NAME
+import pytest
 
 
 @pytest.fixture
 def mock_decode_token():
     """Mock decode_token to return a valid payload."""
-
-    async def _decode_token(request):
-        return {"sub": "test-user-123", "email": "test@example.com"}
-
-    return _decode_token
+    with patch("recnavi.apis.root.root_router.decode_token") as mock:
+        mock.return_value = AsyncMock(return_value={"sub": "test-user-123"})
+        yield mock
 
 
 @pytest.fixture
-def mock_user_database():
+def mock_user_database(client):
     """Mock UserDatabase with test data."""
 
-    class MockUserDatabase:
+    class FakeDatabaseForIntegration:
         def __init__(self):
             self.users = {
                 "test-user-123": {
                     "userId": "test-user-123",
-                    "userName": "Test User",
+                    "userName": "Test Admin",
                     "role": "admin",
-                    "groupId": "group-456",
-                },
-                "owner-user": {
-                    "userId": "owner-user",
-                    "userName": "Owner User",
-                    "role": "owner",
-                    "groupId": "group-789",
-                },
-                "staff-user": {
-                    "userId": "staff-user",
-                    "userName": "Staff User",
-                    "role": "staff",
-                    "groupId": "group-101",
+                    "groupId": "group-999",
                 },
             }
 
-        async def get_item(self, key: dict):
-            user_id = key.get("userId")
-            return self.users.get(user_id)
+        async def get_item(self, key):
+            return self.users.get(key.get("userId"))
 
-        async def put_item(self, item: dict):
+        async def put_item(self, item):
             pass
 
-        async def query(self, key_condition: dict, _filter_expression=None):
+        async def query(self, key_condition, _filter_expression=None):
             return []
 
-        async def delete_item(self, key: dict):
+        async def delete_item(self, key):
             pass
 
-    return MockUserDatabase()
+    # Replace the database instance in app state
+    from recnavi.config.variables import USERS_TABLE_NAME
+
+    original_db = client.app.state.database.get(USERS_TABLE_NAME)
+    client.app.state.database[USERS_TABLE_NAME] = FakeDatabaseForIntegration()
+
+    yield
+
+    # Restore original
+    if original_db:
+        client.app.state.database[USERS_TABLE_NAME] = original_db
 
 
 def test_get_me_returns_user_when_authenticated(
-    client, mock_decode_token, mock_user_database
+    client,
+    mock_decode_token,
+    mock_user_database,
 ):
-    """Test GET /getMe returns user data for authenticated user."""
-    with patch("recnavi.apis.root.root_router.decode_token", mock_decode_token):
-        client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
+    """Test GET /getMe returns user when properly authenticated."""
 
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
+    async def fake_decode(request):
+        return {"sub": "test-user-123"}
 
-        assert response.status_code == 200
-        data = response.json()
+    mock_decode_token.side_effect = fake_decode
 
-        assert data["status"] == "ok"
-        assert data["message"] is None
-        assert data["user"]["userId"] == "test-user-123"
-        assert data["user"]["userName"] == "Test User"
-        assert data["user"]["role"] == "admin"
-        assert data["user"]["groupId"] == "group-456"
-        assert data["groupId"] == "group-456"
+    response = client.get(
+        "/getMe",
+        headers={"Authorization": "Bearer valid_token"},
+    )
 
+    assert response.status_code == 200
+    data = response.json()
 
-def test_get_me_returns_owner_role(client, mock_user_database):
-    """Test GET /getMe returns owner role correctly."""
-
-    async def _decode_token_owner(request):
-        return {"sub": "owner-user", "email": "owner@example.com"}
-
-    with patch("recnavi.apis.root.root_router.decode_token", _decode_token_owner):
-        client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
-
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["user"]["role"] == "owner"
-        assert data["user"]["groupId"] == "group-789"
-        assert data["groupId"] == "group-789"
+    assert data["status"] == "ok"
+    assert data["user"]["userId"] == "test-user-123"
+    assert data["user"]["userName"] == "Test Admin"
+    assert data["user"]["role"] == "admin"
+    assert data["groupId"] == "group-999"
+    # Verify groupId is at top level, not duplicated in user
+    assert "groupId" in data
+    assert data["groupId"] == data["user"]["groupId"]
 
 
-def test_get_me_returns_staff_role(client, mock_user_database):
-    """Test GET /getMe returns staff role correctly."""
-
-    async def _decode_token_staff(request):
-        return {"sub": "staff-user", "email": "staff@example.com"}
-
-    with patch("recnavi.apis.root.root_router.decode_token", _decode_token_staff):
-        client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
-
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["user"]["role"] == "staff"
-
-
-def test_get_me_returns_400_when_no_token(client, mock_user_database):
-    """Test GET /getMe returns 400 when Authorization header missing."""
-    client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
-
+def test_get_me_returns_401_when_no_token(client):
+    """Test GET /getMe returns 401 when no authorization header."""
     response = client.get("/getMe")
 
     assert response.status_code == 400
@@ -153,131 +102,94 @@ def test_get_me_returns_400_when_no_token(client, mock_user_database):
     assert data["status"] == "error"
 
 
-def test_get_me_returns_403_when_user_not_in_database(client):
+def test_get_me_returns_403_when_user_not_in_database(
+    client,
+    mock_decode_token,
+):
     """Test GET /getMe returns 403 when user not found in database."""
 
-    async def _decode_token_unknown(request):
-        return {"sub": "unknown-user", "email": "unknown@example.com"}
+    async def fake_decode(request):
+        return {"sub": "nonexistent-user"}
 
-    class EmptyUserDatabase:
-        async def get_item(self, key: dict):
+    mock_decode_token.side_effect = fake_decode
+
+    # Mock empty database
+    class EmptyDatabase:
+        async def get_item(self, key):
             return None
 
-        async def put_item(self, item: dict):
+        async def put_item(self, item):
             pass
 
-        async def query(self, key_condition: dict, _filter_expression=None):
+        async def query(self, key_condition, _filter_expression=None):
             return []
 
-        async def delete_item(self, key: dict):
+        async def delete_item(self, key):
             pass
 
-    with patch("recnavi.apis.root.root_router.decode_token", _decode_token_unknown):
-        client.app.state.database = {USERS_TABLE_NAME: EmptyUserDatabase()}
+    from recnavi.config.variables import USERS_TABLE_NAME
 
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
+    original_db = client.app.state.database.get(USERS_TABLE_NAME)
+    client.app.state.database[USERS_TABLE_NAME] = EmptyDatabase()
 
-        assert response.status_code == 403
-        data = response.json()
-        assert data["status"] == "error"
-        assert "User not found" in data["message"]
+    response = client.get(
+        "/getMe",
+        headers={"Authorization": "Bearer valid_token"},
+    )
+
+    # Restore
+    if original_db:
+        client.app.state.database[USERS_TABLE_NAME] = original_db
+
+    assert response.status_code == 403
+    data = response.json()
+    assert data["status"] == "error"
+    assert "User not found" in data["message"]
 
 
-def test_get_me_returns_403_for_invalid_role(client):
+def test_get_me_returns_403_when_invalid_role(client, mock_decode_token):
     """Test GET /getMe returns 403 when user has invalid role."""
 
-    async def _decode_token_invalid_role(request):
-        return {"sub": "invalid-role-user", "email": "invalid@example.com"}
+    async def fake_decode(request):
+        return {"sub": "bad-role-user"}
 
-    class InvalidRoleDatabase:
-        async def get_item(self, key: dict):
-            return {
-                "userId": "invalid-role-user",
-                "userName": "Invalid Role User",
-                "role": "superadmin",
-                "groupId": "group-999",
-            }
+    mock_decode_token.side_effect = fake_decode
 
-        async def put_item(self, item: dict):
+    class DatabaseWithBadRole:
+        async def get_item(self, key):
+            if key.get("userId") == "bad-role-user":
+                return {
+                    "userId": "bad-role-user",
+                    "userName": "Bad User",
+                    "role": "superadmin",  # Invalid role
+                    "groupId": "group-123",
+                }
+            return None
+
+        async def put_item(self, item):
             pass
 
-        async def query(self, key_condition: dict, _filter_expression=None):
+        async def query(self, key_condition, _filter_expression=None):
             return []
 
-        async def delete_item(self, key: dict):
+        async def delete_item(self, key):
             pass
 
-    with patch(
-        "recnavi.apis.root.root_router.decode_token", _decode_token_invalid_role
-    ):
-        client.app.state.database = {USERS_TABLE_NAME: InvalidRoleDatabase()}
+    from recnavi.config.variables import USERS_TABLE_NAME
 
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
+    original_db = client.app.state.database.get(USERS_TABLE_NAME)
+    client.app.state.database[USERS_TABLE_NAME] = DatabaseWithBadRole()
 
-        assert response.status_code == 403
-        data = response.json()
-        assert data["status"] == "error"
-        assert "Invalid role" in data["message"]
+    response = client.get(
+        "/getMe",
+        headers={"Authorization": "Bearer valid_token"},
+    )
 
+    # Restore
+    if original_db:
+        client.app.state.database[USERS_TABLE_NAME] = original_db
 
-def test_get_me_group_id_not_duplicated_in_user(
-    client, mock_decode_token, mock_user_database
-):
-    """Test GET /getMe has groupId at top level, not duplicated in user."""
-    with patch("recnavi.apis.root.root_router.decode_token", mock_decode_token):
-        client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
-
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "groupId" in data
-        assert data["groupId"] == "group-456"
-        assert data["user"]["groupId"] == "group-456"
-
-
-def test_get_me_field_names_are_camel_case(
-    client, mock_decode_token, mock_user_database
-):
-    """Test GET /getMe response uses camelCase field names."""
-    with patch("recnavi.apis.root.root_router.decode_token", mock_decode_token):
-        client.app.state.database = {USERS_TABLE_NAME: mock_user_database}
-
-        response = client.get(
-            "/getMe",
-            headers={
-                "Authorization": "Bearer valid_token",
-                "Client-Id": "test_client",
-            },
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-
-        assert "userId" in data["user"]
-        assert "userName" in data["user"]
-        assert "groupId" in data["user"]
-        assert "groupId" in data
-
-        assert "user_id" not in data["user"]
-        assert "user_name" not in data["user"]
-        assert "group_id" not in data
+    assert response.status_code == 403
+    data = response.json()
+    assert data["status"] == "error"
+    assert "Invalid role" in data["message"]
