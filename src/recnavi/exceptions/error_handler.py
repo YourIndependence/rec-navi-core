@@ -24,6 +24,7 @@ from recnavi.config.variables import ENV
 from recnavi.core.utils.discord_handler import post_error_discord
 
 from .exceptions import BaseClientExceptionError
+from .exceptions import ClientAuthorizationError
 
 
 ERROR_LOG_BUCKET_NAME = "trust-api-error-log"
@@ -45,13 +46,19 @@ async def custom_exception_handler(request: Request, exc: Exception):
 
     kwargs["x_user"] = x_user
 
-    if isinstance(exc, BaseClientExceptionError):
+    if isinstance(exc, ClientAuthorizationError):
         message = str(exc)
+        status_code = 403
+    elif isinstance(exc, BaseClientExceptionError):
+        message = str(exc)
+        status_code = 400
+    elif isinstance(exc, TypeError):
+        message = "Invalid request parameter"
         status_code = 400
     else:
         message = "Unexpected Server Error"
         status_code = 500
-        print(
+        logger.error(
             f"ERROR DETECTED! {traceback.format_exception_only(type(exc), exc)}\n"
             f"environment: {ENV}\n"
             f"traceback:\n{traceback.format_exc()}",
@@ -68,12 +75,3 @@ async def custom_exception_handler(request: Request, exc: Exception):
         status_code=status_code,
         content={"status": "error", "message": message},
     )
-
-
-def _tojson(value: Any):
-    """Safe json fallback serializer."""
-    if isinstance(value, BaseModel):
-        return dict(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    return None
