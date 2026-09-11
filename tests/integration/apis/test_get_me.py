@@ -9,23 +9,13 @@
 
 """Integration tests for GET /getMe endpoint."""
 
-from unittest.mock import AsyncMock
-from unittest.mock import patch
-
 import pytest
 
 
 @pytest.fixture
-def mock_decode_token():
-    """Mock decode_token to return a valid payload."""
-    with patch("recnavi.apis.root.root_router.decode_token") as mock:
-        mock.return_value = AsyncMock(return_value={"sub": "test-user-123"})
-        yield mock
-
-
-@pytest.fixture
-def mock_user_database(client):
-    """Mock UserDatabase with test data."""
+def setup_auth_and_database(client, monkeypatch):
+    """Setup authentication and database for integration tests."""
+    from recnavi.config.variables import USERS_TABLE_NAME
 
     class FakeDatabaseForIntegration:
         def __init__(self):
@@ -50,31 +40,28 @@ def mock_user_database(client):
         async def delete_item(self, key):
             pass
 
-    # Replace the database instance in app state
-    from recnavi.config.variables import USERS_TABLE_NAME
+    async def fake_decode_token(request):
+        return {"sub": "test-user-123"}
+
+    monkeypatch.setattr(
+        "recnavi.apis.root.root_router.decode_token",
+        fake_decode_token,
+    )
 
     original_db = client.app.state.database.get(USERS_TABLE_NAME)
     client.app.state.database[USERS_TABLE_NAME] = FakeDatabaseForIntegration()
 
     yield
 
-    # Restore original
     if original_db:
         client.app.state.database[USERS_TABLE_NAME] = original_db
 
 
 def test_get_me_returns_user_when_authenticated(
     client,
-    mock_decode_token,
-    mock_user_database,
+    setup_auth_and_database,
 ):
     """Test GET /getMe returns user when properly authenticated."""
-
-    async def fake_decode(request):
-        return {"sub": "test-user-123"}
-
-    mock_decode_token.side_effect = fake_decode
-
     response = client.get(
         "/getMe",
         headers={"Authorization": "Bearer valid_token"},
@@ -88,7 +75,6 @@ def test_get_me_returns_user_when_authenticated(
     assert data["user"]["userName"] == "Test Admin"
     assert data["user"]["role"] == "admin"
     assert data["groupId"] == "group-999"
-    # Verify groupId is at top level, not duplicated in user
     assert "groupId" in data
     assert data["groupId"] == data["user"]["groupId"]
 
@@ -102,18 +88,10 @@ def test_get_me_returns_401_when_no_token(client):
     assert data["status"] == "error"
 
 
-def test_get_me_returns_403_when_user_not_in_database(
-    client,
-    mock_decode_token,
-):
+def test_get_me_returns_403_when_user_not_in_database(client, monkeypatch):
     """Test GET /getMe returns 403 when user not found in database."""
+    from recnavi.config.variables import USERS_TABLE_NAME
 
-    async def fake_decode(request):
-        return {"sub": "nonexistent-user"}
-
-    mock_decode_token.side_effect = fake_decode
-
-    # Mock empty database
     class EmptyDatabase:
         async def get_item(self, key):
             return None
@@ -127,7 +105,13 @@ def test_get_me_returns_403_when_user_not_in_database(
         async def delete_item(self, key):
             pass
 
-    from recnavi.config.variables import USERS_TABLE_NAME
+    async def fake_decode_token(request):
+        return {"sub": "nonexistent-user"}
+
+    monkeypatch.setattr(
+        "recnavi.apis.root.root_router.decode_token",
+        fake_decode_token,
+    )
 
     original_db = client.app.state.database.get(USERS_TABLE_NAME)
     client.app.state.database[USERS_TABLE_NAME] = EmptyDatabase()
@@ -137,7 +121,6 @@ def test_get_me_returns_403_when_user_not_in_database(
         headers={"Authorization": "Bearer valid_token"},
     )
 
-    # Restore
     if original_db:
         client.app.state.database[USERS_TABLE_NAME] = original_db
 
@@ -147,13 +130,9 @@ def test_get_me_returns_403_when_user_not_in_database(
     assert "User not found" in data["message"]
 
 
-def test_get_me_returns_403_when_invalid_role(client, mock_decode_token):
+def test_get_me_returns_403_when_invalid_role(client, monkeypatch):
     """Test GET /getMe returns 403 when user has invalid role."""
-
-    async def fake_decode(request):
-        return {"sub": "bad-role-user"}
-
-    mock_decode_token.side_effect = fake_decode
+    from recnavi.config.variables import USERS_TABLE_NAME
 
     class DatabaseWithBadRole:
         async def get_item(self, key):
@@ -161,7 +140,7 @@ def test_get_me_returns_403_when_invalid_role(client, mock_decode_token):
                 return {
                     "userId": "bad-role-user",
                     "userName": "Bad User",
-                    "role": "superadmin",  # Invalid role
+                    "role": "superadmin",
                     "groupId": "group-123",
                 }
             return None
@@ -175,7 +154,13 @@ def test_get_me_returns_403_when_invalid_role(client, mock_decode_token):
         async def delete_item(self, key):
             pass
 
-    from recnavi.config.variables import USERS_TABLE_NAME
+    async def fake_decode_token(request):
+        return {"sub": "bad-role-user"}
+
+    monkeypatch.setattr(
+        "recnavi.apis.root.root_router.decode_token",
+        fake_decode_token,
+    )
 
     original_db = client.app.state.database.get(USERS_TABLE_NAME)
     client.app.state.database[USERS_TABLE_NAME] = DatabaseWithBadRole()
@@ -185,7 +170,6 @@ def test_get_me_returns_403_when_invalid_role(client, mock_decode_token):
         headers={"Authorization": "Bearer valid_token"},
     )
 
-    # Restore
     if original_db:
         client.app.state.database[USERS_TABLE_NAME] = original_db
 
