@@ -11,15 +11,12 @@
 
 from pydantic import Field
 
-from recnavi.apis.schemas.response_schemas import BaseApiResponseModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.user import User
 
 
 class GetMeResponse(BaseApiResponseModel):
-    """Response schema for GET /getMe endpoint.
-
-    Returns the currently authenticated user, including their group ID.
-    """
+    """Response schema for GET /getMe endpoint."""
 
     user: User = Field(
         ...,
