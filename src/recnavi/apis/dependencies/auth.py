@@ -12,9 +12,9 @@
 from fastapi import Request
 
 from recnavi.apis.auth.auth import decode_token
-from recnavi.application.user.get_me import get_me_use_case
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
+from recnavi.core.user.user import get_user_by_id
 
 
 async def verify_user(request: Request) -> User:
@@ -41,9 +41,9 @@ async def verify_user(request: Request) -> User:
 
     """
     payload = await decode_token(request)
-    sub = payload["sub"]
+    sub = str(payload["sub"])
 
     user_db = request.app.state.database[USERS_TABLE_NAME]
-    user = await get_me_use_case(sub=sub, user_db=user_db)
+    user = await get_user_by_id(user_id=sub, user_db=user_db)
 
     return user
