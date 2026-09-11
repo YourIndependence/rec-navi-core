@@ -12,13 +12,10 @@
 import json
 import logging
 import traceback
-from datetime import datetime
-from typing import Any
 
 import boto3
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from recnavi.config.variables import ENV
 from recnavi.core.utils.discord_handler import post_error_discord
