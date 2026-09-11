@@ -1,4 +1,4 @@
-# Copyright (c) 2025 YourIndependence. All rights reserved.
+# Copyright (c) 2026 YourIndependence. All rights reserved.
 #
 # This software is the confidential and proprietary information of
 # YourIndependence. Unauthorized copying, distribution,
@@ -38,7 +38,8 @@ async def verify_user(request: Request) -> XUser:
 
     except ClientPermissionError as e:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=str(e)
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
         ) from e
 
 
@@ -50,7 +51,7 @@ async def get_verified_user(request: Request) -> XUser:
         raise ClientPermissionError("Authorization header is required.")
     if not authorization.startswith("Bearer "):
         raise ClientPermissionError(
-            "Authorization header must start with 'Bearer '"
+            "Authorization header must start with 'Bearer '",
         )
     token = authorization.split(" ")[1]
 

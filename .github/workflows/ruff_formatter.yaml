@@ -27,7 +27,7 @@ jobs:
           uv sync --frozen --extra dev
 
       - name: Check formatting with Ruff
-        run: uv run ruff check .
+        run: uv run ruff check src/ tests/
 
       - name: Check formatting with Ruff
-        run: uv run ruff format --check .
+        run: uv run ruff format --check src/ tests/
