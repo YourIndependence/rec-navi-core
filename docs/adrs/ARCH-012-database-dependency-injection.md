@@ -4,7 +4,7 @@ title: Database Dependency Injection via FastAPI Application State
 domain: backend
 status: active
 date: 2026-09-11
-rules: false
+rules: true
 files:
   - 'src/recnavi/main.py'
   - 'src/recnavi/core/database/**/*.py'
