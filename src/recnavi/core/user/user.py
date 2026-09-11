@@ -9,7 +9,6 @@
 
 """Core user domain logic."""
 
-
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
