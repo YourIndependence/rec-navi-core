@@ -30,9 +30,7 @@ TARGET_SUFFIXES = {".py"}
 
 
 def _has_header(text: str) -> bool:
-    return text.startswith(
-        "# Copyright (c) 2026 YourIndependence. All rights reserved.",
-    )
+    return text.startswith("# Copyright (c) 2026 YourIndependence. All rights reserved.")
 
 
 def _insert_header(text: str) -> str:

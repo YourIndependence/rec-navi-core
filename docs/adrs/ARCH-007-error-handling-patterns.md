@@ -60,7 +60,6 @@ import logging
 import traceback
 from trust.exceptions.error_handler import send_error_alert
 
-
 async def background_task(arg1: str, arg2: int) -> None:
     try:
         # do something risky
@@ -73,9 +72,7 @@ async def background_task(arg1: str, arg2: int) -> None:
             f"traceback:\n{traceback.format_exc()}",
         )
         # Send alert to developers
-        await send_error_alert(
-            func=background_task, e=e, kwargs={"arg1": arg1, "arg2": arg2}
-        )
+        await send_error_alert(func=background_task, e=e, kwargs={"arg1": arg1, "arg2": arg2})
         # DO NOT re-raise — this is a top-level boundary
 ```
 

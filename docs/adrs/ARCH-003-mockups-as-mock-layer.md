@@ -27,7 +27,6 @@ class MockDatabase(BaseDatabase):
     async def get(self, key: str) -> dict[str, object]:
         return {"key": key}
 
-
 @pytest.fixture
 def mock_database() -> MockDatabase:
     return MockDatabase()
@@ -35,7 +34,8 @@ def mock_database() -> MockDatabase:
 
 ```python
 # tests/unittests/test_service.py
-def test_service(mock_database): ...
+def test_service(mock_database):
+    ...
 ```
 
 Private duck-typed stubs that do not inherit a `Base*` ABC may remain local to

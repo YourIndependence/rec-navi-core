@@ -43,7 +43,6 @@ Non-English content (comments, variable names, documentation) creates particular
 ```python
 # File encoding: UTF-8 (default in Python 3)
 
-
 def send_greeting_email(user_name: str, user_email: str) -> None:
     """Send greeting email to user."""
     message = "こんにちは"  # OK: string literal for user-facing message
@@ -58,7 +57,6 @@ def メール送信(ユーザー名: str, メール: str) -> None:
     メッセージ = "こんにちは"
     send_email(to=メール, body=メッセージ)
 
-
 # ❌ Non-English comment (example: Japanese)
 def send_email(user_name: str) -> None:
     # ユーザーにメールを送信
@@ -69,7 +67,8 @@ def send_email(user_name: str) -> None:
 
 ```python
 # -*- coding: shift-jis -*-  ← FORBIDDEN
-def process_data(): ...
+def process_data():
+    ...
 ```
 
 ## Rationale
@@ -132,11 +131,9 @@ While this seems convenient for teams sharing a native language, it creates tech
 # ✅ String literals for user-facing messages
 ERROR_MESSAGE = "エラーが発生しました"
 
-
 # ✅ Test data
 def test_japanese_input():
     assert process("こんにちは") == "hello"
-
 
 # ✅ Docstrings for public APIs (if targeting non-English users)
 def send_notification(message: str) -> None:
