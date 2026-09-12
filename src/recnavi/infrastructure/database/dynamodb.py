@@ -96,6 +96,27 @@ class DynamoDb(BaseDatabase):
             table = await dynamodb.Table(self.table_name)
             await table.delete_item(Key=key)
 
+    async def scan(
+        self,
+        _filter_expression: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Scan all items in the table.
+
+        Warning: Full table scan. Only use for small tables.
+
+        Args:
+            _filter_expression: Optional filter expression (reserved for future use).
+
+        Returns:
+            List of all items with Python native types.
+
+        """
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            response = await table.scan()
+            items = response.get("Items", [])
+            return [_convert_from_dynamodb_format(item) for item in items]
+
 
 def _decimal_to_num(obj: Any) -> int | float | object | None:
     """Convert Decimal values to Python numbers."""

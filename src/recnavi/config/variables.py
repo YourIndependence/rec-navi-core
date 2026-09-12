@@ -23,6 +23,7 @@ COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "dummy")
 
 USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "recnavi-local-users")
+SCENES_TABLE_NAME = os.environ.get("SCENES_TABLE_NAME", "recnavi-local-scenes")
 
 APP_DOMAINS = "rec-navi.com"
 
