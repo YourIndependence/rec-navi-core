@@ -47,7 +47,7 @@ async def lifespan(_app: FastAPI):
         }
         logger.info("database instances initialized.")
 
-        if ENV != "LOCAL":
+        if ENV not in ["LOCAL", "CI"]:
             post_notify_discord(
                 title=f"{ENV}: ECS Task started!",
                 message=f"{ENV}: ECS task started.",

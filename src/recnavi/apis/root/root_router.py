@@ -14,7 +14,7 @@ import time
 from fastapi import APIRouter
 from fastapi import Depends
 
-from recnavi.apis.dependencies.auth import verify_user
+from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.user_schemas import GetMeResponse
 from recnavi.config.variables import ENV
 from recnavi.core.types.user import User
@@ -40,24 +40,8 @@ async def greeting():
 
 
 @root_router.get("/getMe")
-async def get_me(user: User = Depends(verify_user)) -> GetMeResponse:
-    """Get current authenticated user.
-
-    Returns the currently signed-in user's information based on their
-    verified JWT token. The role and groupId are read from the users
-    table in DynamoDB, not from Cognito claims, so changes take effect
-    immediately without requiring re-authentication.
-
-    Args:
-        user: Verified user from dependency injection.
-
-    Returns:
-        GetMeResponse with user information and groupId.
-
-    Raises:
-        ClientPermissionError (401): Token missing, invalid, or expired.
-        ClientAuthorizationError (403): Valid token but user not in database,
-            or user has invalid role.
-
-    """
-    return GetMeResponse(user=user, group_id=user.group_id)
+async def get_me(
+    user: User = Depends(verify_user),
+) -> GetMeResponse:
+    """Get current authenticated user."""
+    return GetMeResponse(user=user)

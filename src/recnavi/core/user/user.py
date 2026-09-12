@@ -16,28 +16,24 @@ from recnavi.exceptions.exceptions import ClientAuthorizationError
 
 
 async def get_user_by_id(
+    user_database: BaseDatabase,
     user_id: str,
-    user_db: BaseDatabase,
 ) -> User:
     """Get user from database and validate.
 
     Args:
-        user_id: User ID to fetch.
-        user_db: Database instance for user table.
+        user_database: Database instance for user table.
+        user_id:
 
     Returns:
         Validated User object.
 
-    Raises:
-        ClientAuthorizationError: If user not found or has invalid role.
-
     """
-    item = await user_db.get_item(key={"userId": user_id})
+    item = await user_database.get_item(key={"userId": user_id})
 
     if not item:
         raise ClientAuthorizationError("User not found in database")
 
-    # Validate role before converting to User
     role = item.get("role")
     if role not in [r.value for r in UserRole]:
         raise ClientAuthorizationError(f"Invalid role: {role}")

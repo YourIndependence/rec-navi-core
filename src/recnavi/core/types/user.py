@@ -27,14 +27,7 @@ class UserRole(StrEnum):
 
 
 class User(BaseModel):
-    """Someone who uses the service, on behalf of one tenant.
-
-    Cognito holds the identity: who this is and how they sign in. What
-    they may do and which tenant they belong to is stored here, so a
-    change takes effect on the next request rather than on the next
-    sign-in. Cognito groups carry no attributes of their own, which is
-    why the tenant is not kept there.
-    """
+    """user"""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,

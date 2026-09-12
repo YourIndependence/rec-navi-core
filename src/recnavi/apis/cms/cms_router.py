@@ -13,7 +13,7 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Request
 
-from recnavi.apis.dependencies.auth import verify_user
+from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.config.variables import SCENES_TABLE_NAME

@@ -33,6 +33,7 @@ class MockUserDatabase:
         self,
         key_condition: dict,
         filter_expression: dict | None = None,
+        index: str | None = None,
     ) -> list[dict]:
         return []
 
@@ -51,7 +52,7 @@ async def test_get_user_by_id_returns_user_when_valid():
     }
     mock_db = MockUserDatabase(users={"user-123": user_data})
 
-    result = await get_user_by_id(user_id="user-123", user_db=mock_db)
+    result = await get_user_by_id(user_id="user-123", user_database=mock_db)
 
     assert isinstance(result, User)
     assert result.user_id == "user-123"
@@ -69,7 +70,7 @@ async def test_get_user_by_id_raises_when_user_not_found():
         ClientAuthorizationError,
         match="User not found in database",
     ):
-        await get_user_by_id(user_id="nonexistent", user_db=mock_db)
+        await get_user_by_id(user_id="nonexistent", user_database=mock_db)
 
 
 @pytest.mark.asyncio
@@ -87,7 +88,7 @@ async def test_get_user_by_id_raises_when_role_invalid():
         ClientAuthorizationError,
         match="Invalid role: superadmin",
     ):
-        await get_user_by_id(user_id="user-789", user_db=mock_db)
+        await get_user_by_id(user_id="user-789", user_database=mock_db)
 
 
 @pytest.mark.asyncio
@@ -102,6 +103,9 @@ async def test_get_user_by_id_accepts_all_valid_roles():
         }
         mock_db = MockUserDatabase(users={f"user-{role}": user_data})
 
-        result = await get_user_by_id(user_id=f"user-{role}", user_db=mock_db)
+        result = await get_user_by_id(
+            user_id=f"user-{role}",
+            user_database=mock_db,
+        )
 
         assert result.role == role

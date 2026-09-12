@@ -11,12 +11,72 @@
 
 from decimal import Decimal
 
+import pytest
+
+from recnavi.infrastructure.database.dynamodb import DynamoDb
 from recnavi.infrastructure.database.dynamodb import (
     _convert_from_dynamodb_format,
 )
 from recnavi.infrastructure.database.dynamodb import (
     _convert_to_dynamodb_format,
 )
+
+
+class MockDynamoTable:
+    """Minimal async DynamoDB table fake for query tests."""
+
+    def __init__(self) -> None:
+        self.query_kwargs: dict[str, object] | None = None
+
+    async def query(self, **kwargs: object) -> dict[str, list[dict[str, str]]]:
+        self.query_kwargs = kwargs
+        return {"Items": [{"userId": "user-123"}]}
+
+
+class MockDynamoResource:
+    """Minimal async DynamoDB resource fake for query tests."""
+
+    def __init__(self, table: MockDynamoTable) -> None:
+        self.table = table
+
+    async def __aenter__(self) -> "MockDynamoResource":
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def Table(self, _table_name: str) -> MockDynamoTable:  # noqa: N802
+        return self.table
+
+
+class MockDynamoSession:
+    """Minimal aioboto3 session fake for query tests."""
+
+    def __init__(self, resource: MockDynamoResource) -> None:
+        self.dynamodb_resource = resource
+
+    def resource(self, _service_name: str) -> MockDynamoResource:
+        return self.dynamodb_resource
+
+
+@pytest.mark.asyncio
+async def test_query_passes_index_name_to_dynamodb():
+    """Test query passes the optional index as DynamoDB IndexName."""
+    table = MockDynamoTable()
+    resource = MockDynamoResource(table)
+    database = DynamoDb(table_name="users")
+    database.session = MockDynamoSession(resource)
+
+    result = await database.query(
+        key_condition={"KeyConditionExpression": "userId = :user_id"},
+        index="group-index",
+    )
+
+    assert result == [{"userId": "user-123"}]
+    assert table.query_kwargs == {
+        "KeyConditionExpression": "userId = :user_id",
+        "IndexName": "group-index",
+    }
 
 
 def test_convert_to_dynamodb_converts_int_to_decimal():

@@ -9,6 +9,7 @@
 
 """DynamoDB implementation with Decimal conversion."""
 
+import json
 from decimal import Decimal
 from typing import Any
 
@@ -17,83 +18,8 @@ import aioboto3
 from recnavi.core.database.base_database import BaseDatabase
 
 
-def _convert_to_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
-    """Convert Python types to DynamoDB-compatible format.
-
-    Converts int and float to Decimal to avoid type errors in DynamoDB.
-
-    Args:
-        item: Dictionary with Python native types.
-
-    Returns:
-        Dictionary with DynamoDB-compatible types.
-
-    """
-    converted = {}
-    for key, value in item.items():
-        if isinstance(value, float | int) and not isinstance(value, bool):
-            converted[key] = Decimal(str(value))
-        elif isinstance(value, dict):
-            converted[key] = _convert_to_dynamodb_format(value)
-        elif isinstance(value, list):
-            converted[key] = [
-                (
-                    _convert_to_dynamodb_format(v)
-                    if isinstance(v, dict)
-                    else Decimal(str(v))
-                    if isinstance(v, float | int) and not isinstance(v, bool)
-                    else v
-                )
-                for v in value
-            ]
-        else:
-            converted[key] = value
-    return converted
-
-
-def _convert_from_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
-    """Convert DynamoDB types to Python native types.
-
-    Converts Decimal back to int or float for application use.
-
-    Args:
-        item: Dictionary with DynamoDB types.
-
-    Returns:
-        Dictionary with Python native types.
-
-    """
-    converted = {}
-    for key, value in item.items():
-        if isinstance(value, Decimal):
-            # Convert Decimal to int if it has no fractional part
-            converted[key] = int(value) if value % 1 == 0 else float(value)
-        elif isinstance(value, dict):
-            converted[key] = _convert_from_dynamodb_format(value)
-        elif isinstance(value, list):
-            converted[key] = [
-                _convert_from_dynamodb_format(v)
-                if isinstance(v, dict)
-                else (
-                    int(v)
-                    if isinstance(v, Decimal) and v % 1 == 0
-                    else float(v)
-                    if isinstance(v, Decimal)
-                    else v
-                )
-                for v in value
-            ]
-        else:
-            converted[key] = value
-    return converted
-
-
 class DynamoDb(BaseDatabase):
-    """DynamoDB implementation with automatic Decimal conversion.
-
-    Handles conversion between Python native types (int, float) and
-    DynamoDB Decimal type transparently.
-    """
+    """DynamoDB"""
 
     def __init__(self, table_name: str):
         """Initialize DynamoDb with table name.
@@ -137,12 +63,14 @@ class DynamoDb(BaseDatabase):
         self,
         key_condition: dict[str, Any],
         _filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query items by key condition.
 
         Args:
             key_condition: Key condition for the query.
             _filter_expression: Optional filter expression (reserved for future use).
+            index: Optional global or local secondary index name.
 
         Returns:
             List of items with Python native types matching the query.
@@ -150,7 +78,10 @@ class DynamoDb(BaseDatabase):
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.query(**key_condition)
+            query_kwargs = dict(key_condition)
+            if index is not None:
+                query_kwargs["IndexName"] = index
+            response = await table.query(**query_kwargs)
             items = response.get("Items", [])
             return [_convert_from_dynamodb_format(item) for item in items]
 
@@ -185,3 +116,29 @@ class DynamoDb(BaseDatabase):
             response = await table.scan()
             items = response.get("Items", [])
             return [_convert_from_dynamodb_format(item) for item in items]
+
+
+def _decimal_to_num(obj: Any) -> int | float | object | None:
+    """Convert Decimal values to Python numbers."""
+    if isinstance(obj, Decimal):
+        return int(obj) if float(obj).is_integer() else float(obj)
+    return None
+
+
+def _convert_to_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
+    """Convert Python numbers to DynamoDB Decimal values."""
+    return json.loads(
+        json.dumps(item, default=_decimal_to_num),
+        parse_float=Decimal,
+        parse_int=Decimal,
+    )
+
+
+def _convert_from_dynamodb_format(item: dict[str, Any]) -> dict[str, Any]:
+    """Convert DynamoDB Decimal values to Python numbers."""
+    return json.loads(
+        json.dumps(
+            item,
+            default=_decimal_to_num,
+        ),
+    )
