@@ -33,6 +33,11 @@ PROJECTS_TABLE_NAME = os.environ.get(
     "recnavi-local-projects",
 )
 
+VIDEO_BUCKET_NAME = os.environ.get(
+    "VIDEO_BUCKET_NAME",
+    "recnavi-local-videos",
+)
+
 APP_DOMAINS = "rec-navi.com"
 
 

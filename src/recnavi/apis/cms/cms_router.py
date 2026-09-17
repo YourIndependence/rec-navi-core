@@ -15,6 +15,8 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import GetProjectRequest
+from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
@@ -32,6 +34,7 @@ from recnavi.application.scene.get_templates_usecase import (
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
 
 
@@ -105,3 +108,47 @@ async def get_projects_endpoint(
         projects=project_views,
         next_cursor=next_cursor,
     )
+
+
+@cms_router.post("/getProject")
+async def get_project_endpoint(
+    request: Request,
+    payload: GetProjectRequest,
+    user: User = Depends(verify_user),
+) -> GetProjectResponse:
+    """Get a project with all scenes and presigned URLs.
+
+    Returns a project with all its scenes. Video and thumbnail URLs are
+    presigned S3 URLs valid for 1 hour.
+
+    Authorization:
+    - User must belong to the same group as the project
+    - User must be the owner or assigned staff
+
+    Args:
+        request: FastAPI request object.
+        payload: Request body with projectId.
+        user: Authenticated user (from JWT token).
+
+    Returns:
+        GetProjectResponse with project and scenes.
+
+    Raises:
+        400: Invalid request (via error_handler).
+        401: Invalid/expired token (via verify_user).
+        403: User not authorized to view project.
+        404: Project not found.
+
+    """
+    from recnavi.application.project.get_project import get_project_use_case
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project_view = await get_project_use_case(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        user=user,
+        video_bucket_name=VIDEO_BUCKET_NAME,
+    )
+
+    return GetProjectResponse(project=project_view)

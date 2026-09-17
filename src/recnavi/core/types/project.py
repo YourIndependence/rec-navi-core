@@ -49,6 +49,10 @@ class Project(BaseModel):
         ...,
         description="Datetime the project was created",
     )
+    updated_at: str = Field(
+        ...,
+        description="Datetime the project was last updated",
+    )
     description: str = Field(
         default="",
         description="Free text of date, place, shop name and notes",
@@ -64,4 +68,8 @@ class Project(BaseModel):
     status: ProjectStatus = Field(
         default=ProjectStatus.IN_PROGRESS,
         description="How far the project has progressed",
+    )
+    version: int = Field(
+        default=1,
+        description="Optimistic lock version for concurrent update control",
     )
