@@ -52,16 +52,21 @@ class BaseDatabase(ABC):
         key_condition: dict[str, Any],
         filter_expression: dict[str, Any] | None = None,
         index: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Query items by key condition.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        """Query items by key condition with optional pagination.
 
         Args:
             key_condition: Key condition for the query.
             filter_expression: Optional filter expression.
             index: Optional global or local secondary index name.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            List of items matching the query.
+            Tuple of (items, last_evaluated_key). last_evaluated_key is None
+            if there are no more items to retrieve.
 
         """
         pass

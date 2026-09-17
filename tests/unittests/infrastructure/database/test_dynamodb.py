@@ -67,12 +67,13 @@ async def test_query_passes_index_name_to_dynamodb():
     database = DynamoDb(table_name="users")
     database.session = MockDynamoSession(resource)
 
-    result = await database.query(
+    items, last_evaluated_key = await database.query(
         key_condition={"KeyConditionExpression": "userId = :user_id"},
         index="group-index",
     )
 
-    assert result == [{"userId": "user-123"}]
+    assert items == [{"userId": "user-123"}]
+    assert last_evaluated_key is None
     assert table.query_kwargs == {
         "KeyConditionExpression": "userId = :user_id",
         "IndexName": "group-index",

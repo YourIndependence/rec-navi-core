@@ -28,6 +28,10 @@ TEMPLATES_TABLE_NAME = os.environ.get(
     "TEMPLATES_TABLE_NAME",
     "recnavi-local-templates",
 )
+PROJECTS_TABLE_NAME = os.environ.get(
+    "PROJECTS_TABLE_NAME",
+    "recnavi-local-projects",
+)
 
 APP_DOMAINS = "rec-navi.com"
 

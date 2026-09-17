@@ -11,15 +11,20 @@
 
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.apis.schemas.template_schemas import TemplateView
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.core.project.projects import get_projects
 from recnavi.core.scene.scene_master import get_scene_masters
 from recnavi.core.scene.scenes_template import get_templates
 from recnavi.core.types.user import User
@@ -96,3 +101,52 @@ async def get_templates_endpoint(
     ]
 
     return GetTemplatesResponse(templates=template_views)
+
+
+@cms_router.get("/getProjects")
+async def get_projects_endpoint(
+    request: Request,
+    user: User = Depends(verify_user),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+) -> GetProjectsResponse:
+    """List projects for the authenticated user's group.
+
+    Returns projects in descending order by creation date (newest first).
+    Requires valid authentication token. The groupId is extracted from the
+    token and cannot be specified by the client.
+
+    Args:
+        request: FastAPI request object.
+        user: Authenticated user (provides group_id).
+        limit: Maximum items per page (1-100, default 20).
+        cursor: Opaque pagination cursor from previous response.
+
+    Returns:
+        GetProjectsResponse with projects and optional next_cursor.
+
+    """
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+    projects, next_cursor = await get_projects(
+        projects_db=projects_db,
+        group_id=user.group_id,
+        limit=limit,
+        cursor=cursor,
+    )
+
+    project_views = [
+        ProjectSummaryView(
+            project_id=p.project_id,
+            project_name=p.project_name,
+            description=p.description,
+            owner_user_id=p.owner_user_id,
+            created_at=p.created_at,
+            status=p.status,
+        )
+        for p in projects
+    ]
+
+    return GetProjectsResponse(
+        projects=project_views,
+        next_cursor=next_cursor,
+    )

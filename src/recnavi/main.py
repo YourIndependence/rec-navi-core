@@ -22,6 +22,7 @@ from recnavi.apis.cms.cms_router import cms_router
 from recnavi.apis.root.root_router import root_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
@@ -46,6 +47,7 @@ async def lifespan(_app: FastAPI):
             USERS_TABLE_NAME: DynamoDb(table_name=USERS_TABLE_NAME),
             SCENES_TABLE_NAME: DynamoDb(table_name=SCENES_TABLE_NAME),
             TEMPLATES_TABLE_NAME: DynamoDb(table_name=TEMPLATES_TABLE_NAME),
+            PROJECTS_TABLE_NAME: DynamoDb(table_name=PROJECTS_TABLE_NAME),
         }
         logger.info("database instances initialized.")
 

@@ -64,16 +64,21 @@ class DynamoDb(BaseDatabase):
         key_condition: dict[str, Any],
         _filter_expression: dict[str, Any] | None = None,
         index: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Query items by key condition.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        """Query items by key condition with optional pagination.
 
         Args:
             key_condition: Key condition for the query.
             _filter_expression: Optional filter expression (reserved for future use).
             index: Optional global or local secondary index name.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            List of items with Python native types matching the query.
+            Tuple of (items, last_evaluated_key). last_evaluated_key is None
+            if there are no more items to retrieve.
 
         """
         async with self.session.resource("dynamodb") as dynamodb:
@@ -81,9 +86,17 @@ class DynamoDb(BaseDatabase):
             query_kwargs = dict(key_condition)
             if index is not None:
                 query_kwargs["IndexName"] = index
+            if limit is not None:
+                query_kwargs["Limit"] = limit
+            if exclusive_start_key is not None:
+                query_kwargs["ExclusiveStartKey"] = exclusive_start_key
             response = await table.query(**query_kwargs)
             items = response.get("Items", [])
-            return [_convert_from_dynamodb_format(item) for item in items]
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            return (
+                [_convert_from_dynamodb_format(item) for item in items],
+                last_evaluated_key,
+            )
 
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.

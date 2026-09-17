@@ -54,17 +54,26 @@ class MockDatabase(BaseDatabase):
         self,
         key_condition: dict[str, Any],
         filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Query items by key condition.
+        index: str | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        """Query items by key condition with optional pagination.
 
         Args:
             key_condition: Key condition for the query.
             filter_expression: Optional filter expression.
+            index: Optional index name (ignored in mock).
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key to start from (for pagination).
 
         Returns:
-            List of items matching the query.
+            Tuple of (items, last_evaluated_key). last_evaluated_key is None
+            if there are no more items.
 
         """
+        # Simple mock implementation: filter by key_condition
+        # In real DynamoDB, this would parse KeyConditionExpression
         results = []
         for item in self.items:
             if all(item.get(k) == v for k, v in key_condition.items()) and (
@@ -72,7 +81,33 @@ class MockDatabase(BaseDatabase):
                 or all(item.get(k) == v for k, v in filter_expression.items())
             ):
                 results.append(item)
-        return results
+
+        # Handle pagination
+        start_index = 0
+        if exclusive_start_key is not None:
+            # Find the starting position
+            for i, item in enumerate(results):
+                if all(
+                    item.get(k) == v for k, v in exclusive_start_key.items()
+                ):
+                    start_index = i + 1
+                    break
+
+        # Apply limit
+        if limit is not None:
+            end_index = start_index + limit
+            paginated_results = results[start_index:end_index]
+
+            # Determine if there are more items
+            if end_index < len(results):
+                last_evaluated_key = paginated_results[-1]
+            else:
+                last_evaluated_key = None
+        else:
+            paginated_results = results[start_index:]
+            last_evaluated_key = None
+
+        return (paginated_results, last_evaluated_key)
 
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.
