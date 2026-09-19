@@ -52,12 +52,11 @@ async def test_generate_presigned_url_calls_boto3_correctly():
             object_key="videos/scene-123.mp4",
         )
 
-        # Verify result
         assert url == mock_url
 
-        # Verify boto3 was called correctly
         mock_session.client.assert_called_once_with(
-            "s3", region_name="ap-northeast-1",
+            "s3",
+            region_name="ap-northeast-1",
         )
         mock_s3.generate_presigned_url.assert_called_once_with(
             ClientMethod="get_object",

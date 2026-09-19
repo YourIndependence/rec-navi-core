@@ -78,12 +78,10 @@ async def test_get_project_use_case_returns_project_view_with_urls():
             video_bucket_name="test-bucket",
         )
 
-    # Verify project metadata
     assert project_view.project_id == "proj-123"
     assert project_view.group_id == "group-456"
     assert project_view.version == 1
 
-    # Verify scene with presigned URLs
     assert len(project_view.scenes) == 1
     scene = project_view.scenes[0]
     assert scene.scene_id == "scene-001"
@@ -96,7 +94,6 @@ async def test_get_project_use_case_returns_project_view_with_urls():
         == "https://example.com/thumbnails/scene-001.jpg?signature=abc123"
     )
 
-    # Verify S3 client was called correctly
     assert mock_generate_url.call_count == 2
 
 
@@ -154,13 +151,11 @@ async def test_get_project_use_case_handles_missing_video_keys():
             video_bucket_name="test-bucket",
         )
 
-    # Verify scene without URLs
     assert len(project_view.scenes) == 1
     scene = project_view.scenes[0]
     assert scene.video_url is None
     assert scene.thumbnail_url is None
 
-    # S3 client should not be called
     mock_generate_url.assert_not_called()
 
 
