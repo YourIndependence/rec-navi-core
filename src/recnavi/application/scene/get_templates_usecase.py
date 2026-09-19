@@ -18,13 +18,5 @@ async def get_templates_usecase(
     *,
     templates_db: BaseDatabase,
 ) -> list[ScenesTemplate]:
-    """List every scenes template.
-
-    Args:
-        templates_db: Database instance for the templates table.
-
-    Returns:
-        All scenes templates stored in the templates table.
-
-    """
+    """Get list all scene templates."""
     return await get_templates(templates_db=templates_db)

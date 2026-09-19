@@ -31,7 +31,10 @@ from recnavi.core.types.user import User
 cms_router = APIRouter(tags=["CMS"])
 
 
-@cms_router.get("/getSceneMasters")
+@cms_router.get(
+    "/getSceneMasters",
+    response_model=GetSceneMastersResponse,
+)
 async def get_scene_masters_endpoint(
     request: Request,
     _user: User = Depends(verify_user),
@@ -54,7 +57,7 @@ async def get_scene_masters_endpoint(
 
 @cms_router.get(
     "/getTemplates",
-    response_model_exclude={"templates": {"__all__": {"thumbnail_uri"}}},
+    response_model=GetTemplatesResponse,
 )
 async def get_templates_endpoint(
     request: Request,

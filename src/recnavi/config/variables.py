@@ -13,10 +13,8 @@ import os
 
 
 # general
-ENV = os.environ.get(
-    "ENV",
-    "LOCAL",
-)  # main, staging, dev, LOCAL, LOCAL_CONTAINER, CI
+# main, staging, dev, LOCAL, LOCAL_CONTAINER, CI
+ENV = os.environ.get("ENV", "LOCAL")
 REGION = "ap-northeast-1"
 
 COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
