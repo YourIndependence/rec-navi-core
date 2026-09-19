@@ -72,8 +72,15 @@ class MockDatabase(BaseDatabase):
             if there are no more items.
 
         """
-        # Simple mock implementation: filter by key_condition
-        # In real DynamoDB, this would parse KeyConditionExpression
+        results = self._filter_items(key_condition, filter_expression)
+        return self._paginate_results(results, limit, exclusive_start_key)
+
+    def _filter_items(
+        self,
+        key_condition: dict[str, Any],
+        filter_expression: dict[str, Any] | None,
+    ) -> list[dict[str, Any]]:
+        """Filter items by key condition and optional filter expression."""
         results = []
         for item in self.items:
             if all(item.get(k) == v for k, v in key_condition.items()) and (
@@ -81,33 +88,42 @@ class MockDatabase(BaseDatabase):
                 or all(item.get(k) == v for k, v in filter_expression.items())
             ):
                 results.append(item)
+        return results
 
-        # Handle pagination
-        start_index = 0
-        if exclusive_start_key is not None:
-            # Find the starting position
-            for i, item in enumerate(results):
-                if all(
-                    item.get(k) == v for k, v in exclusive_start_key.items()
-                ):
-                    start_index = i + 1
-                    break
+    def _paginate_results(
+        self,
+        results: list[dict[str, Any]],
+        limit: int | None,
+        exclusive_start_key: dict[str, Any] | None,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+        """Paginate query results with limit and exclusive start key."""
+        start_index = self._find_start_index(results, exclusive_start_key)
 
-        # Apply limit
         if limit is not None:
             end_index = start_index + limit
             paginated_results = results[start_index:end_index]
-
-            # Determine if there are more items
-            if end_index < len(results):
-                last_evaluated_key = paginated_results[-1]
-            else:
-                last_evaluated_key = None
+            last_evaluated_key = (
+                paginated_results[-1] if end_index < len(results) else None
+            )
         else:
             paginated_results = results[start_index:]
             last_evaluated_key = None
 
         return (paginated_results, last_evaluated_key)
+
+    def _find_start_index(
+        self,
+        results: list[dict[str, Any]],
+        exclusive_start_key: dict[str, Any] | None,
+    ) -> int:
+        """Find the starting index for pagination based on exclusive start key."""
+        if exclusive_start_key is None:
+            return 0
+
+        for i, item in enumerate(results):
+            if all(item.get(k) == v for k, v in exclusive_start_key.items()):
+                return i + 1
+        return 0
 
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.
