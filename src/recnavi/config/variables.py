@@ -20,11 +20,11 @@ REGION = "ap-northeast-1"
 COGNITO_CLIENT_ID = os.environ.get("COGNITO_CLIENT_ID", "dummy")
 COGNITO_USER_POOL_ID = os.environ.get("COGNITO_USER_POOL_ID", "dummy")
 
-USERS_TABLE_NAME = os.environ.get("USERS_TABLE_NAME", "recnavi-local-users")
-SCENES_TABLE_NAME = os.environ.get("SCENES_TABLE_NAME", "recnavi-local-scenes")
+USERS_TABLE_NAME = os.environ.get("DDB_USERS_TABLE", "rec-navi-dev-users")
+PROJECTS_TABLE_NAME = os.environ.get("DDB_PROJECTS_TABLE", "rec-navi-dev-projects")
+SCENES_TABLE_NAME = os.environ.get("DDB_SCENES_TABLE", "rec-navi-dev-scenes")
 TEMPLATES_TABLE_NAME = os.environ.get(
-    "TEMPLATES_TABLE_NAME",
-    "recnavi-local-templates",
+    "DDB_SCENE_TEMPLATES_TABLE", "rec-navi-dev-scene-templates",
 )
 
 APP_DOMAINS = "rec-navi.com"
@@ -43,4 +43,4 @@ def _get_cors_origins() -> list[str]:
 
 CORS_ORIGINS = _get_cors_origins()
 
-LOG_BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "recnavi-dev-log-data")
+LOG_BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "rec-navi-dev-log-data")

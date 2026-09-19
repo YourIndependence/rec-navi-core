@@ -3,7 +3,7 @@ id: ARCH-011
 title: Test Implementation Rules
 domain: testing
 status: active
-date: 2026-07-11
+date: 2026-09-20
 rules: true
 files:
   - 'tests/**/*.py'
@@ -21,7 +21,10 @@ test suite misleading or nondeterministic.
 Tests must preserve the distinction between integration and unit behavior.
 Reusable abstract-class mocks belong in `tests/mockups/`; integration tests
 must keep real component wiring; and unit tests must use in-process doubles for
-external boundaries.
+external boundaries. Every API endpoint must have a corresponding test in
+`tests/integration/`. In CI, where `ENV=CI` is injected, integration tests use
+the `mock_infrastracture_injection_when_ci` fixture to replace external
+infrastructure with in-memory doubles while preserving the application wiring.
 
 ### 1. Shared Mock Implementations
 
@@ -59,10 +62,41 @@ attribute exists on the target object. When a collaborator is instantiated
 inside a method, patch the class at its import binding instead of an instance
 attribute that may not exist.
 
+### 6. AWS Resource Cleanup
+
+Integration tests outside CI may access real AWS resources. Tests that create
+temporary AWS resources or data must clean them up reliably. Temporary AWS
+resource names must use the `it_` prefix so that test-owned resources are
+identifiable and safe to remove.
+
+Each test module must inject the data required for its own responsibility and
+remove it after the test completes. Use the `fixture + yield + cleanup`
+pattern so cleanup runs even when assertions fail:
+
+```python
+@pytest_asyncio.fixture
+async def integration_data(database):
+    item = {
+        "id": "it_example",
+        "data": "mock_data"
+    }
+    await database.put_item(item)
+    
+    yield
+    with suppress(Exception):
+        await database.delete_item({"id": item["id"]})
+```
+
+Cleanup coverage for every temporary AWS resource and injected test datum is a
+manual review requirement. It is intentionally not enforced by Archgate,
+because the complete lifecycle cannot be reliably determined from static
+source inspection.
+
 ## Automated Enforcement
 
 The following implementation rules are active:
 
+- `every-api-endpoint-has-integration-test`
 - `no-patch-in-integration-tests`
 - `no-monkeypatch-setattr-component-in-integration`
 - `async-fixture-must-use-pytest-asyncio-fixture`
@@ -84,6 +118,9 @@ violated.
 - Use `module` or `session` scope for expensive shared fixtures
 - Mock outbound HTTP in unit tests
 - Verify private attributes before patching them
+- Prefix temporary AWS resource names with `it_`
+- Inject module-owned test data and clean it up with `fixture + yield + cleanup`
+- Manually verify that every temporary AWS resource and test datum is cleaned up
 
 **Don't:**
 
@@ -92,6 +129,7 @@ violated.
 - Recreate database tables, HTTP clients, or indexes per test unnecessarily
 - Make unit tests call real external URLs
 - Assume a private attribute exists merely because it has an underscore prefix
+- Leave temporary AWS resources or injected test data behind after integration tests
 
 ## References
 

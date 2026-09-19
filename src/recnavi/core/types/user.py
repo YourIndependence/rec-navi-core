@@ -39,7 +39,8 @@ class User(BaseModel):
     role: UserRole = Field(..., description="What the user may do")
     group_id: str = Field(..., description="Tenant the user belongs to")
     email: str | None = Field(
-        default=None, description="Email address of the user"
+        default=None,
+        description="Email address of the user",
     )
     phone_number: str | None = Field(
         default=None,
