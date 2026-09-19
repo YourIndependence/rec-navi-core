@@ -14,13 +14,18 @@ Detected automatically by pytest, so no need to import it in the test code.
 import os
 
 import pytest
+from fastapi import FastAPI
 from fastapi import Request
 from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.config.variables import SCENES_TABLE_NAME
+from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.main import app
+from tests.mockups.mock_database import MockDatabase
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -36,13 +41,26 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 @pytest.fixture(scope="session", autouse=True)
 def client():
-    """FastAPI test client with mocked authentication."""
+    """FastAPI test client with CI infrastructure and auth isolation."""
     app.dependency_overrides[verify_user] = get_mock_x_user
 
     with TestClient(app, raise_server_exceptions=False) as client:
+        mock_infrastracture_injection_when_ci(app)
         yield client
 
     app.dependency_overrides.clear()
+
+
+def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
+    """Inject in-memory infrastructure for integration tests running in CI."""
+    if os.environ.get("ENV") != "CI":
+        return
+
+    app.state.database = {
+        USERS_TABLE_NAME: MockDatabase(),
+        SCENES_TABLE_NAME: MockDatabase(),
+        TEMPLATES_TABLE_NAME: MockDatabase(),
+    }
 
 
 @pytest.fixture(scope="session")

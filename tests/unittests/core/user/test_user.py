@@ -49,6 +49,10 @@ async def test_get_user_by_id_returns_user_when_valid():
         "userName": "Test User",
         "role": "admin",
         "groupId": "group-456",
+        "email": "test@example.com",
+        "phoneNumber": "090-1234-5678",
+        "birthday": "1990-01-01",
+        "profileImageUri": "s3://bucket/user-123/profile.jpg",
     }
     mock_db = MockUserDatabase(users={"user-123": user_data})
 
@@ -59,6 +63,10 @@ async def test_get_user_by_id_returns_user_when_valid():
     assert result.user_name == "Test User"
     assert result.role == "admin"
     assert result.group_id == "group-456"
+    assert result.email == "test@example.com"
+    assert result.phone_number == "090-1234-5678"
+    assert result.birthday == "1990-01-01"
+    assert result.profile_image_uri == "s3://bucket/user-123/profile.jpg"
 
 
 @pytest.mark.asyncio
@@ -81,6 +89,10 @@ async def test_get_user_by_id_raises_when_role_invalid():
         "userName": "Bad Role User",
         "role": "superadmin",
         "groupId": "group-999",
+        "email": "bad@example.com",
+        "phoneNumber": "090-9999-9999",
+        "birthday": "1985-05-05",
+        "profileImageUri": "s3://bucket/user-789/profile.jpg",
     }
     mock_db = MockUserDatabase(users={"user-789": user_data})
 
@@ -100,6 +112,10 @@ async def test_get_user_by_id_accepts_all_valid_roles():
             "userName": f"{role.capitalize()} User",
             "role": role,
             "groupId": "group-123",
+            "email": f"{role}@example.com",
+            "phoneNumber": "090-0000-0000",
+            "birthday": "2000-01-01",
+            "profileImageUri": f"s3://bucket/user-{role}/profile.jpg",
         }
         mock_db = MockUserDatabase(users={f"user-{role}": user_data})
 

@@ -14,7 +14,10 @@ from decimal import Decimal
 from typing import Any
 
 import aioboto3
+from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import ConditionBase
 
+from recnavi.config.variables import REGION
 from recnavi.core.database.base_database import BaseDatabase
 
 
@@ -29,7 +32,7 @@ class DynamoDb(BaseDatabase):
 
         """
         self.table_name = table_name
-        self.session = aioboto3.Session()
+        self.session = aioboto3.Session(region_name=REGION)
 
     async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
         """Get an item by primary key.
@@ -62,14 +65,15 @@ class DynamoDb(BaseDatabase):
     async def query(
         self,
         key_condition: dict[str, Any],
-        _filter_expression: dict[str, Any] | None = None,
+        filter_expression: dict[str, Any] | None = None,
         index: str | None = None,
     ) -> list[dict[str, Any]]:
         """Query items by key condition.
 
         Args:
             key_condition: Key condition for the query.
-            _filter_expression: Optional filter expression (reserved for future use).
+            filter_expression: Optional attribute equality filters.
+            Multiple filters are combined with AND.
             index: Optional global or local secondary index name.
 
         Returns:
@@ -79,6 +83,9 @@ class DynamoDb(BaseDatabase):
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             query_kwargs = dict(key_condition)
+            condition = _build_filter_expression(filter_expression)
+            if condition is not None:
+                query_kwargs["FilterExpression"] = condition
             if index is not None:
                 query_kwargs["IndexName"] = index
             response = await table.query(**query_kwargs)
@@ -98,14 +105,15 @@ class DynamoDb(BaseDatabase):
 
     async def scan(
         self,
-        _filter_expression: dict[str, Any] | None = None,
+        filter_expression: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         """Scan all items in the table.
 
         Warning: Full table scan. Only use for small tables.
 
         Args:
-            _filter_expression: Optional filter expression (reserved for future use).
+            filter_expression: Optional attribute equality filters.
+            Multiple filters are combined with AND.
 
         Returns:
             List of all items with Python native types.
@@ -113,9 +121,30 @@ class DynamoDb(BaseDatabase):
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.scan()
+            scan_kwargs: dict[str, object] = {}
+            condition = _build_filter_expression(filter_expression)
+            if condition is not None:
+                scan_kwargs["FilterExpression"] = condition
+            response = await table.scan(**scan_kwargs)
             items = response.get("Items", [])
             return [_convert_from_dynamodb_format(item) for item in items]
+
+
+def _build_filter_expression(
+    filter_expression: dict[str, Any] | None,
+) -> ConditionBase | None:
+    """Build a DynamoDB AND expression from attribute equality filters."""
+    if not filter_expression:
+        return None
+
+    conditions = [
+        Attr(attribute).eq(value)
+        for attribute, value in filter_expression.items()
+    ]
+    expression = conditions[0]
+    for condition in conditions[1:]:
+        expression &= condition
+    return expression
 
 
 def _decimal_to_num(obj: Any) -> int | float | object | None:
