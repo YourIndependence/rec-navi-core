@@ -15,6 +15,8 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import CreateProjectRequest
+from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
@@ -160,3 +162,59 @@ async def get_project_endpoint(
     )
 
     return GetProjectResponse(project=project_view)
+
+
+@cms_router.post("/createProject")
+async def create_project_endpoint(
+    request: Request,
+    payload: CreateProjectRequest,
+    user: User = Depends(verify_user),
+) -> CreateProjectResponse:
+    """Create a new project."""
+    from recnavi.apis.schemas.project_schemas import ProjectView
+    from recnavi.apis.schemas.project_schemas import SceneView
+    from recnavi.application.project.create_project import (
+        create_project_usecase,
+    )
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project = await create_project_usecase(
+        projects_db=projects_db,
+        project_name=payload.project_name,
+        description=payload.description,
+        scene_principals=payload.scene_principals,
+        assigned_user_ids=payload.assigned_user_ids,
+        owner=user,
+    )
+
+    scene_views = [
+        SceneView(
+            scene_id=scene.scene_id,
+            scene_principal=scene.scene_principal,
+            status=scene.status.value,
+            video_url=None,
+            thumbnail_url=None,
+            created_by=scene.created_by,
+            created_at=scene.created_at,
+            assigned_at=scene.assigned_at,
+            assigned_user_ids=scene.assigned_user_ids,
+        )
+        for scene in project.scenes
+    ]
+
+    project_view = ProjectView(
+        project_id=project.project_id,
+        group_id=project.group_id,
+        project_name=project.project_name,
+        description=project.description,
+        owner_user_id=project.owner_user_id,
+        assigned_user_ids=project.assigned_user_ids,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        status=project.status,
+        version=project.version,
+        scenes=scene_views,
+    )
+
+    return CreateProjectResponse(project=project_view)

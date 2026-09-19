@@ -70,6 +70,6 @@ class Project(BaseModel):
         description="How far the project has progressed",
     )
     version: int = Field(
-        default=1,
+        default=0,
         description="Optimistic lock version for concurrent update control",
     )

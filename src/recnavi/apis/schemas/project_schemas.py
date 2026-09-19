@@ -141,3 +141,35 @@ class GetProjectResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: ProjectView = Field(..., description="Project with all scenes")
+
+
+class CreateProjectRequest(BaseModel):
+    """Request payload for POST /createProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_name: str = Field(..., description="Name shown to members")
+    description: str = Field(default="", description="Free text notes")
+    scene_principals: list[str] = Field(
+        ...,
+        description="Scene principals expanded by client",
+    )
+    assigned_user_ids: list[str] = Field(
+        default_factory=list,
+        description="Staff assigned to the project",
+    )
+
+
+class CreateProjectResponse(BaseModel):
+    """Response for POST /createProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    project: ProjectView = Field(..., description="Created project")
