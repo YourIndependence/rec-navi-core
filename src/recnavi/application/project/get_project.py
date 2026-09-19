@@ -23,30 +23,13 @@ async def get_project_use_case(
     user: User,
     video_bucket_name: str,
 ) -> ProjectView:
-    """Get project with presigned URLs for videos and thumbnails.
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: Project ID to retrieve.
-        user: Authenticated user requesting the project.
-        video_bucket_name: S3 bucket name for video/thumbnail storage.
-
-    Returns:
-        ProjectView with SceneView objects containing presigned URLs.
-
-    Raises:
-        ClientNotFoundError: Project does not exist (404).
-        ClientAuthorizationError: User not authorized (403).
-
-    """
-    # Core layer: get project with authorization check
+    """Get project with presigned URLs for videos and thumbnails."""
     project = await get_project_if_authorized(
         projects_db=projects_db,
         project_id=project_id,
         user=user,
     )
 
-    # Infrastructure layer: resolve presigned URLs for each scene
     scene_views = []
     for scene in project.scenes:
         video_url = None

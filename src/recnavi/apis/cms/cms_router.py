@@ -116,30 +116,7 @@ async def get_project_endpoint(
     payload: GetProjectRequest,
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
-    """Get a project with all scenes and presigned URLs.
-
-    Returns a project with all its scenes. Video and thumbnail URLs are
-    presigned S3 URLs valid for 1 hour.
-
-    Authorization:
-    - User must belong to the same group as the project
-    - User must be the owner or assigned staff
-
-    Args:
-        request: FastAPI request object.
-        payload: Request body with projectId.
-        user: Authenticated user (from JWT token).
-
-    Returns:
-        GetProjectResponse with project and scenes.
-
-    Raises:
-        400: Invalid request (via error_handler).
-        401: Invalid/expired token (via verify_user).
-        403: User not authorized to view project.
-        404: Project not found.
-
-    """
+    """Get a project with all scenes."""
     from recnavi.application.project.get_project import get_project_use_case
 
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]

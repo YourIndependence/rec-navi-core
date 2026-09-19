@@ -21,25 +21,7 @@ async def get_project_if_authorized(
     project_id: str,
     user: User,
 ) -> Project:
-    """Get project if user is authorized (owner or assigned staff).
-
-    Authorization rules:
-    - User must belong to the same group as the project
-    - User must be either the owner or assigned staff
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: Project ID to retrieve.
-        user: Authenticated user requesting the project.
-
-    Returns:
-        Project object with all scenes.
-
-    Raises:
-        ClientNotFoundError: Project does not exist (404).
-        ClientAuthorizationError: User not authorized (403).
-
-    """
+    """Get project if user is authorized."""
     item = await projects_db.get_item(key={"projectId": project_id})
 
     if not item:
@@ -47,13 +29,11 @@ async def get_project_if_authorized(
 
     project = Project.model_validate(item)
 
-    # Group membership check (403 for other groups)
     if project.group_id != user.group_id:
         raise ClientAuthorizationError(
             "Access to other group's project is forbidden",
         )
 
-    # Owner or assigned staff check
     is_owner = project.owner_user_id == user.user_id
     is_assigned_staff = user.user_id in project.assigned_user_ids
 
