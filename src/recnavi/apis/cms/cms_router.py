@@ -117,15 +117,46 @@ async def get_project_endpoint(
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
+    from recnavi.apis.schemas.project_schemas import ProjectView
+    from recnavi.apis.schemas.project_schemas import SceneView
     from recnavi.application.project.get_project import get_project_use_case
 
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    project_view = await get_project_use_case(
+    project, scene_urls = await get_project_use_case(
         projects_db=projects_db,
         project_id=payload.project_id,
         user=user,
         video_bucket_name=VIDEO_BUCKET_NAME,
+    )
+
+    scene_views = [
+        SceneView(
+            scene_id=scene.scene_id,
+            scene_principal=scene.scene_principal,
+            status=scene.status.value,
+            video_url=scene_urls[scene.scene_id]["video_url"],
+            thumbnail_url=scene_urls[scene.scene_id]["thumbnail_url"],
+            created_by=scene.created_by,
+            created_at=scene.created_at,
+            assigned_at=scene.assigned_at,
+            assigned_user_ids=scene.assigned_user_ids,
+        )
+        for scene in project.scenes
+    ]
+
+    project_view = ProjectView(
+        project_id=project.project_id,
+        group_id=project.group_id,
+        project_name=project.project_name,
+        description=project.description,
+        owner_user_id=project.owner_user_id,
+        assigned_user_ids=project.assigned_user_ids,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+        status=project.status,
+        version=project.version,
+        scenes=scene_views,
     )
 
     return GetProjectResponse(project=project_view)

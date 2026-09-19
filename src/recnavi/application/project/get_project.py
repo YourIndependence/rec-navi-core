@@ -9,10 +9,9 @@
 
 """Application use case for getting a project with presigned URLs."""
 
-from recnavi.apis.schemas.project_schemas import ProjectView
-from recnavi.apis.schemas.project_schemas import SceneView
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.project import get_project_if_authorized
+from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 
@@ -22,7 +21,7 @@ async def get_project_use_case(
     project_id: str,
     user: User,
     video_bucket_name: str,
-) -> ProjectView:
+) -> tuple[Project, dict[str, dict[str, str | None]]]:
     """Get project with presigned URLs for videos and thumbnails."""
     project = await get_project_if_authorized(
         projects_db=projects_db,
@@ -30,7 +29,7 @@ async def get_project_use_case(
         user=user,
     )
 
-    scene_views = []
+    scene_urls: dict[str, dict[str, str | None]] = {}
     for scene in project.scenes:
         video_url = None
         thumbnail_url = None
@@ -47,30 +46,9 @@ async def get_project_use_case(
                 object_key=scene.thumbnail_key,
             )
 
-        scene_views.append(
-            SceneView(
-                scene_id=scene.scene_id,
-                scene_principal=scene.scene_principal,
-                status=scene.status.value,
-                video_url=video_url,
-                thumbnail_url=thumbnail_url,
-                created_by=scene.created_by,
-                created_at=scene.created_at,
-                assigned_at=scene.assigned_at,
-                assigned_user_ids=scene.assigned_user_ids,
-            ),
-        )
+        scene_urls[scene.scene_id] = {
+            "video_url": video_url,
+            "thumbnail_url": thumbnail_url,
+        }
 
-    return ProjectView(
-        project_id=project.project_id,
-        group_id=project.group_id,
-        project_name=project.project_name,
-        description=project.description,
-        owner_user_id=project.owner_user_id,
-        assigned_user_ids=project.assigned_user_ids,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        status=project.status,
-        version=project.version,
-        scenes=scene_views,
-    )
+    return project, scene_urls

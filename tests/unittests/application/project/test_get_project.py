@@ -14,14 +14,15 @@ from unittest.mock import patch
 import pytest
 
 from recnavi.application.project.get_project import get_project_use_case
+from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_project_use_case_returns_project_view_with_urls():
-    """Test get_project_use_case returns ProjectView with presigned URLs."""
+async def test_get_project_use_case_returns_project_with_urls():
+    """Test get_project_use_case returns Project and presigned URLs."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -63,7 +64,6 @@ async def test_get_project_use_case_returns_project_view_with_urls():
         profile_image_uri="s3://bucket/profile.jpg",
     )
 
-    # Mock S3 presigned URL generation
     with patch(
         "recnavi.application.project.get_project.generate_presigned_url",
     ) as mock_generate_url:
@@ -71,26 +71,26 @@ async def test_get_project_use_case_returns_project_view_with_urls():
             f"https://example.com/{object_key}?signature=abc123"
         )
 
-        project_view = await get_project_use_case(
+        project, scene_urls = await get_project_use_case(
             projects_db=projects_db,
             project_id="proj-123",
             user=user,
             video_bucket_name="test-bucket",
         )
 
-    assert project_view.project_id == "proj-123"
-    assert project_view.group_id == "group-456"
-    assert project_view.version == 1
+    assert isinstance(project, Project)
+    assert project.project_id == "proj-123"
+    assert project.group_id == "group-456"
+    assert project.version == 1
 
-    assert len(project_view.scenes) == 1
-    scene = project_view.scenes[0]
-    assert scene.scene_id == "scene-001"
+    assert len(project.scenes) == 1
+    assert "scene-001" in scene_urls
     assert (
-        scene.video_url
+        scene_urls["scene-001"]["video_url"]
         == "https://example.com/videos/scene-001.mp4?signature=abc123"
     )
     assert (
-        scene.thumbnail_url
+        scene_urls["scene-001"]["thumbnail_url"]
         == "https://example.com/thumbnails/scene-001.jpg?signature=abc123"
     )
 
@@ -144,17 +144,18 @@ async def test_get_project_use_case_handles_missing_video_keys():
     with patch(
         "recnavi.application.project.get_project.generate_presigned_url",
     ) as mock_generate_url:
-        project_view = await get_project_use_case(
+        project, scene_urls = await get_project_use_case(
             projects_db=projects_db,
             project_id="proj-456",
             user=user,
             video_bucket_name="test-bucket",
         )
 
-    assert len(project_view.scenes) == 1
-    scene = project_view.scenes[0]
-    assert scene.video_url is None
-    assert scene.thumbnail_url is None
+    assert isinstance(project, Project)
+    assert len(project.scenes) == 1
+    assert "scene-002" in scene_urls
+    assert scene_urls["scene-002"]["video_url"] is None
+    assert scene_urls["scene-002"]["thumbnail_url"] is None
 
     mock_generate_url.assert_not_called()
 
