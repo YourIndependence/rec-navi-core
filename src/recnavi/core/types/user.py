@@ -38,10 +38,16 @@ class User(BaseModel):
     user_name: str = Field(..., description="Name shown to other members")
     role: UserRole = Field(..., description="What the user may do")
     group_id: str = Field(..., description="Tenant the user belongs to")
-    email: str = Field(..., description="Email address of the user")
-    phone_number: str = Field(..., description="Phone number of the user")
-    birthday: str = Field(..., description="Birthday in YYYY-MM-DD format")
-    profile_image_uri: str = Field(
-        ...,
+    email: str | None = Field(None, description="Email address of the user")
+    phone_number: str | None = Field(
+        None,
+        description="Phone number of the user",
+    )
+    birthday: str | None = Field(
+        None,
+        description="Birthday in YYYY-MM-DD format",
+    )
+    profile_image_uri: str | None = Field(
+        None,
         description="S3 URI of the user's profile image",
     )
