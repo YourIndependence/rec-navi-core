@@ -17,7 +17,6 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
-from recnavi.apis.schemas.template_schemas import TemplateView
 from recnavi.application.scene.get_scene_masters_usecase import (
     get_scene_masters_usecase,
 )
@@ -53,7 +52,10 @@ async def get_scene_masters_endpoint(
     return GetSceneMastersResponse(scenes=scene_views)
 
 
-@cms_router.get("/getTemplates")
+@cms_router.get(
+    "/getTemplates",
+    response_model_exclude={"templates": {"__all__": {"thumbnail_uri"}}},
+)
 async def get_templates_endpoint(
     request: Request,
     _user: User = Depends(verify_user),
@@ -61,14 +63,4 @@ async def get_templates_endpoint(
     """List all scenes templates."""
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
     templates = await get_templates_usecase(templates_db=templates_db)
-
-    template_views = [
-        TemplateView(
-            template_id=template.template_id,
-            title=template.title,
-            scene_principals=template.scene_principals,
-        )
-        for template in templates
-    ]
-
-    return GetTemplatesResponse(templates=template_views)
+    return GetTemplatesResponse(templates=templates)
