@@ -116,7 +116,7 @@ class MockDatabase(BaseDatabase):
         results: list[dict[str, Any]],
         exclusive_start_key: dict[str, Any] | None,
     ) -> int:
-        """Find the starting index for pagination based on exclusive start key."""
+        """Find starting index for pagination from exclusive start key."""
         if exclusive_start_key is None:
             return 0
 
