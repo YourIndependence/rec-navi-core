@@ -40,7 +40,7 @@ async def test_create_project_usecase_saves_to_database():
     )
 
     saved_item = await projects_db.get_item(
-        key={"projectId": project.project_id}
+        key={"projectId": project.project_id},
     )
     assert saved_item is not None
     assert saved_item["projectName"] == "Test Project"

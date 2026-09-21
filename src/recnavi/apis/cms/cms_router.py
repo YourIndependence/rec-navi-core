@@ -171,8 +171,6 @@ async def create_project_endpoint(
     user: User = Depends(verify_user),
 ) -> CreateProjectResponse:
     """Create a new project."""
-    from recnavi.apis.schemas.project_schemas import ProjectView
-    from recnavi.apis.schemas.project_schemas import SceneView
     from recnavi.application.project.create_project import (
         create_project_usecase,
     )
@@ -188,33 +186,4 @@ async def create_project_endpoint(
         owner=user,
     )
 
-    scene_views = [
-        SceneView(
-            scene_id=scene.scene_id,
-            scene_principal=scene.scene_principal,
-            status=scene.status.value,
-            video_url=None,
-            thumbnail_url=None,
-            created_by=scene.created_by,
-            created_at=scene.created_at,
-            assigned_at=scene.assigned_at,
-            assigned_user_ids=scene.assigned_user_ids,
-        )
-        for scene in project.scenes
-    ]
-
-    project_view = ProjectView(
-        project_id=project.project_id,
-        group_id=project.group_id,
-        project_name=project.project_name,
-        description=project.description,
-        owner_user_id=project.owner_user_id,
-        assigned_user_ids=project.assigned_user_ids,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        status=project.status,
-        version=project.version,
-        scenes=scene_views,
-    )
-
-    return CreateProjectResponse(project=project_view)
+    return CreateProjectResponse(project=project)

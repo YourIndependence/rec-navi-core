@@ -14,6 +14,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 
 
@@ -172,4 +173,4 @@ class CreateProjectResponse(BaseModel):
     )
 
     status: str = Field(default="ok", description="Response status")
-    project: ProjectView = Field(..., description="Created project")
+    project: Project = Field(..., description="Created project")
