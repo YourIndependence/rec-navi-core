@@ -107,3 +107,27 @@ async def test_get_templates_returns_injected_template(
         "title": template_data["title"],
         "scenePrincipals": template_data["scenePrincipals"],
     } in data["templates"]
+
+
+def test_get_projects_returns_400_when_no_token(client):
+    """Test GET /getProjects returns 400 when no authorization header."""
+    response = client.get("/getProjects")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
+def test_create_project_returns_400_when_no_token(client):
+    """Test POST /createProject returns 400 when no authorization header."""
+    response = client.post(
+        "/createProject",
+        json={
+            "projectName": "Test Project",
+            "description": "Test Description",
+            "scenePrincipals": ["cooking"],
+            "assignedUserIds": [],
+        },
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
