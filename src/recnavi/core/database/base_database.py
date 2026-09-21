@@ -88,14 +88,8 @@ class BaseDatabase(ABC):
     ) -> list[dict[str, Any]]:
         """Scan all items in the table.
 
-        Warning: This is a full table scan and should only be used for small
-        tables or with appropriate filters.
-
         Args:
             filter_expression: Optional filter expression to apply.
-
-        Returns:
-            List of all items in the table (or matching the filter).
 
         """
         pass

@@ -27,9 +27,14 @@ class MockDynamoTable:
 
     def __init__(self) -> None:
         self.query_kwargs: dict[str, object] | None = None
+        self.scan_kwargs: dict[str, object] | None = None
 
     async def query(self, **kwargs: object) -> dict[str, list[dict[str, str]]]:
         self.query_kwargs = kwargs
+        return {"Items": [{"userId": "user-123"}]}
+
+    async def scan(self, **kwargs: object) -> dict[str, list[dict[str, str]]]:
+        self.scan_kwargs = kwargs
         return {"Items": [{"userId": "user-123"}]}
 
 
@@ -78,6 +83,47 @@ async def test_query_passes_index_name_to_dynamodb():
         "KeyConditionExpression": "userId = :user_id",
         "IndexName": "group-index",
     }
+
+
+@pytest.mark.asyncio
+async def test_query_passes_filter_expression_to_dynamodb():
+    """Test query converts equality filters to a DynamoDB condition."""
+    table = MockDynamoTable()
+    resource = MockDynamoResource(table)
+    database = DynamoDb(table_name="users")
+    database.session = MockDynamoSession(resource)
+
+    await database.query(
+        key_condition={"KeyConditionExpression": "userId = :user_id"},
+        filter_expression={"isActive": True},
+    )
+
+    assert table.query_kwargs is not None
+    filter_expression = table.query_kwargs["FilterExpression"]
+    expression = filter_expression.get_expression()
+    assert expression["format"] == "{0} {operator} {1}"
+    assert expression["operator"] == "="
+    assert expression["values"][0].name == "isActive"
+    assert expression["values"][1] is True
+
+
+@pytest.mark.asyncio
+async def test_scan_passes_filter_expression_to_dynamodb():
+    """Test scan converts equality filters to a DynamoDB condition."""
+    table = MockDynamoTable()
+    resource = MockDynamoResource(table)
+    database = DynamoDb(table_name="users")
+    database.session = MockDynamoSession(resource)
+
+    await database.scan(filter_expression={"role": "admin"})
+
+    assert table.scan_kwargs is not None
+    filter_expression = table.scan_kwargs["FilterExpression"]
+    expression = filter_expression.get_expression()
+    assert expression["format"] == "{0} {operator} {1}"
+    assert expression["operator"] == "="
+    assert expression["values"][0].name == "role"
+    assert expression["values"][1] == "admin"
 
 
 def test_convert_to_dynamodb_converts_int_to_decimal():
