@@ -3,6 +3,69 @@
 export default {
   rules: {
     /**
+     * Every FastAPI endpoint must be exercised by an integration test.
+     * This source/test topology check catches a new route being added without
+     * the corresponding HTTP-boundary test.
+     */
+    "every-api-endpoint-has-integration-test": {
+      description:
+        "Every FastAPI API endpoint must have a corresponding HTTP integration test under tests/integration/.",
+      severity: "error",
+      check: async (ctx) => {
+        const apiFiles = await ctx.glob("src/recnavi/apis/**/*.py");
+        const testFiles = await ctx.glob("tests/integration/**/*.py");
+        const routePattern =
+          /@[A-Za-z_][\w.]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/g;
+        const methodCallPattern =
+          /\b[A-Za-z_][\w]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/gi;
+        const requestCallPattern =
+          /\b[A-Za-z_][\w]*\.request\s*\(\s*["'](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|TRACE)["']\s*,\s*["']([^"']+)["']/g;
+
+        const normalizePath = (path: string): string => {
+          const withoutQuery = path.split("?", 1)[0];
+          const withLeadingSlash = withoutQuery.startsWith("/")
+            ? withoutQuery
+            : `/${withoutQuery}`;
+          return withLeadingSlash.length > 1
+            ? withLeadingSlash.replace(/\/$/, "")
+            : withLeadingSlash;
+        };
+
+        const testedEndpoints = new Set<string>();
+        for (const file of testFiles) {
+          const content = await ctx.readFile(file);
+          for (const match of content.matchAll(methodCallPattern)) {
+            testedEndpoints.add(
+              `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+            );
+          }
+          for (const match of content.matchAll(requestCallPattern)) {
+            testedEndpoints.add(
+              `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+            );
+          }
+        }
+
+        for (const file of apiFiles) {
+          const content = await ctx.readFile(file);
+          for (const match of content.matchAll(routePattern)) {
+            const endpoint = `${match[1].toUpperCase()}:${normalizePath(match[2])}`;
+            if (testedEndpoints.has(endpoint)) continue;
+
+            const line = content.slice(0, match.index ?? 0).split("\n").length;
+            ctx.report.violation({
+              message:
+                `API endpoint ${endpoint} has no corresponding integration test under tests/integration/`,
+              file,
+              line,
+              fix: `Add a ${match[1].toUpperCase()} request test for ${normalizePath(match[2])} under tests/integration/.`,
+            });
+          }
+        }
+      },
+    },
+
+    /**
      * Integration tests must not use @patch or unittest.mock.patch.
      * Patching out real components turns the test into a unit test and removes
      * the ability to verify that actual component interactions work correctly.
