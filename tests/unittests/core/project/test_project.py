@@ -107,7 +107,8 @@ async def test_get_project_raises_404_for_missing_project():
     )
 
     with pytest.raises(
-        ClientResourcesNotFoundError, match="Project not found",
+        ClientResourcesNotFoundError,
+        match="Project not found",
     ):
         await get_project(
             projects_db=projects_db,
