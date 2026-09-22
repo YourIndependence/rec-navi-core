@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""S3 client for presigned URL generation."""
+"""S3 client for presigned URL generation and object deletion."""
 
 import aioboto3
 
@@ -38,3 +38,55 @@ async def generate_presigned_url(
             ExpiresIn=expiration,
         )
         return url
+
+
+async def delete_objects_by_prefix(
+    *,
+    bucket_name: str,
+    prefix: str,
+) -> int:
+    """Delete all S3 objects under a prefix.
+
+    Args:
+        bucket_name: S3 bucket name.
+        prefix: Object key prefix (e.g., "projects/proj-123/").
+
+    Returns:
+        Number of objects deleted.
+
+    """
+    session = aioboto3.Session()
+    deleted_count = 0
+
+    async with session.client("s3", region_name=REGION) as s3:
+        continuation_token = None
+
+        while True:
+            list_kwargs = {
+                "Bucket": bucket_name,
+                "Prefix": prefix,
+            }
+            if continuation_token:
+                list_kwargs["ContinuationToken"] = continuation_token
+
+            response = await s3.list_objects_v2(**list_kwargs)
+
+            contents = response.get("Contents", [])
+            if not contents:
+                break
+
+            delete_keys = [{"Key": obj["Key"]} for obj in contents]
+
+            await s3.delete_objects(
+                Bucket=bucket_name,
+                Delete={"Objects": delete_keys},
+            )
+
+            deleted_count += len(delete_keys)
+
+            if not response.get("IsTruncated"):
+                break
+
+            continuation_token = response.get("NextContinuationToken")
+
+    return deleted_count

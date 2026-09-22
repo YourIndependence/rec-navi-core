@@ -241,3 +241,26 @@ class UpdateProjectResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: Project = Field(..., description="Updated project")
+
+
+class DeleteProjectRequest(BaseModel):
+    """Request payload for POST /deleteProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID to delete")
+
+
+class DeleteProjectResponse(BaseModel):
+    """Response for POST /deleteProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    project_id: str = Field(..., description="Deleted project ID")

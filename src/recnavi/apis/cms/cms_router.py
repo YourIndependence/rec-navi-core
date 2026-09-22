@@ -17,6 +17,8 @@ from fastapi import Request
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
+from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
+from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
@@ -229,3 +231,26 @@ async def update_project_endpoint(
     )
 
     return UpdateProjectResponse(project=updated_project)
+
+
+@cms_router.post("/deleteProject")
+async def delete_project_endpoint(
+    request: Request,
+    payload: DeleteProjectRequest,
+    user: User = Depends(verify_user),
+) -> DeleteProjectResponse:
+    """Delete a project and its recordings."""
+    from recnavi.application.project.delete_project_usecase import (
+        delete_project_usecase,
+    )
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project_id = await delete_project_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        user=user,
+        video_bucket_name=VIDEO_BUCKET_NAME,
+    )
+
+    return DeleteProjectResponse(project_id=project_id)

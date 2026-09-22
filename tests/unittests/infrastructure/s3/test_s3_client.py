@@ -7,11 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Tests for S3 client presigned URL generation.
-
-These are smoke tests verifying the function signature and basic structure.
-Full integration testing with real/mocked S3 is covered in integration tests.
-"""
+"""Tests for S3 client operations."""
 
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
@@ -19,6 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
+from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
 from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 
 
@@ -97,3 +94,129 @@ async def test_generate_presigned_url_respects_custom_expiration():
             Params={"Bucket": "test-bucket", "Key": "videos/scene-456.mp4"},
             ExpiresIn=7200,  # Custom expiration
         )
+
+
+@pytest.mark.asyncio
+async def test_delete_objects_by_prefix_deletes_multiple_objects():
+    """Test delete_objects_by_prefix deletes all objects under prefix."""
+    mock_objects_page1 = {
+        "Contents": [
+            {"Key": "projects/proj-123/scenes/scene-1.mp4"},
+            {"Key": "projects/proj-123/scenes/scene-1-thumb.jpg"},
+            {"Key": "projects/proj-123/scenes/scene-2.mp4"},
+        ],
+        "IsTruncated": False,
+    }
+
+    mock_s3 = AsyncMock()
+    mock_s3.list_objects_v2 = AsyncMock(return_value=mock_objects_page1)
+    mock_s3.delete_objects = AsyncMock()
+
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "recnavi.infrastructure.s3.s3_client.aioboto3.Session",
+    ) as mock_session_class:
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+        mock_session.client = MagicMock(return_value=mock_client_cm)
+
+        deleted_count = await delete_objects_by_prefix(
+            bucket_name="test-bucket",
+            prefix="projects/proj-123/",
+        )
+
+    assert deleted_count == 3
+    mock_s3.list_objects_v2.assert_called_once_with(
+        Bucket="test-bucket",
+        Prefix="projects/proj-123/",
+    )
+    mock_s3.delete_objects.assert_called_once()
+    call_args = mock_s3.delete_objects.call_args
+    assert call_args[1]["Bucket"] == "test-bucket"
+    assert len(call_args[1]["Delete"]["Objects"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_delete_objects_by_prefix_returns_zero_when_empty():
+    """Test delete_objects_by_prefix returns 0 when prefix has no objects."""
+    mock_empty_response = {
+        "Contents": [],
+        "IsTruncated": False,
+    }
+
+    mock_s3 = AsyncMock()
+    mock_s3.list_objects_v2 = AsyncMock(return_value=mock_empty_response)
+
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "recnavi.infrastructure.s3.s3_client.aioboto3.Session",
+    ) as mock_session_class:
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+        mock_session.client = MagicMock(return_value=mock_client_cm)
+
+        deleted_count = await delete_objects_by_prefix(
+            bucket_name="test-bucket",
+            prefix="projects/nonexistent/",
+        )
+
+    assert deleted_count == 0
+    mock_s3.list_objects_v2.assert_called_once()
+    mock_s3.delete_objects.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_delete_objects_by_prefix_handles_pagination():
+    """Test delete_objects_by_prefix handles pagination for 1000+ objects."""
+    mock_page1 = {
+        "Contents": [
+            {"Key": f"projects/proj-999/file-{i:04d}.txt"} for i in range(1000)
+        ],
+        "IsTruncated": True,
+        "NextContinuationToken": "token-1",
+    }
+    mock_page2 = {
+        "Contents": [
+            {"Key": f"projects/proj-999/file-{i:04d}.txt"}
+            for i in range(1000, 1500)
+        ],
+        "IsTruncated": False,
+    }
+
+    mock_s3 = AsyncMock()
+    mock_s3.list_objects_v2 = AsyncMock(side_effect=[mock_page1, mock_page2])
+    mock_s3.delete_objects = AsyncMock()
+
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "recnavi.infrastructure.s3.s3_client.aioboto3.Session",
+    ) as mock_session_class:
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+        mock_session.client = MagicMock(return_value=mock_client_cm)
+
+        deleted_count = await delete_objects_by_prefix(
+            bucket_name="test-bucket",
+            prefix="projects/proj-999/",
+        )
+
+    assert deleted_count == 1500
+    assert mock_s3.list_objects_v2.call_count == 2
+    assert mock_s3.delete_objects.call_count == 2
+
+    first_list_call = mock_s3.list_objects_v2.call_args_list[0]
+    assert first_list_call[1]["Bucket"] == "test-bucket"
+    assert first_list_call[1]["Prefix"] == "projects/proj-999/"
+    assert "ContinuationToken" not in first_list_call[1]
+
+    second_list_call = mock_s3.list_objects_v2.call_args_list[1]
+    assert second_list_call[1]["ContinuationToken"] == "token-1"
