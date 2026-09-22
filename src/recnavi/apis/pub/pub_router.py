@@ -17,10 +17,16 @@ from fastapi import Request
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import ProjectSummaryView
+from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
+from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
 from recnavi.application.project.get_my_projects_usecase import (
     get_my_projects_usecase,
 )
+from recnavi.application.scene.update_scene_record_usecase import (
+    update_scene_record_usecase,
+)
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
 
 
@@ -60,3 +66,25 @@ async def get_my_projects_endpoint(
         projects=project_views,
         next_cursor=next_cursor,
     )
+
+
+@pub_router.post("/updateSceneRecord")
+async def update_scene_record_endpoint(
+    request: Request,
+    payload: UpdateSceneRecordRequest,
+    user: User = Depends(verify_user),
+) -> UpdateSceneRecordResponse:
+    """Upload scene recording (staff only)."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await update_scene_record_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        scene_id=payload.scene_id,
+        video_base64=payload.video,
+        thumbnail_base64=payload.thumbnail,
+        user=user,
+        video_bucket_name=VIDEO_BUCKET_NAME,
+    )
+
+    return UpdateSceneRecordResponse(project=updated_project)

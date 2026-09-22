@@ -410,3 +410,184 @@ async def test_put_item_raises_conflict_when_condition_check_fails():
         )
 
     assert "ConditionalCheckFailedException" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_update_item_passes_expression_to_dynamodb():
+    """Test update_item passes update expression to DynamoDB."""
+
+    class MockTableWithUpdate:
+        def __init__(self) -> None:
+            self.update_item_kwargs: dict[str, object] | None = None
+
+        async def update_item(self, **kwargs: object) -> dict[str, object]:
+            self.update_item_kwargs = kwargs
+            return {
+                "Attributes": {
+                    "projectId": {"S": "proj-123"},
+                    "status": {"S": "pending"},
+                },
+            }
+
+    class MockResourceWithUpdate:
+        def __init__(self, table: MockTableWithUpdate) -> None:
+            self.table = table
+
+        async def __aenter__(self) -> "MockResourceWithUpdate":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def Table(self, _table_name: str) -> MockTableWithUpdate:  # noqa: N802
+            return self.table
+
+    class MockSessionWithUpdate:
+        def __init__(self, resource: MockResourceWithUpdate) -> None:
+            self.dynamodb_resource = resource
+
+        def resource(self, _service_name: str) -> MockResourceWithUpdate:
+            return self.dynamodb_resource
+
+    table = MockTableWithUpdate()
+    resource = MockResourceWithUpdate(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockSessionWithUpdate(resource)
+
+    await database.update_item(
+        key={"projectId": "proj-123"},
+        update_expression="SET #status = :status",
+        expression_attribute_names={"#status": "status"},
+        expression_attribute_values={":status": "pending"},
+    )
+
+    assert table.update_item_kwargs is not None
+    assert table.update_item_kwargs["Key"] == {"projectId": "proj-123"}
+    assert (
+        table.update_item_kwargs["UpdateExpression"] == "SET #status = :status"
+    )
+    assert table.update_item_kwargs["ExpressionAttributeNames"] == {
+        "#status": "status",
+    }
+    assert table.update_item_kwargs["ExpressionAttributeValues"] == {
+        ":status": "pending",
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_item_converts_decimal_in_expression_values():
+    """Test update_item converts int to Decimal in expression values."""
+
+    class MockTableWithUpdateDecimal:
+        def __init__(self) -> None:
+            self.update_item_kwargs: dict[str, object] | None = None
+
+        async def update_item(self, **kwargs: object) -> dict[str, object]:
+            self.update_item_kwargs = kwargs
+            return {
+                "Attributes": {
+                    "projectId": {"S": "proj-123"},
+                    "version": {"N": "2"},
+                },
+            }
+
+    class MockResourceWithUpdateDecimal:
+        def __init__(self, table: MockTableWithUpdateDecimal) -> None:
+            self.table = table
+
+        async def __aenter__(self) -> "MockResourceWithUpdateDecimal":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def Table(self, _table_name: str) -> MockTableWithUpdateDecimal:  # noqa: N802
+            return self.table
+
+    class MockSessionWithUpdateDecimal:
+        def __init__(self, resource: MockResourceWithUpdateDecimal) -> None:
+            self.dynamodb_resource = resource
+
+        def resource(
+            self, _service_name: str,
+        ) -> MockResourceWithUpdateDecimal:
+            return self.dynamodb_resource
+
+    table = MockTableWithUpdateDecimal()
+    resource = MockResourceWithUpdateDecimal(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockSessionWithUpdateDecimal(resource)
+
+    await database.update_item(
+        key={"projectId": "proj-123"},
+        update_expression="SET version = :version",
+        expression_attribute_values={":version": 2},
+    )
+
+    assert table.update_item_kwargs is not None
+    expression_values = table.update_item_kwargs["ExpressionAttributeValues"]
+    assert isinstance(expression_values[":version"], Decimal)
+    assert expression_values[":version"] == Decimal("2")
+
+
+@pytest.mark.asyncio
+async def test_update_item_raises_conflict_on_condition_failure():
+    """Test update_item raises ClientConflictError on ConditionalCheckFailedException."""
+    from botocore.exceptions import ClientError
+
+    class MockTableThatFailsUpdateCondition:
+        async def update_item(self, **kwargs: object) -> dict[str, object]:
+            raise ClientError(
+                error_response={
+                    "Error": {
+                        "Code": "ConditionalCheckFailedException",
+                        "Message": "The conditional request failed",
+                    },
+                },
+                operation_name="UpdateItem",
+            )
+
+    class MockResourceWithFailingUpdateTable:
+        def __init__(self, table: MockTableThatFailsUpdateCondition) -> None:
+            self.table = table
+
+        async def __aenter__(self) -> "MockResourceWithFailingUpdateTable":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def Table(  # noqa: N802
+            self,
+            _table_name: str,
+        ) -> MockTableThatFailsUpdateCondition:
+            return self.table
+
+    class MockSessionWithFailingUpdateTable:
+        def __init__(
+            self, resource: MockResourceWithFailingUpdateTable,
+        ) -> None:
+            self.dynamodb_resource = resource
+
+        def resource(
+            self, _service_name: str,
+        ) -> MockResourceWithFailingUpdateTable:
+            return self.dynamodb_resource
+
+    table = MockTableThatFailsUpdateCondition()
+    resource = MockResourceWithFailingUpdateTable(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockSessionWithFailingUpdateTable(resource)
+
+    with pytest.raises(
+        ClientConflictError, match="ConditionalCheckFailedException",
+    ):
+        await database.update_item(
+            key={"projectId": "proj-123"},
+            update_expression="SET scenes[0].status = :status",
+            condition_expression="scenes[0].sceneId = :sceneId",
+            expression_attribute_values={
+                ":status": "pending",
+                ":sceneId": "scene-1",
+            },
+        )

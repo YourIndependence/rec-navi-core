@@ -137,6 +137,74 @@ class DynamoDb(BaseDatabase):
                 last_evaluated_key,
             )
 
+    async def update_item(
+        self,
+        *,
+        key: dict[str, Any],
+        update_expression: str,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update item with UpdateExpression.
+
+        Args:
+            key: Primary key of item to update.
+            update_expression: DynamoDB UpdateExpression (e.g., "SET status = :status").
+            condition_expression: Optional condition (e.g., "sceneId = :sceneId").
+            expression_attribute_names: Attribute name substitutions.
+            expression_attribute_values: Value substitutions.
+
+        Returns:
+            Updated item with Python native types.
+
+        Raises:
+            ClientConflictError: Condition check failed.
+
+        """
+        from botocore.exceptions import ClientError
+
+        from recnavi.exceptions.exceptions import ClientConflictError
+
+        converted_values = (
+            _convert_to_dynamodb_format(expression_attribute_values)
+            if expression_attribute_values
+            else None
+        )
+
+        async with self.session.resource("dynamodb") as dynamodb:
+            table = await dynamodb.Table(self.table_name)
+            update_kwargs: dict[str, Any] = {
+                "Key": key,
+                "UpdateExpression": update_expression,
+                "ReturnValues": "ALL_NEW",
+            }
+
+            if condition_expression is not None:
+                update_kwargs["ConditionExpression"] = condition_expression
+
+            if expression_attribute_names is not None:
+                update_kwargs["ExpressionAttributeNames"] = (
+                    expression_attribute_names
+                )
+
+            if converted_values is not None:
+                update_kwargs["ExpressionAttributeValues"] = converted_values
+
+            try:
+                response = await table.update_item(**update_kwargs)
+                item = response["Attributes"]
+                return _convert_from_dynamodb_format(item)
+            except ClientError as error:
+                if (
+                    error.response["Error"]["Code"]
+                    == "ConditionalCheckFailedException"
+                ):
+                    raise ClientConflictError(
+                        f"ConditionalCheckFailedException: {error.response['Error']['Message']}",
+                    ) from error
+                raise
+
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.
 

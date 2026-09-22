@@ -9,6 +9,8 @@
 
 """S3 client for presigned URL generation and object deletion."""
 
+import base64
+
 import aioboto3
 
 from recnavi.config.variables import REGION
@@ -90,3 +92,37 @@ async def delete_objects_by_prefix(
             continuation_token = response.get("NextContinuationToken")
 
     return deleted_count
+
+
+async def upload_base64(
+    *,
+    bucket_name: str,
+    object_key: str,
+    base64_data: str,
+    content_type: str = "video/mp4",
+) -> None:
+    """Upload base64-encoded data to S3.
+
+    Args:
+        bucket_name: S3 bucket name.
+        object_key: S3 object key (e.g., "projects/proj-123/scenes/scene-1/shot-abc.mp4").
+        base64_data: Base64-encoded binary data.
+        content_type: MIME type for Content-Type header.
+
+    Raises:
+        ValueError: Invalid base64 data.
+
+    """
+    try:
+        binary_data = base64.b64decode(base64_data)
+    except Exception as e:
+        raise ValueError("Invalid base64 data") from e
+
+    session = aioboto3.Session()
+    async with session.client("s3", region_name=REGION) as s3:
+        await s3.put_object(
+            Bucket=bucket_name,
+            Key=object_key,
+            Body=binary_data,
+            ContentType=content_type,
+        )

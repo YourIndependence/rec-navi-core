@@ -122,3 +122,11 @@ class ClientConflictError(BaseClientExceptionError):
     """Conflict error for optimistic locking failure (409 Conflict)."""
 
     pass
+
+
+class ClientPayloadTooLargeError(BaseClientExceptionError):
+    """Payload too large error (413 Payload Too Large)."""
+
+    def __init__(self, message: str = "Payload too large") -> None:
+        super().__init__(message)
+        self.status_code = 413

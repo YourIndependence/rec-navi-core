@@ -9,10 +9,16 @@
 
 """Scene-related API schemas."""
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+
+
+if TYPE_CHECKING:
+    from recnavi.core.types.project import Project
 
 
 class SceneMasterView(BaseModel):
@@ -51,3 +57,30 @@ class GetSceneMastersResponse(BaseModel):
         ...,
         description="List of all scene masters",
     )
+
+
+class UpdateSceneRecordRequest(BaseModel):
+    """Request for POST /updateSceneRecord."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    video: str = Field(..., description="Base64-encoded video data")
+    thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
+
+
+class UpdateSceneRecordResponse(BaseModel):
+    """Response for POST /updateSceneRecord."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    project: "Project"  # Forward reference
