@@ -116,3 +116,9 @@ class ClientNotFoundError(BaseClientExceptionError):
     """Resource not found error (404 Not Found)."""
 
     pass
+
+
+class ClientConflictError(BaseClientExceptionError):
+    """Conflict error for optimistic locking failure (409 Conflict)."""
+
+    pass

@@ -41,14 +41,73 @@ class MockDatabase(BaseDatabase):
                 return item
         return None
 
-    async def put_item(self, item: dict[str, Any]) -> None:
-        """Put an item into the database.
+    async def put_item(
+        self,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Put an item into the database with optional condition.
 
         Args:
             item: Item to store.
+            condition_expression: Optional condition expression (e.g., "version = :expected_version").
+            expression_attribute_values: Values for expression placeholders.
+
+        Raises:
+            ClientConflictError: Condition check failed.
 
         """
+        from recnavi.exceptions.exceptions import ClientConflictError
+
+        if (
+            condition_expression is not None
+            and expression_attribute_values is not None
+        ):
+            for i, existing_item in enumerate(self.items):
+                if self._is_same_key(item, existing_item):
+                    if not self._check_condition(
+                        existing_item,
+                        condition_expression,
+                        expression_attribute_values,
+                    ):
+                        raise ClientConflictError("Condition check failed")
+                    self.items[i] = item
+                    return
+            raise ClientConflictError("Item not found for conditional update")
+
+        for i, existing_item in enumerate(self.items):
+            if self._is_same_key(item, existing_item):
+                self.items[i] = item
+                return
+
         self.items.append(item)
+
+    def _is_same_key(
+        self,
+        item1: dict[str, Any],
+        item2: dict[str, Any],
+    ) -> bool:
+        """Check if two items have the same primary key."""
+        key_fields = ["projectId", "userId", "sceneId", "templateId"]
+        for key_field in key_fields:
+            if key_field in item1 and key_field in item2:
+                return item1[key_field] == item2[key_field]
+        return False
+
+    def _check_condition(
+        self,
+        item: dict[str, Any],
+        condition_expression: str,
+        expression_attribute_values: dict[str, Any],
+    ) -> bool:
+        """Check if condition expression is satisfied."""
+        if "version = :expected_version" in condition_expression:
+            expected_version = expression_attribute_values.get(
+                ":expected_version",
+            )
+            return item.get("version") == expected_version
+        return True
 
     async def query(
         self,

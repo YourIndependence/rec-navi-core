@@ -131,3 +131,23 @@ def test_create_project_returns_400_when_no_token(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] == "error"
+
+
+def test_update_project_returns_400_when_no_token(client):
+    """Test POST /updateProject returns 400 when no authorization header."""
+    response = client.post(
+        "/updateProject",
+        json={
+            "project": {
+                "projectId": "proj-123",
+                "projectName": "Updated Name",
+                "description": "Updated Description",
+                "assignedUserIds": [],
+                "scenes": [],
+                "version": 1,
+            },
+        },
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"

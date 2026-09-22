@@ -50,17 +50,49 @@ class DynamoDb(BaseDatabase):
             item = response.get("Item")
             return _convert_from_dynamodb_format(item) if item else None
 
-    async def put_item(self, item: dict[str, Any]) -> None:
-        """Put an item into the table.
+    async def put_item(
+        self,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
+        """Put an item into the table with optional condition.
 
         Args:
             item: Item to store with Python native types.
+            condition_expression: Optional DynamoDB condition expression.
+            expression_attribute_values: Values for condition expression placeholders.
+
+        Raises:
+            ClientConflictError: Condition check failed (409).
 
         """
+        from botocore.exceptions import ClientError
+
+        from recnavi.exceptions.exceptions import ClientConflictError
+
         converted_item = _convert_to_dynamodb_format(item)
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            await table.put_item(Item=converted_item)
+            put_kwargs: dict[str, Any] = {"Item": converted_item}
+            if condition_expression is not None:
+                put_kwargs["ConditionExpression"] = condition_expression
+            if expression_attribute_values is not None:
+                put_kwargs["ExpressionAttributeValues"] = (
+                    expression_attribute_values
+                )
+
+            try:
+                await table.put_item(**put_kwargs)
+            except ClientError as error:
+                if (
+                    error.response["Error"]["Code"]
+                    == "ConditionalCheckFailedException"
+                ):
+                    raise ClientConflictError(
+                        f"ConditionalCheckFailedException: {error.response['Error']['Message']}",
+                    ) from error
+                raise
 
     async def query(
         self,

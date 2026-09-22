@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 
+from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.infrastructure.database.dynamodb import DynamoDb
 from recnavi.infrastructure.database.dynamodb import (
     _convert_from_dynamodb_format,
@@ -305,3 +306,107 @@ def test_convert_roundtrip_preserves_data():
     assert converted_back["isActive"] == original["isActive"]
     assert converted_back["profile"]["level"] == original["profile"]["level"]
     assert converted_back["profile"]["score"] == original["profile"]["score"]
+
+
+@pytest.mark.asyncio
+async def test_put_item_with_condition_passes_expression_to_dynamodb():
+    """Test put_item passes condition expression to DynamoDB."""
+
+    class MockTableWithCondition:
+        def __init__(self) -> None:
+            self.put_item_kwargs: dict[str, object] | None = None
+
+        async def put_item(self, **kwargs: object) -> None:
+            self.put_item_kwargs = kwargs
+
+    class MockResourceWithCondition:
+        def __init__(self, table: MockTableWithCondition) -> None:
+            self.table = table
+
+        async def __aenter__(self) -> "MockResourceWithCondition":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def Table(self, _table_name: str) -> MockTableWithCondition:  # noqa: N802
+            return self.table
+
+    class MockSessionWithCondition:
+        def __init__(self, resource: MockResourceWithCondition) -> None:
+            self.dynamodb_resource = resource
+
+        def resource(self, _service_name: str) -> MockResourceWithCondition:
+            return self.dynamodb_resource
+
+    table = MockTableWithCondition()
+    resource = MockResourceWithCondition(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockSessionWithCondition(resource)
+
+    await database.put_item(
+        item={"projectId": "proj-123", "version": 2},
+        condition_expression="version = :expected_version",
+        expression_attribute_values={":expected_version": 1},
+    )
+
+    assert table.put_item_kwargs is not None
+    assert (
+        table.put_item_kwargs["ConditionExpression"]
+        == "version = :expected_version"
+    )
+    assert table.put_item_kwargs["ExpressionAttributeValues"] == {
+        ":expected_version": 1,
+    }
+
+
+@pytest.mark.asyncio
+async def test_put_item_raises_conflict_when_condition_check_fails():
+    """Test put_item raises ClientConflictError on ConditionalCheckFailedException."""
+    from botocore.exceptions import ClientError
+
+    class MockTableThatFailsCondition:
+        async def put_item(self, **kwargs: object) -> None:
+            raise ClientError(
+                error_response={
+                    "Error": {
+                        "Code": "ConditionalCheckFailedException",
+                        "Message": "The conditional request failed",
+                    },
+                },
+                operation_name="PutItem",
+            )
+
+    class MockResourceWithFailingTable:
+        def __init__(self, table: MockTableThatFailsCondition) -> None:
+            self.table = table
+
+        async def __aenter__(self) -> "MockResourceWithFailingTable":
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def Table(self, _table_name: str) -> MockTableThatFailsCondition:  # noqa: N802
+            return self.table
+
+    class MockSessionWithFailingTable:
+        def __init__(self, resource: MockResourceWithFailingTable) -> None:
+            self.dynamodb_resource = resource
+
+        def resource(self, _service_name: str) -> MockResourceWithFailingTable:
+            return self.dynamodb_resource
+
+    table = MockTableThatFailsCondition()
+    resource = MockResourceWithFailingTable(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockSessionWithFailingTable(resource)
+
+    with pytest.raises(ClientConflictError) as exc_info:
+        await database.put_item(
+            item={"projectId": "proj-123", "version": 3},
+            condition_expression="version = :expected_version",
+            expression_attribute_values={":expected_version": 1},
+        )
+
+    assert "ConditionalCheckFailedException" in str(exc_info.value)

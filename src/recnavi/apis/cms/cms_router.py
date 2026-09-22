@@ -21,6 +21,8 @@ from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import ProjectSummaryView
+from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
+from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
@@ -190,3 +192,40 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/updateProject")
+async def update_project_endpoint(
+    request: Request,
+    payload: UpdateProjectRequest,
+    user: User = Depends(verify_user),
+) -> UpdateProjectResponse:
+    """Update project with optimistic locking."""
+    from recnavi.application.project.update_project_usecase import (
+        update_project_usecase,
+    )
+    from recnavi.core.types.scene_input import SceneInput as CoreSceneInput
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    core_scene_inputs = [
+        CoreSceneInput(
+            scene_id=scene.scene_id,
+            scene_principal=scene.scene_principal,
+            assigned_user_ids=scene.assigned_user_ids,
+        )
+        for scene in payload.project.scenes
+    ]
+
+    updated_project = await update_project_usecase(
+        projects_db=projects_db,
+        project_id=payload.project.project_id,
+        project_name=payload.project.project_name,
+        description=payload.project.description,
+        assigned_user_ids=payload.project.assigned_user_ids,
+        scenes=core_scene_inputs,
+        expected_version=payload.project.version,
+        user=user,
+    )
+
+    return UpdateProjectResponse(project=updated_project)

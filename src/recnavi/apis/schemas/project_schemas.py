@@ -174,3 +174,70 @@ class CreateProjectResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: Project = Field(..., description="Created project")
+
+
+class SceneInput(BaseModel):
+    """Scene input for update request (read-only fields excluded)."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    scene_id: str | None = Field(
+        None,
+        description="Scene ID (null for new scene)",
+    )
+    scene_principal: str = Field(..., description="Scene master principal")
+    assigned_user_ids: list[str] = Field(
+        default_factory=list,
+        description="Staff assigned to scene",
+    )
+
+
+class ProjectInput(BaseModel):
+    """Project input for update."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID to update")
+    project_name: str = Field(..., description="Project name")
+    description: str = Field(..., description="Project description")
+    assigned_user_ids: list[str] = Field(
+        default_factory=list,
+        description="Staff assigned to project",
+    )
+    scenes: list[SceneInput] = Field(
+        default_factory=list,
+        description="Scenes array",
+    )
+    version: int = Field(
+        ...,
+        description="Expected version for optimistic locking",
+    )
+
+
+class UpdateProjectRequest(BaseModel):
+    """Request payload for POST /updateProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project: ProjectInput = Field(..., description="Project data to update")
+
+
+class UpdateProjectResponse(BaseModel):
+    """Response for POST /updateProject."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    project: Project = Field(..., description="Updated project")
