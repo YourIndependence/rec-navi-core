@@ -26,7 +26,8 @@ pub_router = APIRouter(tags=["Public"])
 async def get_scene_thumbnail_endpoint(
     request: Request,
     scene_principal: str = Query(
-        ..., description="Scene principal identifier",
+        ...,
+        description="Scene principal identifier",
     ),
     kind: str = Query(..., description="Image kind: 'example' or 'guide'"),
 ) -> StreamingResponse:
