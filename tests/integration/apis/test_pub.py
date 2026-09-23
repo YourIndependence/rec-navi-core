@@ -54,6 +54,6 @@ def test_get_template_thumbnail_minimal_integration(client):
         },
     )
 
-    # We expect either 404 (template not found), 500 (if S3 fails), or 400 (if DB not initialized)
+    # We expect 400 (DB init), 404 (not found), or 500 (S3 error)
     # The important thing is NOT 404 "endpoint not found"
     assert response.status_code in (400, 404, 500)
