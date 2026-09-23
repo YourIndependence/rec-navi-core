@@ -30,6 +30,7 @@ from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.get_projects_usecase import (
     get_projects_usecase,
 )
@@ -39,9 +40,13 @@ from recnavi.application.scene.get_scene_masters_usecase import (
 from recnavi.application.scene.get_templates_usecase import (
     get_templates_usecase,
 )
+from recnavi.application.user.get_group_users_usecase import (
+    get_group_users_usecase,
+)
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
 
@@ -85,6 +90,20 @@ async def get_templates_endpoint(
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
     templates = await get_templates_usecase(templates_db=templates_db)
     return GetTemplatesResponse(templates=templates)
+
+
+@cms_router.get("/getGroupUsers")
+async def get_group_users_endpoint(
+    request: Request,
+    user: User = Depends(verify_user),
+) -> GetGroupUsersResponse:
+    """List all users in the authenticated user's group."""
+    users_db = request.app.state.database[USERS_TABLE_NAME]
+    users = await get_group_users_usecase(
+        users_db=users_db,
+        group_id=user.group_id,
+    )
+    return GetGroupUsersResponse(users=users)
 
 
 @cms_router.get("/getProjects")

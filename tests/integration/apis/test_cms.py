@@ -109,6 +109,14 @@ async def test_get_templates_returns_injected_template(
     } in data["templates"]
 
 
+def test_get_group_users_returns_400_when_no_token(client):
+    """Test GET /getGroupUsers returns 400 when no authorization header."""
+    response = client.get("/getGroupUsers")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
 def test_get_projects_returns_400_when_no_token(client):
     """Test GET /getProjects returns 400 when no authorization header."""
     response = client.get("/getProjects")

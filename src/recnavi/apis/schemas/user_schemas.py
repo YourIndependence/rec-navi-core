@@ -22,3 +22,12 @@ class GetMeResponse(BaseApiResponseModel):
         ...,
         description="Current authenticated user information",
     )
+
+
+class GetGroupUsersResponse(BaseApiResponseModel):
+    """Response schema for GET /getGroupUsers endpoint."""
+
+    users: list[User] = Field(
+        ...,
+        description="All users in the authenticated user's group",
+    )
