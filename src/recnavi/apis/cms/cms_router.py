@@ -84,54 +84,23 @@ async def download_project_endpoint(
     user: User = Depends(verify_user),
 ) -> DownloadProjectResponse:
     """Download approved project as zip archive."""
+    from recnavi.core.types.project import Project
+    from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    # Get project from database
     project_item = await projects_db.get_item({"projectId": body.project_id})
     if not project_item:
-        from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
-
         raise ClientResourcesNotFoundError(
             f"Project '{body.project_id}' not found.",
         )
 
-    # Convert to Project type
-    from recnavi.core.types.project import Project
-
     project = Project.model_validate(project_item)
 
-    # Import S3 functions locally (ARCH-012 compliance)
-    from recnavi.infrastructure.s3.s3_client import download_object
-    from recnavi.infrastructure.s3.s3_client import generate_presigned_url
-
-    # Helper for S3 upload
-    async def upload_zip_to_s3(
-        *,
-        bucket_name: str,
-        object_key: str,
-        zip_bytes: bytes,
-    ) -> None:
-        """Upload zip bytes to S3."""
-        import base64
-
-        from recnavi.infrastructure.s3.s3_client import upload_base64
-
-        base64_data = base64.b64encode(zip_bytes).decode("utf-8")
-        await upload_base64(
-            bucket_name=bucket_name,
-            object_key=object_key,
-            base64_data=base64_data,
-            content_type="application/zip",
-        )
-
-    # Call use case
     presigned_url = await download_project_usecase(
         user=user,
         project=project,
         bucket_name=VIDEO_BUCKET_NAME,
-        download_object_fn=download_object,
-        generate_presigned_url_fn=generate_presigned_url,
-        upload_zip_fn=upload_zip_to_s3,
     )
 
     return DownloadProjectResponse(download_url=presigned_url)

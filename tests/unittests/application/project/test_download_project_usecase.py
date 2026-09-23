@@ -13,6 +13,7 @@ import io
 import json
 import zipfile
 from unittest.mock import AsyncMock
+from unittest.mock import patch
 
 import pytest
 
@@ -72,30 +73,37 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         updated_at="2026-09-20T10:10:00Z",
     )
 
-    # Mock S3 downloads
+    # Mock S3 functions
     mock_download_object = AsyncMock(
         side_effect=[
             b"fake video data 1",  # cooking video
             b"fake video data 2",  # plating video
         ],
     )
-
-    # Mock presigned URL generation
+    mock_upload_base64 = AsyncMock()
     mock_generate_presigned_url = AsyncMock(
         return_value="https://test-bucket.s3.amazonaws.com/archives/test.zip?signature",
     )
 
-    # Mock S3 upload
-    mock_upload_zip = AsyncMock()
-
-    presigned_url = await download_project_usecase(
-        user=owner,
-        project=project,
-        bucket_name="test-bucket",
-        download_object_fn=mock_download_object,
-        generate_presigned_url_fn=mock_generate_presigned_url,
-        upload_zip_fn=mock_upload_zip,
-    )
+    with (
+        patch(
+            "recnavi.application.project.download_project_usecase.download_object",
+            mock_download_object,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.upload_base64",
+            mock_upload_base64,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.generate_presigned_url",
+            mock_generate_presigned_url,
+        ),
+    ):
+        presigned_url = await download_project_usecase(
+            user=owner,
+            project=project,
+            bucket_name="test-bucket",
+        )
 
     assert (
         presigned_url
@@ -112,12 +120,15 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         object_key="projects/proj-123/scenes/scene-2/shot-2.mp4",
     )
 
-    mock_upload_zip.assert_called_once()
-    upload_call_kwargs = mock_upload_zip.call_args[1]
+    mock_upload_base64.assert_called_once()
+    upload_call_kwargs = mock_upload_base64.call_args[1]
     assert upload_call_kwargs["bucket_name"] == "test-bucket"
     assert upload_call_kwargs["object_key"] == "archives/proj-123.zip"
+    assert upload_call_kwargs["content_type"] == "application/zip"
 
-    zip_bytes = upload_call_kwargs["zip_bytes"]
+    import base64
+
+    zip_bytes = base64.b64decode(upload_call_kwargs["base64_data"])
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
         assert "cooking.mp4" in namelist
@@ -200,7 +211,7 @@ async def test_download_project_usecase_handles_duplicate_scene_principals():
         updated_at="2026-09-20T10:15:00Z",
     )
 
-    # Mock S3 downloads
+    # Mock S3 functions
     mock_download_object = AsyncMock(
         side_effect=[
             b"video 1",
@@ -208,26 +219,36 @@ async def test_download_project_usecase_handles_duplicate_scene_principals():
             b"video 3",
         ],
     )
-
-    # Mock presigned URL generation
+    mock_upload_base64 = AsyncMock()
     mock_generate_presigned_url = AsyncMock(
         return_value="https://test-bucket.s3.amazonaws.com/archives/test.zip",
     )
 
-    # Mock S3 upload
-    mock_upload_zip = AsyncMock()
+    with (
+        patch(
+            "recnavi.application.project.download_project_usecase.download_object",
+            mock_download_object,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.upload_base64",
+            mock_upload_base64,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.generate_presigned_url",
+            mock_generate_presigned_url,
+        ),
+    ):
+        await download_project_usecase(
+            user=owner,
+            project=project,
+            bucket_name="test-bucket",
+        )
 
-    await download_project_usecase(
-        user=owner,
-        project=project,
-        bucket_name="test-bucket",
-        download_object_fn=mock_download_object,
-        generate_presigned_url_fn=mock_generate_presigned_url,
-        upload_zip_fn=mock_upload_zip,
-    )
+    upload_call_kwargs = mock_upload_base64.call_args[1]
 
-    upload_call_kwargs = mock_upload_zip.call_args[1]
-    zip_bytes = upload_call_kwargs["zip_bytes"]
+    import base64
+
+    zip_bytes = base64.b64decode(upload_call_kwargs["base64_data"])
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
         assert "cooking.mp4" in namelist

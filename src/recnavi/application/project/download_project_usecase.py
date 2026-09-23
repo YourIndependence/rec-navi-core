@@ -9,15 +9,17 @@
 
 """Download project use case."""
 
+import base64
 import io
 import json
 import zipfile
-from collections.abc import Awaitable
-from collections.abc import Callable
 
 from recnavi.core.project.project_download import validate_project_for_download
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
+from recnavi.infrastructure.s3.s3_client import download_object
+from recnavi.infrastructure.s3.s3_client import generate_presigned_url
+from recnavi.infrastructure.s3.s3_client import upload_base64
 
 
 async def download_project_usecase(
@@ -25,9 +27,6 @@ async def download_project_usecase(
     user: User,
     project: Project,
     bucket_name: str,
-    download_object_fn: Callable[[str, str], Awaitable[bytes]],
-    generate_presigned_url_fn: Callable[[str, str, int], Awaitable[str]],
-    upload_zip_fn: Callable[[str, str, bytes], Awaitable[None]],
 ) -> str:
     """Download project as zip archive.
 
@@ -35,9 +34,6 @@ async def download_project_usecase(
         user: Authenticated user.
         project: Project to download.
         bucket_name: S3 bucket name for videos and archives.
-        download_object_fn: Function to download S3 objects (for dependency injection).
-        generate_presigned_url_fn: Function to generate presigned URLs (for dependency injection).
-        upload_zip_fn: Function to upload zip to S3 (for dependency injection).
 
     Returns:
         Presigned URL for zip archive download (1-hour expiration).
@@ -76,7 +72,7 @@ async def download_project_usecase(
                 filename = f"{base_name}_{principal_counts[base_name]}.mp4"
 
             # Download video from S3
-            video_data = await download_object_fn(
+            video_data = await download_object(
                 bucket_name=bucket_name,
                 object_key=scene.video_key,
             )
@@ -102,14 +98,16 @@ async def download_project_usecase(
 
     # Upload zip to S3
     archive_key = f"archives/{project.project_id}.zip"
-    await upload_zip_fn(
+    base64_data = base64.b64encode(zip_bytes).decode("utf-8")
+    await upload_base64(
         bucket_name=bucket_name,
         object_key=archive_key,
-        zip_bytes=zip_bytes,
+        base64_data=base64_data,
+        content_type="application/zip",
     )
 
     # Generate presigned URL (1-hour expiration)
-    presigned_url = await generate_presigned_url_fn(
+    presigned_url = await generate_presigned_url(
         bucket_name=bucket_name,
         object_key=archive_key,
         expiration=3600,
