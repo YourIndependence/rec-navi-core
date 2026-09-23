@@ -29,3 +29,27 @@ async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
     items = await scenes_db.scan()
 
     return [SceneMaster.model_validate(item) for item in items]
+
+
+async def get_scene_master_by_principal(
+    *,
+    scenes_db: BaseDatabase,
+    scene_principal: str,
+) -> SceneMaster | None:
+    """Get a single scene master by principal.
+
+    Args:
+        scenes_db: Database instance for the scenes table.
+        scene_principal: Scene principal identifier (e.g., "cooking").
+
+    Returns:
+        SceneMaster if found, None otherwise.
+
+    """
+    items = await scenes_db.scan()
+
+    for item in items:
+        if item.get("scenePrincipal") == scene_principal:
+            return SceneMaster.model_validate(item)
+
+    return None

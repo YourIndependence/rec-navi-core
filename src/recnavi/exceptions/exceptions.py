@@ -110,3 +110,9 @@ class ClientAuthorizationError(BaseClientExceptionError):
     """User authorization/permission error (403 Forbidden)."""
 
     pass
+
+
+class ClientUnprocessableEntityError(BaseClientExceptionError):
+    """Request validation error (422 Unprocessable Entity)."""
+
+    pass
