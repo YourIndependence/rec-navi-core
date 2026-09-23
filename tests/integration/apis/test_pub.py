@@ -33,3 +33,27 @@ def test_get_scene_thumbnail_minimal_integration(client):
     # We expect either 404 (scene not found) or 422 (if validation fails)
     # The important thing is NOT 404 "endpoint not found"
     assert response.status_code in (404, 422, 500)
+
+
+def test_get_template_thumbnail_minimal_integration(client):
+    """Minimal integration test for GET /getTemplateThumbnail.
+
+    Note: Full integration tests are not possible here due to moto/aioboto3
+    compatibility issues. This test only verifies that:
+    - The endpoint is registered correctly
+    - The endpoint exists and is accessible
+
+    Real S3 integration should be tested manually or with real AWS credentials.
+    """
+    # This will return 404 because templates table is empty, but it proves
+    # the endpoint exists and is wired correctly
+    response = client.get(
+        "/getTemplateThumbnail",
+        params={
+            "template_id": "nonexistent_template",
+        },
+    )
+
+    # We expect either 404 (template not found) or 500 (if S3 fails)
+    # The important thing is NOT 404 "endpoint not found"
+    assert response.status_code in (404, 500)

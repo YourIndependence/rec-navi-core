@@ -17,3 +17,27 @@ async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
     """Retrieve all scenes templates from the database."""
     items = await templates_db.scan()
     return [ScenesTemplate.model_validate(item) for item in items]
+
+
+async def get_template_by_id(
+    *,
+    templates_db: BaseDatabase,
+    template_id: str,
+) -> ScenesTemplate | None:
+    """Get a single template by ID.
+
+    Args:
+        templates_db: Database instance for templates table.
+        template_id: Template identifier (e.g., "tpl_cafe").
+
+    Returns:
+        ScenesTemplate if found, None otherwise.
+
+    """
+    items = await templates_db.scan()
+
+    for item in items:
+        if item.get("templateId") == template_id:
+            return ScenesTemplate.model_validate(item)
+
+    return None
