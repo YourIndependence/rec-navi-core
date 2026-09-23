@@ -108,3 +108,14 @@ async def test_get_templates_returns_injected_template(
         "scenePrincipals": template_data["scenePrincipals"],
         "thumbnailUri": template_data["thumbnailUri"],
     } in data["templates"]
+
+
+def test_download_project_returns_400_when_no_token(client):
+    """Test POST /downloadProject returns 400 when no authorization header."""
+    response = client.post(
+        "/downloadProject",
+        json={"projectId": "proj-123"},
+    )
+
+    # Expect 400 because Authorization header is missing
+    assert response.status_code == 400

@@ -129,6 +129,30 @@ async def upload_base64(
         )
 
 
+async def download_object(
+    *,
+    bucket_name: str,
+    object_key: str,
+) -> bytes:
+    """Download S3 object as bytes.
+
+    Args:
+        bucket_name: S3 bucket name.
+        object_key: S3 object key (e.g., "videos/scene-123.mp4").
+
+    Returns:
+        Object content as bytes.
+
+    Raises:
+        ClientError: If S3 object not found or access denied.
+
+    """
+    session = aioboto3.Session()
+    async with session.client("s3", region_name=REGION) as s3:
+        response = await s3.get_object(Bucket=bucket_name, Key=object_key)
+        return await response["Body"].read()
+
+
 async def download_object_stream(
     *,
     bucket_name: str,

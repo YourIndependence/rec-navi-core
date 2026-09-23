@@ -17,6 +17,7 @@ from unittest.mock import patch
 import pytest
 
 from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
+from recnavi.infrastructure.s3.s3_client import download_object
 from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 from recnavi.infrastructure.s3.s3_client import upload_base64
 
@@ -302,3 +303,38 @@ async def test_upload_base64_raises_value_error_on_invalid_base64():
             base64_data="not-valid-base64!!!",
             content_type="video/mp4",
         )
+
+
+@pytest.mark.asyncio
+async def test_download_object_returns_bytes():
+    """Test download_object downloads S3 object as bytes."""
+    test_data = b"fake video content"
+
+    mock_s3 = AsyncMock()
+    mock_s3.get_object = AsyncMock(
+        return_value={
+            "Body": AsyncMock(read=AsyncMock(return_value=test_data)),
+        },
+    )
+
+    mock_client_cm = AsyncMock()
+    mock_client_cm.__aenter__ = AsyncMock(return_value=mock_s3)
+    mock_client_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "recnavi.infrastructure.s3.s3_client.aioboto3.Session",
+    ) as mock_session_class:
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+        mock_session.client = MagicMock(return_value=mock_client_cm)
+
+        data = await download_object(
+            bucket_name="test-bucket",
+            object_key="videos/scene-123.mp4",
+        )
+
+    assert data == test_data
+    mock_s3.get_object.assert_called_once_with(
+        Bucket="test-bucket",
+        Key="videos/scene-123.mp4",
+    )
