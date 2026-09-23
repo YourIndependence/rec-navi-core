@@ -287,7 +287,8 @@ class SubmitProjectResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: Project = Field(
-        ..., description="Project (SUBMITTED if all approved)"
+        ...,
+        description="Project (SUBMITTED if all approved)",
     )
     missing_scene_ids: list[str] = Field(
         default_factory=list,
