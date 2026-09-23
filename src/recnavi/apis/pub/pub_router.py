@@ -10,107 +10,56 @@
 """Public router for staff-facing endpoints."""
 
 from fastapi import APIRouter
-from fastapi import Depends
 from fastapi import Query
 from fastapi import Request
+from fastapi.responses import StreamingResponse
 
-from recnavi.apis.auth.auth import verify_user
-from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-from recnavi.apis.schemas.project_schemas import ProjectSummaryView
-from recnavi.apis.schemas.project_schemas import SubmitProjectRequest
-from recnavi.apis.schemas.project_schemas import SubmitProjectResponse
-from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
-from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
-from recnavi.application.project.get_my_projects_usecase import (
-    get_my_projects_usecase,
-)
-from recnavi.application.project.submit_project_usecase import (
-    submit_project_usecase,
-)
-from recnavi.application.scene.update_scene_record_usecase import (
-    update_scene_record_usecase,
-)
-from recnavi.config.variables import PROJECTS_TABLE_NAME
-from recnavi.config.variables import VIDEO_BUCKET_NAME
-from recnavi.core.types.user import User
+from recnavi.application.scene import get_scene_thumbnail_usecase
+from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
+from recnavi.config.variables import SCENES_TABLE_NAME
 
 
 pub_router = APIRouter(tags=["Public"])
 
 
-@pub_router.get("/getMyProjects")
-async def get_my_projects_endpoint(
+@pub_router.get("/getSceneThumbnail")
+async def get_scene_thumbnail_endpoint(
     request: Request,
-    user: User = Depends(verify_user),
-    limit: int = Query(default=20, ge=1, le=100),
-    cursor: str | None = Query(default=None),
-) -> GetProjectsResponse:
-    """List projects assigned to the authenticated user."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-    projects, next_cursor = await get_my_projects_usecase(
-        projects_db=projects_db,
-        group_id=user.group_id,
-        user_id=user.user_id,
-        limit=limit,
-        cursor=cursor,
+    scene_principal: str = Query(
+        ..., description="Scene principal identifier",
+    ),
+    kind: str = Query(..., description="Image kind: 'example' or 'guide'"),
+) -> StreamingResponse:
+    """Serve scene thumbnail or guide image without authentication.
+
+    IMPORTANT: This endpoint intentionally violates 3 architecture rules:
+    1. Uses GET with query params (not POST) - <img src> only supports GET
+    2. Returns raw bytes (not BaseApiResponseModel) - returning actual image data
+    3. No authentication - <img src> cannot send Authorization header
+
+    Args:
+        scene_principal: Scene identifier (e.g., "cooking")
+        kind: Image type - "example" for thumbnail, "guide" for guide image
+
+    Returns:
+        StreamingResponse with image data and appropriate Content-Type
+
+    Raises:
+        404: Scene principal not found
+        422: Invalid kind parameter (must be "example" or "guide")
+
+    """
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    stream, content_type = await get_scene_thumbnail_usecase(
+        scenes_db=scenes_db,
+        scene_principal=scene_principal,
+        kind=kind,
+        bucket_name=SCENE_IMAGES_BUCKET_NAME,
     )
 
-    project_views = [
-        ProjectSummaryView(
-            project_id=p.project_id,
-            project_name=p.project_name,
-            description=p.description,
-            owner_user_id=p.owner_user_id,
-            created_at=p.created_at,
-            status=p.status,
-        )
-        for p in projects
-    ]
-
-    return GetProjectsResponse(
-        projects=project_views,
-        next_cursor=next_cursor,
-    )
-
-
-@pub_router.post("/updateSceneRecord")
-async def update_scene_record_endpoint(
-    request: Request,
-    payload: UpdateSceneRecordRequest,
-    user: User = Depends(verify_user),
-) -> UpdateSceneRecordResponse:
-    """Upload scene recording (staff only)."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    updated_project = await update_scene_record_usecase(
-        projects_db=projects_db,
-        project_id=payload.project_id,
-        scene_id=payload.scene_id,
-        video_base64=payload.video,
-        thumbnail_base64=payload.thumbnail,
-        user=user,
-        video_bucket_name=VIDEO_BUCKET_NAME,
-    )
-
-    return UpdateSceneRecordResponse(project=updated_project)
-
-
-@pub_router.post("/submitProject")
-async def submit_project_endpoint(
-    request: Request,
-    payload: SubmitProjectRequest,
-    user: User = Depends(verify_user),
-) -> SubmitProjectResponse:
-    """Submit project for owner review (staff only)."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    updated_project, missing_scene_ids = await submit_project_usecase(
-        projects_db=projects_db,
-        project_id=payload.project_id,
-        user=user,
-    )
-
-    return SubmitProjectResponse(
-        project=updated_project,
-        missing_scene_ids=missing_scene_ids,
+    return StreamingResponse(
+        content=stream,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
     )
