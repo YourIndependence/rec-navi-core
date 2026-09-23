@@ -97,13 +97,11 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         upload_zip_fn=mock_upload_zip,
     )
 
-    # Verify presigned URL returned
     assert (
         presigned_url
         == "https://test-bucket.s3.amazonaws.com/archives/test.zip?signature"
     )
 
-    # Verify S3 downloads were called
     assert mock_download_object.call_count == 2
     mock_download_object.assert_any_call(
         bucket_name="test-bucket",
@@ -114,13 +112,11 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         object_key="projects/proj-123/scenes/scene-2/shot-2.mp4",
     )
 
-    # Verify zip upload was called
     mock_upload_zip.assert_called_once()
     upload_call_kwargs = mock_upload_zip.call_args[1]
     assert upload_call_kwargs["bucket_name"] == "test-bucket"
     assert upload_call_kwargs["object_key"] == "archives/proj-123.zip"
 
-    # Verify zip content
     zip_bytes = upload_call_kwargs["zip_bytes"]
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
         namelist = zf.namelist()
@@ -128,11 +124,9 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         assert "plating.mp4" in namelist
         assert "metadata.json" in namelist
 
-        # Verify video content
         assert zf.read("cooking.mp4") == b"fake video data 1"
         assert zf.read("plating.mp4") == b"fake video data 2"
 
-        # Verify metadata.json structure
         metadata_json = zf.read("metadata.json").decode("utf-8")
         metadata = json.loads(metadata_json)
         assert metadata["projectId"] == "proj-123"
@@ -144,7 +138,6 @@ async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
         assert metadata["scenes"][1]["scenePrincipal"] == "plating"
         assert metadata["scenes"][1]["fileName"] == "plating.mp4"
 
-    # Verify presigned URL generation was called
     mock_generate_presigned_url.assert_called_once_with(
         bucket_name="test-bucket",
         object_key="archives/proj-123.zip",
@@ -233,7 +226,6 @@ async def test_download_project_usecase_handles_duplicate_scene_principals():
         upload_zip_fn=mock_upload_zip,
     )
 
-    # Verify zip content has unique filenames
     upload_call_kwargs = mock_upload_zip.call_args[1]
     zip_bytes = upload_call_kwargs["zip_bytes"]
     with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
@@ -243,7 +235,6 @@ async def test_download_project_usecase_handles_duplicate_scene_principals():
         assert "cooking_3.mp4" in namelist
         assert "metadata.json" in namelist
 
-        # Verify metadata has correct filenames
         metadata_json = zf.read("metadata.json").decode("utf-8")
         metadata = json.loads(metadata_json)
         assert metadata["scenes"][0]["fileName"] == "cooking.mp4"
