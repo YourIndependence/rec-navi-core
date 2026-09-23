@@ -17,10 +17,15 @@ from fastapi import Request
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import ProjectSummaryView
+from recnavi.apis.schemas.project_schemas import SubmitProjectRequest
+from recnavi.apis.schemas.project_schemas import SubmitProjectResponse
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
 from recnavi.application.project.get_my_projects_usecase import (
     get_my_projects_usecase,
+)
+from recnavi.application.project.submit_project_usecase import (
+    submit_project_usecase,
 )
 from recnavi.application.scene.update_scene_record_usecase import (
     update_scene_record_usecase,
@@ -88,3 +93,24 @@ async def update_scene_record_endpoint(
     )
 
     return UpdateSceneRecordResponse(project=updated_project)
+
+
+@pub_router.post("/submitProject")
+async def submit_project_endpoint(
+    request: Request,
+    payload: SubmitProjectRequest,
+    user: User = Depends(verify_user),
+) -> SubmitProjectResponse:
+    """Submit project for owner review (staff only)."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project, missing_scene_ids = await submit_project_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        user=user,
+    )
+
+    return SubmitProjectResponse(
+        project=updated_project,
+        missing_scene_ids=missing_scene_ids,
+    )

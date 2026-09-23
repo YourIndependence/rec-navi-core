@@ -32,3 +32,14 @@ def test_update_scene_record_returns_400_when_no_token(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] == "error"
+
+
+def test_submit_project_returns_400_when_no_token(client):
+    """Test POST /submitProject returns 400 when no authorization header."""
+    response = client.post(
+        "/submitProject",
+        json={"projectId": "proj-123"},
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
