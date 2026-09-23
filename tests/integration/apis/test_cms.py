@@ -162,3 +162,19 @@ def test_delete_project_returns_400_when_no_token(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] == "error"
+
+
+def test_review_scene_returns_400_when_no_token(client):
+    """Test POST /reviewScene returns 400 when no authorization header."""
+    response = client.post(
+        "/reviewScene",
+        json={
+            "projectId": "proj-123",
+            "sceneId": "scene-456",
+            "result": "approve",
+            "comment": None,
+        },
+    )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"

@@ -12,6 +12,7 @@
 from recnavi.exceptions.exceptions import BaseClientExceptionError
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientPayloadTooLargeError
+from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
 def test_client_conflict_error_is_base_client_exception():
@@ -27,3 +28,11 @@ def test_client_payload_too_large_error_has_status_code_413():
     assert isinstance(error, BaseClientExceptionError)
     assert error.status_code == 413
     assert str(error) == "Payload too large"
+
+
+def test_client_unprocessable_entity_error_has_status_code_422():
+    """Test ClientUnprocessableEntityError has status_code 422."""
+    error = ClientUnprocessableEntityError("Invalid state transition")
+    assert isinstance(error, BaseClientExceptionError)
+    assert error.status_code == 422
+    assert str(error) == "Invalid state transition"

@@ -26,6 +26,8 @@ from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
+from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
+from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.get_projects_usecase import (
@@ -254,3 +256,28 @@ async def delete_project_endpoint(
     )
 
     return DeleteProjectResponse(project_id=project_id)
+
+
+@cms_router.post("/reviewScene")
+async def review_scene_endpoint(
+    request: Request,
+    payload: ReviewSceneRequest,
+    user: User = Depends(verify_user),
+) -> ReviewSceneResponse:
+    """Review a recorded scene (owner-only operation)."""
+    from recnavi.application.scene.review_scene_usecase import (
+        review_scene_usecase,
+    )
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await review_scene_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        scene_id=payload.scene_id,
+        result=payload.result,
+        review_comment=payload.comment,
+        user=user,
+    )
+
+    return ReviewSceneResponse(project=updated_project)

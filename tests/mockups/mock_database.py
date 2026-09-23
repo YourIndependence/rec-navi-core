@@ -271,8 +271,8 @@ class MockDatabase(BaseDatabase):
         """Apply SET operations from UpdateExpression (simplified parser)."""
         import re
 
-        set_pattern = r"scenes\[(\d+)\]\.(\#?\w+) = :(\w+)"
-        for match in re.finditer(set_pattern, update_expression):
+        scene_pattern = r"scenes\[(\d+)\]\.(\#?\w+) = :(\w+)"
+        for match in re.finditer(scene_pattern, update_expression):
             index = int(match.group(1))
             field_name = match.group(2)
             value_key = f":{match.group(3)}"
@@ -288,6 +288,21 @@ class MockDatabase(BaseDatabase):
                 item["scenes"][index][camel_field] = (
                     expression_attribute_values[value_key]
                 )
+
+        top_level_pattern = r"(?<!scenes\[\d\]\.)(\#?\w+) = :(\w+)"
+        for match in re.finditer(top_level_pattern, update_expression):
+            field_name = match.group(1)
+            value_key = f":{match.group(2)}"
+
+            if field_name.startswith("#"):
+                field_name = expression_attribute_names.get(
+                    field_name,
+                    field_name[1:],
+                )
+
+            camel_field = self._to_camel_case(field_name)
+            if value_key in expression_attribute_values:
+                item[camel_field] = expression_attribute_values[value_key]
 
     def _to_camel_case(self, field: str) -> str:
         """Convert field name to camelCase (preserves if already camelCase)."""

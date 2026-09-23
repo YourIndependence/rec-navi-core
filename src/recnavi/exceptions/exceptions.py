@@ -130,3 +130,11 @@ class ClientPayloadTooLargeError(BaseClientExceptionError):
     def __init__(self, message: str = "Payload too large") -> None:
         super().__init__(message)
         self.status_code = 413
+
+
+class ClientUnprocessableEntityError(BaseClientExceptionError):
+    """Unprocessable entity error (422 Unprocessable Entity)."""
+
+    def __init__(self, message: str = "Unprocessable entity") -> None:
+        super().__init__(message)
+        self.status_code = 422

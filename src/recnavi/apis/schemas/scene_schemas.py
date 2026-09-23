@@ -84,3 +84,30 @@ class UpdateSceneRecordResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: "Project"  # Forward reference
+
+
+class ReviewSceneRequest(BaseModel):
+    """Request for POST /reviewScene."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    result: str = Field(..., description="Review result (approve or reject)")
+    comment: str | None = Field(default=None, description="Review comment")
+
+
+class ReviewSceneResponse(BaseModel):
+    """Response for POST /reviewScene."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    project: "Project"  # Forward reference
