@@ -31,8 +31,6 @@ from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
-from recnavi.infrastructure.s3.s3_client import download_object
-from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -101,6 +99,10 @@ async def download_project_endpoint(
     from recnavi.core.types.project import Project
 
     project = Project.model_validate(project_item)
+
+    # Import S3 functions locally (ARCH-012 compliance)
+    from recnavi.infrastructure.s3.s3_client import download_object
+    from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 
     # Helper for S3 upload
     async def upload_zip_to_s3(
