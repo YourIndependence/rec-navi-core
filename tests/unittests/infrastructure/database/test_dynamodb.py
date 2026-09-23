@@ -509,7 +509,8 @@ async def test_update_item_converts_decimal_in_expression_values():
             self.dynamodb_resource = resource
 
         def resource(
-            self, _service_name: str,
+            self,
+            _service_name: str,
         ) -> MockResourceWithUpdateDecimal:
             return self.dynamodb_resource
 
@@ -565,12 +566,14 @@ async def test_update_item_raises_conflict_on_condition_failure():
 
     class MockSessionWithFailingUpdateTable:
         def __init__(
-            self, resource: MockResourceWithFailingUpdateTable,
+            self,
+            resource: MockResourceWithFailingUpdateTable,
         ) -> None:
             self.dynamodb_resource = resource
 
         def resource(
-            self, _service_name: str,
+            self,
+            _service_name: str,
         ) -> MockResourceWithFailingUpdateTable:
             return self.dynamodb_resource
 
@@ -580,7 +583,8 @@ async def test_update_item_raises_conflict_on_condition_failure():
     database.session = MockSessionWithFailingUpdateTable(resource)
 
     with pytest.raises(
-        ClientConflictError, match="ConditionalCheckFailedException",
+        ClientConflictError,
+        match="ConditionalCheckFailedException",
     ):
         await database.update_item(
             key={"projectId": "proj-123"},
