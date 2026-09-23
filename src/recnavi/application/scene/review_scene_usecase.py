@@ -90,7 +90,8 @@ async def review_scene_usecase(
 
     update_expression_with_names = "SET " + ", ".join(update_expressions)
     update_expression_with_names = update_expression_with_names.replace(
-        "#status", "#sceneStatus",
+        "#status",
+        "#sceneStatus",
     )
 
     await projects_db.update_item(

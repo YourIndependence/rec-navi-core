@@ -87,14 +87,14 @@ async def update_scene_record_usecase(
     await projects_db.update_item(
         key={"projectId": project_id},
         update_expression=(
-            f"SET scenes[{scene_index}].#status = :status, "
+            f"SET scenes[{scene_index}].#sceneStatus = :status, "
             f"scenes[{scene_index}].videoKey = :videoKey, "
             f"scenes[{scene_index}].thumbnailKey = :thumbnailKey, "
             f"scenes[{scene_index}].createdBy = :createdBy, "
             f"scenes[{scene_index}].createdAt = :createdAt"
         ),
         condition_expression=f"scenes[{scene_index}].sceneId = :sceneId",
-        expression_attribute_names={"#status": "status"},
+        expression_attribute_names={"#sceneStatus": "status"},
         expression_attribute_values={
             ":status": SceneStatus.PENDING.value,
             ":videoKey": new_video_key,
