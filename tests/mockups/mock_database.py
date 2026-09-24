@@ -42,13 +42,43 @@ class MockDatabase(BaseDatabase):
         return None
 
     async def put_item(self, item: dict[str, Any]) -> None:
-        """Put an item into the database.
+        """Put an item into the database (upsert behavior).
+
+        If an item with the same primary key exists, it will be replaced.
+        Otherwise, the new item will be added.
 
         Args:
             item: Item to store.
 
         """
+        primary_keys = self._get_primary_keys(item)
+        if primary_keys:
+            for i, existing_item in enumerate(self.items):
+                if all(
+                    existing_item.get(k) == v for k, v in primary_keys.items()
+                ):
+                    self.items[i] = item
+                    return
         self.items.append(item)
+
+    def _get_primary_keys(self, item: dict[str, Any]) -> dict[str, Any]:
+        """Extract primary keys from an item.
+
+        Common primary key patterns in this project:
+        - scenePrincipal (scene masters)
+        - templateId (templates)
+        - projectId (projects)
+        - userId (users)
+
+        Args:
+            item: Item to extract keys from.
+
+        Returns:
+            Dictionary of primary key fields.
+
+        """
+        key_fields = ["scenePrincipal", "templateId", "projectId", "userId"]
+        return {k: v for k, v in item.items() if k in key_fields}
 
     async def query(
         self,

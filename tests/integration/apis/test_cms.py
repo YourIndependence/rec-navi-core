@@ -119,3 +119,20 @@ def test_download_project_returns_400_when_no_token(client):
 
     # Expect 400 because Authorization header is missing
     assert response.status_code == 400
+
+
+def test_update_scene_returns_400_when_no_token(client):
+    """Test POST /updateScene returns 400 when no authorization header."""
+    response = client.post(
+        "/updateScene",
+        json={
+            "scenePrincipal": "test_scene",
+            "title": "Test Scene",
+            "maxDurationSeconds": 5,
+            "exampleImage": "base64_data",
+            "guideImage": "base64_data",
+        },
+    )
+
+    # Expect 400 because Authorization header is missing
+    assert response.status_code == 400

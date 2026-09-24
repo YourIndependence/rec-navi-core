@@ -13,11 +13,14 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Request
 
+from recnavi.apis.auth.auth import verify_admin
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
 from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
+from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
+from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project import download_project_usecase
 from recnavi.application.scene.get_scene_masters_usecase import (
@@ -26,7 +29,9 @@ from recnavi.application.scene.get_scene_masters_usecase import (
 from recnavi.application.scene.get_templates_usecase import (
     get_templates_usecase,
 )
+from recnavi.application.scene.update_scene_usecase import update_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import VIDEO_BUCKET_NAME
@@ -72,6 +77,40 @@ async def get_templates_endpoint(
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
     templates = await get_templates_usecase(templates_db=templates_db)
     return GetTemplatesResponse(templates=templates)
+
+
+@cms_router.post(
+    "/updateScene",
+    response_model=UpdateSceneResponse,
+)
+async def update_scene_endpoint(
+    request: Request,
+    body: UpdateSceneRequest,
+    _user: User = Depends(verify_admin),
+) -> UpdateSceneResponse:
+    """Create or update scene master (admin-only)."""
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    scenes = await update_scene_usecase(
+        scenes_db=scenes_db,
+        scene_principal=body.scene_principal,
+        title=body.title,
+        max_duration_seconds=body.max_duration_seconds,
+        example_image=body.example_image,
+        guide_image=body.guide_image,
+        bucket_name=SCENE_IMAGES_BUCKET_NAME,
+    )
+
+    scene_views = [
+        SceneMasterView(
+            scene_principal=sm.scene_principal,
+            title=sm.title,
+            max_duration_seconds=sm.max_duration_seconds,
+        )
+        for sm in scenes
+    ]
+
+    return UpdateSceneResponse(scenes=scene_views)
 
 
 @cms_router.post(
