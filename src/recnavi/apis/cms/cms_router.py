@@ -22,6 +22,8 @@ from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.template_schemas import UpdateTemplateRequest
+from recnavi.apis.schemas.template_schemas import UpdateTemplateResponse
 from recnavi.application.project import download_project_usecase
 from recnavi.application.scene.get_scene_masters_usecase import (
     get_scene_masters_usecase,
@@ -30,6 +32,9 @@ from recnavi.application.scene.get_templates_usecase import (
     get_templates_usecase,
 )
 from recnavi.application.scene.update_scene_usecase import update_scene_usecase
+from recnavi.application.scene.update_template_usecase import (
+    update_template_usecase,
+)
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
@@ -111,6 +116,32 @@ async def update_scene_endpoint(
     ]
 
     return UpdateSceneResponse(scenes=scene_views)
+
+
+@cms_router.post(
+    "/updateTemplate",
+    response_model=UpdateTemplateResponse,
+)
+async def update_template_endpoint(
+    request: Request,
+    body: UpdateTemplateRequest,
+    _user: User = Depends(verify_admin),
+) -> UpdateTemplateResponse:
+    """Create or update template (admin-only)."""
+    templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    templates = await update_template_usecase(
+        templates_db=templates_db,
+        scenes_db=scenes_db,
+        template_id=body.template_id,
+        title=body.title,
+        scene_principals=body.scene_principals,
+        thumbnail=body.thumbnail,
+        bucket_name=SCENE_IMAGES_BUCKET_NAME,
+    )
+
+    return UpdateTemplateResponse(templates=templates)
 
 
 @cms_router.post(

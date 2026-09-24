@@ -136,3 +136,19 @@ def test_update_scene_returns_400_when_no_token(client):
 
     # Expect 400 because Authorization header is missing
     assert response.status_code == 400
+
+
+def test_update_template_returns_400_when_no_token(client):
+    """Test POST /updateTemplate returns 400 when no authorization header."""
+    response = client.post(
+        "/updateTemplate",
+        json={
+            "templateId": "test_template",
+            "title": "Test Template",
+            "scenePrincipals": ["cooking"],
+            "thumbnail": "base64_data",
+        },
+    )
+
+    # Expect 400 because Authorization header is missing
+    assert response.status_code == 400

@@ -27,3 +27,35 @@ class GetTemplatesResponse(BaseModel):
 
     status: str = Field(default="ok", description="Response status")
     templates: list[ScenesTemplate]
+
+
+class UpdateTemplateRequest(BaseModel):
+    """Request for POST /updateTemplate (admin-only)."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    template_id: str = Field(..., description="Identifier of the template")
+    title: str = Field(..., description="Name shown to the owner")
+    scene_principals: list[str] = Field(
+        ...,
+        description="Scene masters to lay out, in shooting order",
+    )
+    thumbnail: str | None = Field(
+        None,
+        description="Base64-encoded JPEG (required on create, optional on update)",
+    )
+
+
+class UpdateTemplateResponse(BaseModel):
+    """Response for POST /updateTemplate."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    status: str = Field(default="ok", description="Response status")
+    templates: list[ScenesTemplate] = Field(..., description="All templates")
