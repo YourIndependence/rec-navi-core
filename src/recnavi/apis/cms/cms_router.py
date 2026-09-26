@@ -85,7 +85,7 @@ async def get_templates_endpoint(
 )
 async def update_scene_endpoint(
     request: Request,
-    body: UpdateSceneRequest,
+    item: UpdateSceneRequest,
     _user: User = Depends(verify_admin),
 ) -> UpdateSceneResponse:
     """Create or update scene master (admin-only)."""
@@ -93,11 +93,11 @@ async def update_scene_endpoint(
 
     scenes = await update_scene_usecase(
         scenes_db=scenes_db,
-        scene_principal=body.scene_principal,
-        title=body.title,
-        max_duration_seconds=body.max_duration_seconds,
-        example_image=body.example_image,
-        guide_image=body.guide_image,
+        scene_principal=item.scene_principal,
+        title=item.title,
+        max_duration_seconds=item.max_duration_seconds,
+        example_image=item.example_image,
+        guide_image=item.guide_image,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
     )
 
