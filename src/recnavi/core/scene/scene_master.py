@@ -26,9 +26,9 @@ async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
         List of all scene masters. Empty list if no scenes exist.
 
     """
-    items = await scenes_db.scan()
+    result = await scenes_db.scan()
 
-    return [SceneMaster.model_validate(item) for item in items]
+    return [SceneMaster.model_validate(item) for item in result.items]
 
 
 async def get_scene_master_by_principal(
@@ -46,9 +46,9 @@ async def get_scene_master_by_principal(
         SceneMaster if found, None otherwise.
 
     """
-    items = await scenes_db.scan()
+    result = await scenes_db.scan()
 
-    for item in items:
+    for item in result.items:
         if item.get("scenePrincipal") == scene_principal:
             return SceneMaster.model_validate(item)
 

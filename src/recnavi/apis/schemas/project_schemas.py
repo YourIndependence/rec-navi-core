@@ -7,10 +7,13 @@
 # For internal use only.
 # developer team.
 
-"""Project API schemas."""
+"""Project-related API schemas."""
 
 from pydantic import BaseModel
 from pydantic import Field
+
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+from recnavi.core.types.project import Project
 
 
 class DownloadProjectRequest(BaseModel):
@@ -34,4 +37,17 @@ class DownloadProjectResponse(BaseModel):
         ...,
         alias="downloadUrl",
         description="Presigned S3 URL for zip archive download (1-hour expiration)",
+    )
+
+
+class GetProjectsResponse(BaseApiResponseModel):
+    """Response for GET /getProjects."""
+
+    projects: list[Project] = Field(
+        ...,
+        description="Projects in descending order by creation date",
+    )
+    next_cursor: str | None = Field(
+        None,
+        description="Opaque pagination cursor. None if last page.",
     )

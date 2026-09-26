@@ -77,7 +77,8 @@ async def test_query_passes_index_name_to_dynamodb():
         index="group-index",
     )
 
-    assert result == [{"userId": "user-123"}]
+    assert result.items == [{"userId": "user-123"}]
+    assert result.last_evaluated_key is None
     assert table.query_kwargs == {
         "KeyConditionExpression": "userId = :user_id",
         "IndexName": "group-index",

@@ -26,7 +26,10 @@ class GetTemplatesResponse(BaseModel):
     )
 
     status: str = Field(default="ok", description="Response status")
-    templates: list[ScenesTemplate]
+    templates: list[ScenesTemplate] = Field(
+        ...,
+        description="List of all scenes templates",
+    )
 
 
 class UpdateTemplateRequest(BaseModel):

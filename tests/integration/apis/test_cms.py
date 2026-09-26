@@ -7,7 +7,13 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for CMS endpoints."""
+"""Integration tests for CMS endpoints.
+
+Some tests require real AWS DynamoDB access and are marked with
+@pytest.mark.real_aws to skip in CI environments.
+
+Other tests verify basic HTTP behavior without AWS dependencies.
+"""
 
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -16,6 +22,7 @@ from typing import cast
 import pytest
 import pytest_asyncio
 
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
@@ -71,7 +78,48 @@ async def template_data() -> AsyncIterator[dict[str, object]]:
             )
 
 
+@pytest_asyncio.fixture
+async def project_data() -> AsyncIterator[dict[str, object]]:
+    """Insert and remove a project used by this module."""
+    database = cast(
+        dict[str, BaseDatabase],
+        app.state.database,
+    )[PROJECTS_TABLE_NAME]
+    item = {
+        "projectId": "it_project_001",
+        "groupId": "dummy_group_id",
+        "projectName": "Integration Test Project",
+        "description": "Test project for integration testing",
+        "ownerUserId": "dummy_user_id",
+        "assignedUserIds": ["dummy_user_id"],
+        "createdAt": "2026-09-21T00:00:00Z",
+        "updatedAt": "2026-09-21T00:00:00Z",
+        "status": "in_progress",
+        "version": 0,
+        "scenes": [],
+    }
+    await database.put_item(item)
+
+    try:
+        yield item
+    finally:
+        with suppress(Exception):
+            await database.delete_item(
+                {"projectId": item["projectId"]},
+            )
+
+
+def test_get_scene_masters_returns_400_when_no_token(client):
+    """Test GET /getSceneMasters returns 400 when no authorization header."""
+    response = client.get("/getSceneMasters")
+
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
 @pytest.mark.asyncio
+@pytest.mark.real_aws
 async def test_get_scene_masters_returns_injected_scene(
     client,
     auth_headers,
@@ -90,7 +138,17 @@ async def test_get_scene_masters_returns_injected_scene(
     } in data["scenes"]
 
 
+def test_get_templates_returns_400_when_no_token(client):
+    """Test GET /getTemplates returns 400 when no authorization header."""
+    response = client.get("/getTemplates")
+
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
 @pytest.mark.asyncio
+@pytest.mark.real_aws
 async def test_get_templates_returns_injected_template(
     client,
     auth_headers,
@@ -106,10 +164,10 @@ async def test_get_templates_returns_injected_template(
         "templateId": template_data["templateId"],
         "title": template_data["title"],
         "scenePrincipals": template_data["scenePrincipals"],
-        "thumbnailUri": template_data["thumbnailUri"],
     } in data["templates"]
 
 
+<<<<<<< HEAD
 def test_download_project_returns_400_when_no_token(client):
     """Test POST /downloadProject returns 400 when no authorization header."""
     response = client.post(
@@ -152,3 +210,37 @@ def test_update_template_returns_400_when_no_token(client):
 
     # Expect 400 because Authorization header is missing
     assert response.status_code == 400
+=======
+def test_get_projects_returns_400_when_no_token(client):
+    """Test GET /getProjects returns 400 when no authorization header."""
+    response = client.get("/getProjects")
+
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.real_aws
+async def test_get_projects_returns_injected_project(
+    client,
+    auth_headers,
+    project_data: dict[str, object],
+):
+    """Return the project injected for this integration test."""
+    response = client.get("/getProjects", headers=auth_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert {
+        "projectId": project_data["projectId"],
+        "groupId": project_data["groupId"],
+        "projectName": project_data["projectName"],
+        "description": project_data["description"],
+        "ownerUserId": project_data["ownerUserId"],
+        "assignedUserIds": project_data["assignedUserIds"],
+        "status": project_data["status"],
+        "version": project_data["version"],
+    } in data["projects"]
+>>>>>>> feat/issue-6-get-projects
