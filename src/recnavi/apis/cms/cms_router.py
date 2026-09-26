@@ -80,7 +80,7 @@ async def get_templates_endpoint(
 )
 async def download_project_endpoint(
     request: Request,
-    body: DownloadProjectRequest,
+    item: DownloadProjectRequest,
     user: User = Depends(verify_user),
 ) -> DownloadProjectResponse:
     """Download approved project as zip archive."""
@@ -89,10 +89,10 @@ async def download_project_endpoint(
 
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    project_item = await projects_db.get_item({"projectId": body.project_id})
+    project_item = await projects_db.get_item({"projectId": item.project_id})
     if not project_item:
         raise ClientResourcesNotFoundError(
-            f"Project '{body.project_id}' not found.",
+            f"Project '{item.project_id}' not found.",
         )
 
     project = Project.model_validate(project_item)

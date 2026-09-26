@@ -9,11 +9,13 @@
 
 """Project API schemas."""
 
-from pydantic import BaseModel
 from pydantic import Field
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 
-class DownloadProjectRequest(BaseModel):
+
+class DownloadProjectRequest(BaseItemModel):
     """Request schema for POST /downloadProject."""
 
     project_id: str = Field(
@@ -23,15 +25,13 @@ class DownloadProjectRequest(BaseModel):
     )
 
 
-class DownloadProjectResponse(BaseModel):
+class DownloadProjectResponse(BaseApiResponseModel):
     """Response schema for POST /downloadProject."""
 
-    status: str = Field(
-        default="ok",
-        description="Response status (always 'ok' on success)",
-    )
     download_url: str = Field(
         ...,
         alias="downloadUrl",
-        description="Presigned S3 URL for zip archive download (1-hour expiration)",
+        description=(
+            "Presigned S3 URL for zip archive download (1-hour expiration)"
+        ),
     )
