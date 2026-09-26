@@ -9,36 +9,24 @@
 
 """Template-related API schemas."""
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.scenes_template import ScenesTemplate
 
 
-class GetTemplatesResponse(BaseModel):
+class GetTemplatesResponse(BaseApiResponseModel):
     """Response for GET /getTemplates."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    status: str = Field(default="ok", description="Response status")
     templates: list[ScenesTemplate] = Field(
         ...,
         description="List of all scenes templates",
     )
 
 
-class UpdateTemplateRequest(BaseModel):
+class UpdateTemplateRequest(BaseItemModel):
     """Request for POST /updateTemplate (admin-only)."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
 
     template_id: str = Field(..., description="Identifier of the template")
     title: str = Field(..., description="Name shown to the owner")
@@ -52,13 +40,7 @@ class UpdateTemplateRequest(BaseModel):
     )
 
 
-class UpdateTemplateResponse(BaseModel):
+class UpdateTemplateResponse(BaseApiResponseModel):
     """Response for POST /updateTemplate."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    status: str = Field(default="ok", description="Response status")
     templates: list[ScenesTemplate] = Field(..., description="All templates")

@@ -151,7 +151,7 @@ async def update_scene_endpoint(
 )
 async def update_template_endpoint(
     request: Request,
-    body: UpdateTemplateRequest,
+    item: UpdateTemplateRequest,
     _user: User = Depends(verify_admin),
 ) -> UpdateTemplateResponse:
     """Create or update template (admin-only)."""
@@ -161,10 +161,10 @@ async def update_template_endpoint(
     templates = await update_template_usecase(
         templates_db=templates_db,
         scenes_db=scenes_db,
-        template_id=body.template_id,
-        title=body.title,
-        scene_principals=body.scene_principals,
-        thumbnail=body.thumbnail,
+        template_id=item.template_id,
+        title=item.title,
+        scene_principals=item.scene_principals,
+        thumbnail=item.thumbnail,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
     )
 

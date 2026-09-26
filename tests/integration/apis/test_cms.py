@@ -167,7 +167,40 @@ async def test_get_templates_returns_injected_template(
     } in data["templates"]
 
 
-<<<<<<< HEAD
+def test_get_projects_returns_400_when_no_token(client):
+    """Test GET /getProjects returns 400 when no authorization header."""
+    response = client.get("/getProjects")
+
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
+
+
+@pytest.mark.asyncio
+@pytest.mark.real_aws
+async def test_get_projects_returns_injected_project(
+    client,
+    auth_headers,
+    project_data: dict[str, object],
+):
+    """Return the project injected for this integration test."""
+    response = client.get("/getProjects", headers=auth_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert {
+        "projectId": project_data["projectId"],
+        "groupId": project_data["groupId"],
+        "projectName": project_data["projectName"],
+        "description": project_data["description"],
+        "ownerUserId": project_data["ownerUserId"],
+        "assignedUserIds": project_data["assignedUserIds"],
+        "status": project_data["status"],
+        "version": project_data["version"],
+    } in data["projects"]
+
+
 def test_download_project_returns_400_when_no_token(client):
     """Test POST /downloadProject returns 400 when no authorization header."""
     response = client.post(
@@ -210,37 +243,3 @@ def test_update_template_returns_400_when_no_token(client):
 
     # Expect 400 because Authorization header is missing
     assert response.status_code == 400
-=======
-def test_get_projects_returns_400_when_no_token(client):
-    """Test GET /getProjects returns 400 when no authorization header."""
-    response = client.get("/getProjects")
-
-    assert response.status_code == 400
-    data = response.json()
-    assert data["status"] == "error"
-
-
-@pytest.mark.asyncio
-@pytest.mark.real_aws
-async def test_get_projects_returns_injected_project(
-    client,
-    auth_headers,
-    project_data: dict[str, object],
-):
-    """Return the project injected for this integration test."""
-    response = client.get("/getProjects", headers=auth_headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert {
-        "projectId": project_data["projectId"],
-        "groupId": project_data["groupId"],
-        "projectName": project_data["projectName"],
-        "description": project_data["description"],
-        "ownerUserId": project_data["ownerUserId"],
-        "assignedUserIds": project_data["assignedUserIds"],
-        "status": project_data["status"],
-        "version": project_data["version"],
-    } in data["projects"]
->>>>>>> feat/issue-6-get-projects

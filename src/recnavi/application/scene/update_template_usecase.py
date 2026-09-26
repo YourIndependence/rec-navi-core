@@ -46,8 +46,8 @@ async def update_template_usecase(
         ClientValueError: Unknown scenePrincipals.
 
     """
-    all_masters = await scenes_db.scan()
-    existing_principals = {item["scenePrincipal"] for item in all_masters}
+    result = await scenes_db.scan()
+    existing_principals = {item["scenePrincipal"] for item in result.items}
     missing = [p for p in scene_principals if p not in existing_principals]
     if missing:
         raise ClientValueError(f"Unknown scenePrincipals: {missing}")
@@ -95,7 +95,9 @@ async def update_template_usecase(
         thumbnail_uri=thumbnail_uri,
     )
 
-    all_items = await templates_db.scan()
-    all_templates = [ScenesTemplate.model_validate(item) for item in all_items]
+    result = await templates_db.scan()
+    all_templates = [
+        ScenesTemplate.model_validate(item) for item in result.items
+    ]
 
     return all_templates
