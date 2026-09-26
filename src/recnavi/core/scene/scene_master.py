@@ -26,6 +26,6 @@ async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
         List of all scene masters. Empty list if no scenes exist.
 
     """
-    items = await scenes_db.scan()
+    result = await scenes_db.scan()
 
-    return [SceneMaster.model_validate(item) for item in items]
+    return [SceneMaster.model_validate(item) for item in result.items]

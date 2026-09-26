@@ -13,6 +13,28 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Any
 
+from pydantic import BaseModel
+from pydantic import Field
+
+
+class DatabaseQueryResult(BaseModel):
+    """Result from database query or scan operations with pagination support.
+
+    Attributes:
+        items: List of items returned from the query/scan.
+        last_evaluated_key: Key to continue pagination, or None if no more items.
+
+    """
+
+    items: list[dict[str, Any]] = Field(
+        ...,
+        description="Items returned from the database operation",
+    )
+    last_evaluated_key: dict[str, Any] | None = Field(
+        default=None,
+        description="Pagination key for next page, None if last page",
+    )
+
 
 class BaseDatabase(ABC):
     """Abstract base class for database table operations.
@@ -54,7 +76,7 @@ class BaseDatabase(ABC):
         index: str | None = None,
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    ) -> DatabaseQueryResult:
         """Query items by key condition with optional pagination.
 
         Args:
@@ -65,8 +87,7 @@ class BaseDatabase(ABC):
             exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            Tuple of (items, last_evaluated_key). last_evaluated_key is None
-            if there are no more items to retrieve.
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         pass
@@ -85,11 +106,18 @@ class BaseDatabase(ABC):
     async def scan(
         self,
         filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Scan all items in the table.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Scan all items in the table with optional pagination.
 
         Args:
             filter_expression: Optional filter expression to apply.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
+
+        Returns:
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         pass
