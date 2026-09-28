@@ -122,7 +122,7 @@ async def get_projects_endpoint(
 @cms_router.post("/getProject")
 async def get_project_endpoint(
     request: Request,
-    payload: GetProjectRequest,
+    item: GetProjectRequest,
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
@@ -134,7 +134,7 @@ async def get_project_endpoint(
 
     project, scene_urls = await get_project_use_case(
         projects_db=projects_db,
-        project_id=payload.project_id,
+        project_id=item.project_id,
         user=user,
         video_bucket_name=VIDEO_BUCKET_NAME,
     )
@@ -236,7 +236,7 @@ async def update_project_endpoint(
 @cms_router.post("/deleteProject")
 async def delete_project_endpoint(
     request: Request,
-    payload: DeleteProjectRequest,
+    item: DeleteProjectRequest,
     user: User = Depends(verify_user),
 ) -> DeleteProjectResponse:
     """Delete a project and its recordings."""
@@ -248,7 +248,7 @@ async def delete_project_endpoint(
 
     project_id = await delete_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project_id,
+        project_id=item.project_id,
         user=user,
         video_bucket_name=VIDEO_BUCKET_NAME,
     )

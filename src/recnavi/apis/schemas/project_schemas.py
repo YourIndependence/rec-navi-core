@@ -14,6 +14,8 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 
@@ -243,24 +245,13 @@ class UpdateProjectResponse(BaseModel):
     project: Project = Field(..., description="Updated project")
 
 
-class DeleteProjectRequest(BaseModel):
+class DeleteProjectRequest(BaseItemModel):
     """Request payload for POST /deleteProject."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
 
     project_id: str = Field(..., description="Project ID to delete")
 
 
-class DeleteProjectResponse(BaseModel):
+class DeleteProjectResponse(BaseApiResponseModel):
     """Response for POST /deleteProject."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    status: str = Field(default="ok", description="Response status")
     project_id: str = Field(..., description="Deleted project ID")
