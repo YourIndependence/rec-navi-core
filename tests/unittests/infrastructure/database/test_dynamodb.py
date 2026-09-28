@@ -73,15 +73,41 @@ async def test_query_passes_index_name_to_dynamodb():
     database.session = MockDynamoSession(resource)
 
     result = await database.query(
-        key_condition={"KeyConditionExpression": "userId = :user_id"},
+        key_condition={"userId": "user-123"},
         index="group-index",
     )
 
-    assert result == [{"userId": "user-123"}]
-    assert table.query_kwargs == {
-        "KeyConditionExpression": "userId = :user_id",
-        "IndexName": "group-index",
-    }
+    assert result.items == [{"userId": "user-123"}]
+    assert result.last_evaluated_key is None
+    assert table.query_kwargs is not None
+    assert table.query_kwargs["IndexName"] == "group-index"
+    expression = table.query_kwargs["KeyConditionExpression"].get_expression()
+    assert expression["operator"] == "="
+    assert expression["values"][0].name == "userId"
+    assert expression["values"][1] == "user-123"
+
+
+@pytest.mark.asyncio
+async def test_query_converts_attribute_key_condition_to_expression():
+    """Test query converts attribute equality conditions for DynamoDB."""
+    table = MockDynamoTable()
+    resource = MockDynamoResource(table)
+    database = DynamoDb(table_name="projects")
+    database.session = MockDynamoSession(resource)
+
+    await database.query(
+        key_condition={"groupId": "group-123"},
+        index="GSI1",
+    )
+
+    assert table.query_kwargs is not None
+    assert "groupId" not in table.query_kwargs
+    key_expression = table.query_kwargs["KeyConditionExpression"]
+    expression = key_expression.get_expression()
+    assert expression["operator"] == "="
+    assert expression["values"][0].name == "groupId"
+    assert expression["values"][1] == "group-123"
+    assert table.query_kwargs["IndexName"] == "GSI1"
 
 
 @pytest.mark.asyncio
@@ -93,7 +119,7 @@ async def test_query_passes_filter_expression_to_dynamodb():
     database.session = MockDynamoSession(resource)
 
     await database.query(
-        key_condition={"KeyConditionExpression": "userId = :user_id"},
+        key_condition={"userId": "user-123"},
         filter_expression={"isActive": True},
     )
 

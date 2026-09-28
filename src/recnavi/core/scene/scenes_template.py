@@ -15,6 +15,7 @@ from recnavi.core.types.scenes_template import ScenesTemplate
 
 async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
     """Retrieve all scenes templates from the database."""
+<<<<<<< HEAD
     items = await templates_db.scan()
     return [ScenesTemplate.model_validate(item) for item in items]
 
@@ -41,3 +42,7 @@ async def get_template_by_id(
             return ScenesTemplate.model_validate(item)
 
     return None
+=======
+    result = await templates_db.scan()
+    return [ScenesTemplate.model_validate(item) for item in result.items]
+>>>>>>> origin/dev

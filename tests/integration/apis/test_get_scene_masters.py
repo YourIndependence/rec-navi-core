@@ -7,17 +7,17 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for CMS endpoints."""
+"""Integration tests for GET /getSceneMasters endpoint."""
 
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import cast
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
 
 from recnavi.config.variables import SCENES_TABLE_NAME
-from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.main import app
 
@@ -30,7 +30,7 @@ async def scene_master_data() -> AsyncIterator[dict[str, object]]:
         app.state.database,
     )[SCENES_TABLE_NAME]
     item = {
-        "scenePrincipal": "it_scene_master",
+        "scenePrincipal": f"it_{uuid4()}",
         "title": "Integration Test Scene",
         "thumbnailUri": "s3://it-test/thumbnail.jpg",
         "guideUri": "s3://it-test/guide.png",
@@ -47,31 +47,17 @@ async def scene_master_data() -> AsyncIterator[dict[str, object]]:
             )
 
 
-@pytest_asyncio.fixture
-async def template_data() -> AsyncIterator[dict[str, object]]:
-    """Insert and remove a template used by this module."""
-    database = cast(
-        dict[str, BaseDatabase],
-        app.state.database,
-    )[TEMPLATES_TABLE_NAME]
-    item = {
-        "templateId": "it_template",
-        "title": "Integration Test Template",
-        "scenePrincipals": ["it_scene_master"],
-        "thumbnailUri": "s3://it-test/template.jpg",
-    }
-    await database.put_item(item)
+def test_get_scene_masters_returns_400_when_no_token(client):
+    """Test GET /getSceneMasters returns 400 when no authorization header."""
+    response = client.get("/getSceneMasters")
 
-    try:
-        yield item
-    finally:
-        with suppress(Exception):
-            await database.delete_item(
-                {"templateId": item["templateId"]},
-            )
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"
 
 
 @pytest.mark.asyncio
+@pytest.mark.real_aws
 async def test_get_scene_masters_returns_injected_scene(
     client,
     auth_headers,
@@ -88,6 +74,7 @@ async def test_get_scene_masters_returns_injected_scene(
         "title": scene_master_data["title"],
         "maxDurationSeconds": scene_master_data["maxDurationSeconds"],
     } in data["scenes"]
+<<<<<<< HEAD:tests/integration/apis/test_cms.py
 
 
 @pytest.mark.asyncio
@@ -136,3 +123,5 @@ def test_update_scene_returns_400_when_no_token(client):
 
     # Expect 400 because Authorization header is missing
     assert response.status_code == 400
+=======
+>>>>>>> origin/dev:tests/integration/apis/test_get_scene_masters.py
