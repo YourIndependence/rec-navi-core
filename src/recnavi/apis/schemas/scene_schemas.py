@@ -16,6 +16,9 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+
 
 if TYPE_CHECKING:
     from recnavi.core.types.project import Project
@@ -59,13 +62,8 @@ class GetSceneMastersResponse(BaseModel):
     )
 
 
-class UpdateSceneRecordRequest(BaseModel):
+class UpdateSceneRecordRequest(BaseItemModel):
     """Request for POST /updateSceneRecord."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
 
     project_id: str = Field(..., description="Project ID")
     scene_id: str = Field(..., description="Scene ID")
@@ -73,26 +71,16 @@ class UpdateSceneRecordRequest(BaseModel):
     thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
 
 
-class UpdateSceneRecordResponse(BaseModel):
+class UpdateSceneRecordResponse(BaseApiResponseModel):
     """Response for POST /updateSceneRecord."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-        from_attributes=True,
-    )
+    model_config = ConfigDict(from_attributes=True)
 
-    status: str = Field(default="ok", description="Response status")
-    project: "Project"  # Forward reference
+    project: "Project" = Field(..., description="Updated project")
 
 
-class ReviewSceneRequest(BaseModel):
+class ReviewSceneRequest(BaseItemModel):
     """Request for POST /reviewScene."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
 
     project_id: str = Field(..., description="Project ID")
     scene_id: str = Field(..., description="Scene ID")
@@ -100,14 +88,9 @@ class ReviewSceneRequest(BaseModel):
     comment: str | None = Field(default=None, description="Review comment")
 
 
-class ReviewSceneResponse(BaseModel):
+class ReviewSceneResponse(BaseApiResponseModel):
     """Response for POST /reviewScene."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-        from_attributes=True,
-    )
+    model_config = ConfigDict(from_attributes=True)
 
-    status: str = Field(default="ok", description="Response status")
-    project: "Project"  # Forward reference
+    project: "Project" = Field(..., description="Updated project")
