@@ -16,6 +16,7 @@ from typing import Any
 import aioboto3
 from boto3.dynamodb.conditions import Attr
 from boto3.dynamodb.conditions import ConditionBase
+from boto3.dynamodb.conditions import Key
 
 from recnavi.config.variables import REGION
 from recnavi.core.database.base_database import BaseDatabase
@@ -87,7 +88,7 @@ class DynamoDb(BaseDatabase):
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            query_kwargs = dict(key_condition)
+            query_kwargs = _build_query_kwargs(key_condition)
             condition = _build_filter_expression(filter_expression)
             if condition is not None:
                 query_kwargs["FilterExpression"] = condition
@@ -170,6 +171,17 @@ def _build_filter_expression(
     for condition in conditions[1:]:
         expression &= condition
     return expression
+
+
+def _build_query_kwargs(key_condition: dict[str, Any]) -> dict[str, Any]:
+    """Build DynamoDB query arguments from the database abstraction input."""
+    conditions = [
+        Key(attribute).eq(value) for attribute, value in key_condition.items()
+    ]
+    expression = conditions[0]
+    for condition in conditions[1:]:
+        expression &= condition
+    return {"KeyConditionExpression": expression}
 
 
 def _decimal_to_num(obj: Any) -> int | float | object | None:

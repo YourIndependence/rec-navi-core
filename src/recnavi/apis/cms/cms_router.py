@@ -16,14 +16,22 @@ from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_admin
 from recnavi.apis.auth.auth import verify_user
+<<<<<<< HEAD
 from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
 from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
+=======
+from recnavi.apis.schemas.project_schemas import CreateProjectRequest
+from recnavi.apis.schemas.project_schemas import CreateProjectResponse
+from recnavi.apis.schemas.project_schemas import GetProjectRequest
+from recnavi.apis.schemas.project_schemas import GetProjectResponse
+>>>>>>> origin/dev
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+<<<<<<< HEAD
 from recnavi.apis.schemas.template_schemas import UpdateTemplateRequest
 from recnavi.apis.schemas.template_schemas import UpdateTemplateResponse
 from recnavi.application.project import download_project_usecase
@@ -40,6 +48,15 @@ from recnavi.application.scene.update_scene_usecase import update_scene_usecase
 from recnavi.application.scene.update_template_usecase import (
     update_template_usecase,
 )
+=======
+from recnavi.application.project.create_project import create_project_usecase
+from recnavi.application.project.get_project import get_project_usecase
+from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.scene.get_scene_masters import (
+    get_scene_masters_usecase,
+)
+from recnavi.application.scene.get_templates import get_templates_usecase
+>>>>>>> origin/dev
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
@@ -111,6 +128,7 @@ async def get_projects_endpoint(
     )
 
 
+<<<<<<< HEAD
 @cms_router.post(
     "/updateScene",
     response_model=UpdateSceneResponse,
@@ -201,3 +219,42 @@ async def download_project_endpoint(
     )
 
     return DownloadProjectResponse(download_url=presigned_url)
+=======
+@cms_router.post("/getProject")
+async def get_project_endpoint(
+    request: Request,
+    item: GetProjectRequest,
+    user: User = Depends(verify_user),
+) -> GetProjectResponse:
+    """Get a project with all scenes."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project = await get_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        user=user,
+    )
+
+    return GetProjectResponse(project=project)
+
+
+@cms_router.post("/createProject")
+async def create_project_endpoint(
+    request: Request,
+    item: CreateProjectRequest,
+    user: User = Depends(verify_user),
+) -> CreateProjectResponse:
+    """Create a new project."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project = await create_project_usecase(
+        projects_db=projects_db,
+        project_name=item.project_name,
+        description=item.description,
+        scene_principals=item.scene_principals,
+        assigned_user_ids=item.assigned_user_ids,
+        owner=user,
+    )
+
+    return CreateProjectResponse(project=project)
+>>>>>>> origin/dev

@@ -30,9 +30,10 @@ TEMPLATES_TABLE_NAME = os.environ.get(
     "DDB_SCENE_TEMPLATES_TABLE",
     "rec-navi-dev-scene-templates",
 )
-PROJECTS_TABLE_NAME = os.environ.get(
-    "PROJECTS_TABLE_NAME",
-    "recnavi-local-projects",
+
+MEDIA_BUCKET_NAME = os.environ.get(
+    "MEDIA_BUCKET_NAME",
+    "rec-navi-dev-media",
 )
 
 VIDEO_BUCKET_NAME = os.environ.get(
