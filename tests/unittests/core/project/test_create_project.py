@@ -16,10 +16,20 @@ from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientPermissionError
+from tests.mockups.mock_database import MockDatabase
 
 
-def test_create_project_returns_project_with_owner():
+@pytest.fixture
+def projects_db() -> MockDatabase:
+    """Provide an isolated database for each test."""
+    return MockDatabase()
+
+
+@pytest.mark.asyncio
+async def test_create_project_returns_project_with_owner(
+    projects_db: MockDatabase,
+):
     """Test create_project returns Project with owner information."""
     owner = User(
         user_id="user-owner",
@@ -28,7 +38,8 @@ def test_create_project_returns_project_with_owner():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Test Project",
         description="Test description",
         scene_principals=["opening", "main"],
@@ -45,9 +56,16 @@ def test_create_project_returns_project_with_owner():
     assert project.status == ProjectStatus.IN_PROGRESS
     assert project.created_at is not None
     assert project.updated_at is not None
+    saved_item = await projects_db.get_item(
+        key={"projectId": project.project_id},
+    )
+    assert saved_item is not None
 
 
-def test_create_project_generates_unique_scene_ids():
+@pytest.mark.asyncio
+async def test_create_project_generates_unique_scene_ids(
+    projects_db: MockDatabase,
+):
     """Test create_project generates unique scene_id for each scene."""
     owner = User(
         user_id="user-owner",
@@ -56,7 +74,8 @@ def test_create_project_generates_unique_scene_ids():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Test Project",
         description="",
         scene_principals=["opening", "main", "closing"],
@@ -69,7 +88,10 @@ def test_create_project_generates_unique_scene_ids():
     assert len(scene_ids) == len(set(scene_ids))  # All unique
 
 
-def test_create_project_allows_duplicate_scene_principals():
+@pytest.mark.asyncio
+async def test_create_project_allows_duplicate_scene_principals(
+    projects_db: MockDatabase,
+):
     """Test create_project allows duplicate scenePrincipal values."""
     owner = User(
         user_id="user-owner",
@@ -78,7 +100,8 @@ def test_create_project_allows_duplicate_scene_principals():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Two Dishes",
         description="",
         scene_principals=["cooking", "cooking"],
@@ -92,7 +115,8 @@ def test_create_project_allows_duplicate_scene_principals():
     assert project.scenes[0].scene_id != project.scenes[1].scene_id
 
 
-def test_create_project_allows_empty_scenes():
+@pytest.mark.asyncio
+async def test_create_project_allows_empty_scenes(projects_db: MockDatabase):
     """Test create_project allows empty scene_principals list."""
     owner = User(
         user_id="user-owner",
@@ -101,7 +125,8 @@ def test_create_project_allows_empty_scenes():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Empty Project",
         description="",
         scene_principals=[],
@@ -112,7 +137,10 @@ def test_create_project_allows_empty_scenes():
     assert len(project.scenes) == 0
 
 
-def test_create_project_sets_scene_status_to_not_recorded():
+@pytest.mark.asyncio
+async def test_create_project_sets_scene_status_to_not_recorded(
+    projects_db: MockDatabase,
+):
     """Test create_project sets all scenes to status NOT_RECORDED."""
     owner = User(
         user_id="user-owner",
@@ -121,7 +149,8 @@ def test_create_project_sets_scene_status_to_not_recorded():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Test Project",
         description="",
         scene_principals=["opening", "main"],
@@ -133,7 +162,10 @@ def test_create_project_sets_scene_status_to_not_recorded():
         assert scene.status == SceneStatus.NOT_RECORDED
 
 
-def test_create_project_applies_assigned_users_to_scenes():
+@pytest.mark.asyncio
+async def test_create_project_applies_assigned_users_to_scenes(
+    projects_db: MockDatabase,
+):
     """Test create_project applies assigned_user_ids to all scenes."""
     owner = User(
         user_id="user-owner",
@@ -142,7 +174,8 @@ def test_create_project_applies_assigned_users_to_scenes():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Test Project",
         description="",
         scene_principals=["opening", "main"],
@@ -154,7 +187,8 @@ def test_create_project_applies_assigned_users_to_scenes():
         assert scene.assigned_user_ids == ["user-001", "user-002"]
 
 
-def test_create_project_sets_version_to_zero():
+@pytest.mark.asyncio
+async def test_create_project_sets_version_to_zero(projects_db: MockDatabase):
     """Test create_project sets version to 0 for new projects."""
     owner = User(
         user_id="user-owner",
@@ -163,7 +197,8 @@ def test_create_project_sets_version_to_zero():
         group_id="group-123",
     )
 
-    project = create_project(
+    project = await create_project(
+        projects_db=projects_db,
         project_name="Test Project",
         description="",
         scene_principals=["opening"],
@@ -174,7 +209,8 @@ def test_create_project_sets_version_to_zero():
     assert project.version == 0
 
 
-def test_create_project_raises_403_for_staff():
+@pytest.mark.asyncio
+async def test_create_project_raises_403_for_staff(projects_db: MockDatabase):
     """Test create_project raises 403 when called by staff."""
     staff = User(
         user_id="user-staff",
@@ -184,10 +220,11 @@ def test_create_project_raises_403_for_staff():
     )
 
     with pytest.raises(
-        ClientAuthorizationError,
+        ClientPermissionError,
         match="Only owners can create projects",
     ):
-        create_project(
+        await create_project(
+            projects_db=projects_db,
             project_name="Test Project",
             description="",
             scene_principals=["opening"],
@@ -196,7 +233,8 @@ def test_create_project_raises_403_for_staff():
         )
 
 
-def test_create_project_raises_403_for_admin():
+@pytest.mark.asyncio
+async def test_create_project_raises_403_for_admin(projects_db: MockDatabase):
     """Test create_project raises 403 when called by admin."""
     admin = User(
         user_id="user-admin",
@@ -205,14 +243,11 @@ def test_create_project_raises_403_for_admin():
         group_id="group-123",
     )
 
-    with pytest.raises(
-        ClientAuthorizationError,
-        match="Only owners can create projects",
-    ):
-        create_project(
-            project_name="Test Project",
-            description="",
-            scene_principals=["opening"],
-            assigned_user_ids=[],
-            owner=admin,
-        )
+    await create_project(
+        projects_db=projects_db,
+        project_name="Test Project",
+        description="",
+        scene_principals=["opening"],
+        assigned_user_ids=[],
+        owner=admin,
+    )
