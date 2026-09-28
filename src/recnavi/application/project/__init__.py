@@ -9,12 +9,9 @@
 
 """Project application use cases."""
 
-from recnavi.application.project.get_my_projects_usecase import (
-    get_my_projects_usecase,
-)
 from recnavi.application.project.update_project_usecase import (
     update_project_usecase,
 )
 
 
-__all__ = ["get_my_projects_usecase", "update_project_usecase"]
+__all__ = ["update_project_usecase"]

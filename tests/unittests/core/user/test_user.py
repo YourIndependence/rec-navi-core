@@ -14,31 +14,7 @@ import pytest
 from recnavi.core.types.user import User
 from recnavi.core.user.user import get_user_by_id
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-
-
-class MockUserDatabase:
-    """Mock database for testing get_user_by_id."""
-
-    def __init__(self, users: dict[str, dict] | None = None):
-        self.users = users or {}
-
-    async def get_item(self, key: dict) -> dict | None:
-        user_id = key.get("userId")
-        return self.users.get(user_id)
-
-    async def put_item(self, item: dict) -> None:
-        pass
-
-    async def query(
-        self,
-        key_condition: dict,
-        filter_expression: dict | None = None,
-        index: str | None = None,
-    ) -> list[dict]:
-        return []
-
-    async def delete_item(self, key: dict) -> None:
-        pass
+from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
@@ -54,7 +30,7 @@ async def test_get_user_by_id_returns_user_when_valid():
         "birthday": "1990-01-01",
         "profileImageUri": "s3://bucket/user-123/profile.jpg",
     }
-    mock_db = MockUserDatabase(users={"user-123": user_data})
+    mock_db = MockDatabase(initial_items=[user_data])
 
     result = await get_user_by_id(user_id="user-123", user_database=mock_db)
 
@@ -72,7 +48,7 @@ async def test_get_user_by_id_returns_user_when_valid():
 @pytest.mark.asyncio
 async def test_get_user_by_id_raises_when_user_not_found():
     """Test get_user_by_id raises ClientAuthorizationError when user not found."""
-    mock_db = MockUserDatabase(users={})
+    mock_db = MockDatabase()
 
     with pytest.raises(
         ClientAuthorizationError,
@@ -88,13 +64,13 @@ async def test_get_user_by_id_raises_when_role_invalid():
         "userId": "user-789",
         "userName": "Bad Role User",
         "role": "superadmin",
-        "groupId": "group-999",
+        "groupId": "it-group",
         "email": "bad@example.com",
         "phoneNumber": "090-9999-9999",
         "birthday": "1985-05-05",
         "profileImageUri": "s3://bucket/user-789/profile.jpg",
     }
-    mock_db = MockUserDatabase(users={"user-789": user_data})
+    mock_db = MockDatabase(initial_items=[user_data])
 
     with pytest.raises(
         ClientAuthorizationError,
@@ -117,7 +93,7 @@ async def test_get_user_by_id_accepts_all_valid_roles():
             "birthday": "2000-01-01",
             "profileImageUri": f"s3://bucket/user-{role}/profile.jpg",
         }
-        mock_db = MockUserDatabase(users={f"user-{role}": user_data})
+        mock_db = MockDatabase(initial_items=[user_data])
 
         result = await get_user_by_id(
             user_id=f"user-{role}",

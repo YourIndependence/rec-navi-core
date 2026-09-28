@@ -11,33 +11,8 @@
 
 import pytest
 
-from recnavi.core.project.projects import decode_cursor
-from recnavi.core.project.projects import encode_cursor
 from recnavi.core.project.projects import get_projects
 from tests.mockups.mock_database import MockDatabase
-
-
-@pytest.mark.asyncio
-async def test_encode_decode_cursor_roundtrip():
-    """Test cursor encoding and decoding roundtrip."""
-    original = {"groupId": "group-123", "createdAt": "2026-09-01T00:00:00Z"}
-
-    encoded = encode_cursor(original)
-    decoded = decode_cursor(encoded)
-
-    assert decoded == original
-
-
-@pytest.mark.asyncio
-async def test_encode_cursor_returns_none_for_none():
-    """Test encode_cursor returns None when input is None."""
-    assert encode_cursor(None) is None
-
-
-@pytest.mark.asyncio
-async def test_decode_cursor_returns_none_for_none():
-    """Test decode_cursor returns None when input is None."""
-    assert decode_cursor(None) is None
 
 
 @pytest.mark.asyncio
