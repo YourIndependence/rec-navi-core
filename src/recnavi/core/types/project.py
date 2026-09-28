@@ -74,10 +74,6 @@ class Project(BaseModel):
         default=None,
         description="Datetime the project was created",
     )
-    version: int = Field(
-        default=1,
-        description="Optimistic lock version for concurrent update control",
-    )
 
     def is_accessible(self, *, user: User) -> bool:
         """Check if user can access this project."""
