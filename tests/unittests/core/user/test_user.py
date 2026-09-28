@@ -88,7 +88,7 @@ async def test_get_user_by_id_raises_when_role_invalid():
         "userId": "user-789",
         "userName": "Bad Role User",
         "role": "superadmin",
-        "groupId": "group-999",
+        "groupId": "it-group",
         "email": "bad@example.com",
         "phoneNumber": "090-9999-9999",
         "birthday": "1985-05-05",

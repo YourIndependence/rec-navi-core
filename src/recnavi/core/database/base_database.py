@@ -13,6 +13,8 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Any
 
+from recnavi.core.types.database import DatabaseQueryResult
+
 
 class BaseDatabase(ABC):
     """Abstract base class for database table operations.
@@ -47,31 +49,6 @@ class BaseDatabase(ABC):
         pass
 
     @abstractmethod
-    async def query(
-        self,
-        key_condition: dict[str, Any],
-        filter_expression: dict[str, Any] | None = None,
-        index: str | None = None,
-        limit: int | None = None,
-        exclusive_start_key: dict[str, Any] | None = None,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-        """Query items by key condition with optional pagination.
-
-        Args:
-            key_condition: Key condition for the query.
-            filter_expression: Optional filter expression.
-            index: Optional global or local secondary index name.
-            limit: Maximum number of items to return.
-            exclusive_start_key: Primary key of item to start from (for pagination).
-
-        Returns:
-            Tuple of (items, last_evaluated_key). last_evaluated_key is None
-            if there are no more items to retrieve.
-
-        """
-        pass
-
-    @abstractmethod
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.
 
@@ -85,17 +62,42 @@ class BaseDatabase(ABC):
     async def scan(
         self,
         filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Scan all items in the table.
-
-        Warning: This is a full table scan and should only be used for small
-        tables or with appropriate filters.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Scan all items in the table with optional pagination.
 
         Args:
             filter_expression: Optional filter expression to apply.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            List of all items in the table (or matching the filter).
+            DatabaseQueryResult with items and optional last_evaluated_key.
+
+        """
+        pass
+
+    @abstractmethod
+    async def query(
+        self,
+        key_condition: dict[str, Any],
+        filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Query items by key condition with optional pagination.
+
+        Args:
+            key_condition: Key condition for the query.
+            filter_expression: Optional filter expression.
+            index: Optional global or local secondary index name.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
+
+        Returns:
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         pass

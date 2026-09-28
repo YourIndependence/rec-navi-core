@@ -37,38 +37,42 @@ class Project(BaseModel):
     )
 
     project_id: str = Field(..., description="Identifier of the project")
-    group_id: str = Field(
-        ...,
-        description="Identifier of the group that owns the project",
-    )
     project_name: str = Field(..., description="Name shown to the members")
-    owner_user_id: str = Field(
-        ...,
-        description="Identifier of the account owner who created it",
-    )
-    created_at: str = Field(
-        ...,
-        description="Datetime the project was created",
-    )
-    updated_at: str = Field(
-        ...,
-        description="Datetime the project was last updated",
-    )
     description: str = Field(
         default="",
         description="Free text of date, place, shop name and notes",
+    )
+    status: ProjectStatus = Field(
+        default=ProjectStatus.IN_PROGRESS,
+        description="How far the project has progressed",
     )
     scenes: list[Scene] = Field(
         default_factory=list,
         description="Scenes to record in the project",
     )
+    owner_user_id: str = Field(
+        ...,
+        description="Identifier of the account owner who created it",
+    )
     assigned_user_ids: list[str] = Field(
         default_factory=list,
         description="Identifiers of the staff who may open the project",
     )
-    status: ProjectStatus = Field(
-        default=ProjectStatus.IN_PROGRESS,
-        description="How far the project has progressed",
+    group_id: str = Field(
+        ...,
+        description="Identifier of the group that owns the project",
+    )
+    created_at: str = Field(
+        ...,
+        description="Datetime the project was created",
+    )
+    updated_at: str | None = Field(
+        default=None,
+        description="Datetime the project was created",
+    )
+    version: str | int | None = Field(
+        default=None,
+        description="Datetime the project was created",
     )
     version: int = Field(
         default=1,

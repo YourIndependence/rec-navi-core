@@ -14,8 +14,13 @@ from decimal import Decimal
 from typing import Any
 
 import aioboto3
+from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import ConditionBase
+from boto3.dynamodb.conditions import Key
 
+from recnavi.config.variables import REGION
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.database.base_database import DatabaseQueryResult
 
 
 class DynamoDb(BaseDatabase):
@@ -29,7 +34,7 @@ class DynamoDb(BaseDatabase):
 
         """
         self.table_name = table_name
-        self.session = aioboto3.Session()
+        self.session = aioboto3.Session(region_name=REGION)
 
     async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
         """Get an item by primary key.
@@ -62,28 +67,31 @@ class DynamoDb(BaseDatabase):
     async def query(
         self,
         key_condition: dict[str, Any],
-        _filter_expression: dict[str, Any] | None = None,
+        filter_expression: dict[str, Any] | None = None,
         index: str | None = None,
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    ) -> DatabaseQueryResult:
         """Query items by key condition with optional pagination.
 
         Args:
             key_condition: Key condition for the query.
-            _filter_expression: Optional filter expression (reserved for future use).
+            filter_expression: Optional attribute equality filters.
+            Multiple filters are combined with AND.
             index: Optional global or local secondary index name.
             limit: Maximum number of items to return.
             exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            Tuple of (items, last_evaluated_key). last_evaluated_key is None
-            if there are no more items to retrieve.
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            query_kwargs = dict(key_condition)
+            query_kwargs = _build_query_kwargs(key_condition)
+            condition = _build_filter_expression(filter_expression)
+            if condition is not None:
+                query_kwargs["FilterExpression"] = condition
             if index is not None:
                 query_kwargs["IndexName"] = index
             if limit is not None:
@@ -93,9 +101,9 @@ class DynamoDb(BaseDatabase):
             response = await table.query(**query_kwargs)
             items = response.get("Items", [])
             last_evaluated_key = response.get("LastEvaluatedKey")
-            return (
-                [_convert_from_dynamodb_format(item) for item in items],
-                last_evaluated_key,
+            return DatabaseQueryResult(
+                items=[_convert_from_dynamodb_format(item) for item in items],
+                last_evaluated_key=last_evaluated_key,
             )
 
     async def delete_item(self, key: dict[str, Any]) -> None:
@@ -111,24 +119,69 @@ class DynamoDb(BaseDatabase):
 
     async def scan(
         self,
-        _filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Scan all items in the table.
+        filter_expression: dict[str, Any] | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Scan all items in the table with optional pagination.
 
         Warning: Full table scan. Only use for small tables.
 
         Args:
-            _filter_expression: Optional filter expression (reserved for future use).
+            filter_expression: Optional attribute equality filters.
+            Multiple filters are combined with AND.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
 
         Returns:
-            List of all items with Python native types.
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.scan()
+            scan_kwargs: dict[str, object] = {}
+            condition = _build_filter_expression(filter_expression)
+            if condition is not None:
+                scan_kwargs["FilterExpression"] = condition
+            if limit is not None:
+                scan_kwargs["Limit"] = limit
+            if exclusive_start_key is not None:
+                scan_kwargs["ExclusiveStartKey"] = exclusive_start_key
+            response = await table.scan(**scan_kwargs)
             items = response.get("Items", [])
-            return [_convert_from_dynamodb_format(item) for item in items]
+            last_evaluated_key = response.get("LastEvaluatedKey")
+            return DatabaseQueryResult(
+                items=[_convert_from_dynamodb_format(item) for item in items],
+                last_evaluated_key=last_evaluated_key,
+            )
+
+
+def _build_filter_expression(
+    filter_expression: dict[str, Any] | None,
+) -> ConditionBase | None:
+    """Build a DynamoDB AND expression from attribute equality filters."""
+    if not filter_expression:
+        return None
+
+    conditions = [
+        Attr(attribute).eq(value)
+        for attribute, value in filter_expression.items()
+    ]
+    expression = conditions[0]
+    for condition in conditions[1:]:
+        expression &= condition
+    return expression
+
+
+def _build_query_kwargs(key_condition: dict[str, Any]) -> dict[str, Any]:
+    """Build DynamoDB query arguments from the database abstraction input."""
+    conditions = [
+        Key(attribute).eq(value) for attribute, value in key_condition.items()
+    ]
+    expression = conditions[0]
+    for condition in conditions[1:]:
+        expression &= condition
+    return {"KeyConditionExpression": expression}
 
 
 def _decimal_to_num(obj: Any) -> int | float | object | None:
