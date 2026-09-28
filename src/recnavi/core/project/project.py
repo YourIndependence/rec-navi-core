@@ -30,9 +30,9 @@ async def get_project(
 
     project = Project.model_validate(item)
 
-    if not project.is_accessible(user=user):
-        raise ClientAuthorizationError(
-            "User does not have access to this project",
-        )
+    if project.is_accessible(user=user):
+        return project
 
-    return project
+    raise ClientAuthorizationError(
+        "User does not have access to this project",
+    )
