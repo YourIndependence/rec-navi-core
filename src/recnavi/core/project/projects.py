@@ -64,4 +64,4 @@ async def get_projects(
     projects = [Project.model_validate(item) for item in result.items]
     next_cursor = _encode_cursor(result.last_evaluated_key)
 
-    return (projects, next_cursor)
+    return projects, next_cursor
