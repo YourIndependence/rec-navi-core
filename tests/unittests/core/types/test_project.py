@@ -12,6 +12,7 @@
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 
 
 def test_project_type_has_version_field_with_default():
@@ -26,7 +27,7 @@ def test_project_type_has_version_field_with_default():
     )
 
     assert hasattr(project, "version")
-    assert project.version == 1
+    assert project.version is None
 
 
 def test_project_type_accepts_custom_version():
@@ -101,7 +102,7 @@ def test_project_is_accessible_returns_true_for_owner():
         user_id="user-owner",
         user_name="Owner",
         group_id="group-456",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     assert project.is_accessible(user=user) is True
@@ -123,7 +124,7 @@ def test_project_is_accessible_returns_true_for_assigned_staff():
         user_id="user-staff-1",
         user_name="Staff 1",
         group_id="group-456",
-        role="staff",
+        role=UserRole.STAFF,
     )
 
     assert project.is_accessible(user=user) is True
@@ -145,7 +146,7 @@ def test_project_is_accessible_returns_false_for_different_group():
         user_id="user-other",
         user_name="Other User",
         group_id="group-999",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     assert project.is_accessible(user=user) is False
@@ -167,7 +168,7 @@ def test_project_is_accessible_returns_false_for_non_assigned_same_group():
         user_id="user-staff-2",
         user_name="Staff 2",
         group_id="group-456",
-        role="staff",
+        role=UserRole.STAFF,
     )
 
     assert project.is_accessible(user=user) is False

@@ -14,6 +14,7 @@ import pytest
 from recnavi.application.project.get_project import get_project_use_case
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from tests.mockups.mock_database import MockDatabase
 
@@ -55,7 +56,7 @@ async def test_get_project_use_case_returns_project():
         user_id="user-789",
         user_name="Test User",
         group_id="group-456",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     project = await get_project_use_case(
@@ -99,7 +100,7 @@ async def test_get_project_use_case_propagates_authorization_error():
         user_id="user-bbb",
         user_name="User BBB",
         group_id="group-bbb",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     with pytest.raises(

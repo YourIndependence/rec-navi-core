@@ -13,6 +13,7 @@ import pytest
 
 from recnavi.core.project.project import get_project
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
@@ -42,7 +43,7 @@ async def test_get_project_returns_project_for_owner():
         user_id="user-789",
         user_name="Test Owner",
         group_id="group-456",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     project = await get_project(
@@ -80,7 +81,7 @@ async def test_get_project_returns_project_for_assigned_staff():
         user_id="user-002",
         user_name="Test Staff",
         group_id="group-789",
-        role="staff",
+        role=UserRole.STAFF,
     )
 
     project = await get_project(
@@ -103,7 +104,7 @@ async def test_get_project_raises_404_for_missing_project():
         user_id="user-123",
         user_name="Test User",
         group_id="group-456",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     with pytest.raises(
@@ -141,7 +142,7 @@ async def test_get_project_raises_403_for_other_group():
         user_id="user-bbb",
         user_name="User BBB",
         group_id="group-bbb",
-        role="owner",
+        role=UserRole.OWNER,
     )
 
     with pytest.raises(
@@ -179,7 +180,7 @@ async def test_get_project_raises_403_for_non_assigned_user():
         user_id="user-staff-3",
         user_name="Staff 3",
         group_id="group-ccc",
-        role="staff",
+        role=UserRole.STAFF,
     )
 
     with pytest.raises(
