@@ -90,5 +90,5 @@ def get_mock_x_user(request: Request):
         user_id="test-user-123",
         user_name="Test User",
         role="admin",
-        group_id="group-999",
+        group_id="it-group",
     )

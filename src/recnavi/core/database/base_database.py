@@ -13,6 +13,8 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Any
 
+from recnavi.core.types.database import DatabaseQueryResult
+
 
 class BaseDatabase(ABC):
     """Abstract base class for database table operations.
@@ -47,26 +49,6 @@ class BaseDatabase(ABC):
         pass
 
     @abstractmethod
-    async def query(
-        self,
-        key_condition: dict[str, Any],
-        filter_expression: dict[str, Any] | None = None,
-        index: str | None = None,
-    ) -> list[dict[str, Any]]:
-        """Query items by key condition.
-
-        Args:
-            key_condition: Key condition for the query.
-            filter_expression: Optional filter expression.
-            index: Optional global or local secondary index name.
-
-        Returns:
-            List of items matching the query.
-
-        """
-        pass
-
-    @abstractmethod
     async def delete_item(self, key: dict[str, Any]) -> None:
         """Delete an item by primary key.
 
@@ -80,11 +62,42 @@ class BaseDatabase(ABC):
     async def scan(
         self,
         filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Scan all items in the table.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Scan all items in the table with optional pagination.
 
         Args:
             filter_expression: Optional filter expression to apply.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
+
+        Returns:
+            DatabaseQueryResult with items and optional last_evaluated_key.
+
+        """
+        pass
+
+    @abstractmethod
+    async def query(
+        self,
+        key_condition: dict[str, Any],
+        filter_expression: dict[str, Any] | None = None,
+        index: str | None = None,
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Query items by key condition with optional pagination.
+
+        Args:
+            key_condition: Key condition for the query.
+            filter_expression: Optional filter expression.
+            index: Optional global or local secondary index name.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key of item to start from (for pagination).
+
+        Returns:
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         pass
