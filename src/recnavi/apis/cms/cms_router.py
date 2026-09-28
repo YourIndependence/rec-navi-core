@@ -197,7 +197,7 @@ async def create_project_endpoint(
 @cms_router.post("/updateProject")
 async def update_project_endpoint(
     request: Request,
-    payload: UpdateProjectRequest,
+    item: UpdateProjectRequest,
     user: User = Depends(verify_user),
 ) -> UpdateProjectResponse:
     """Update project with optimistic locking."""
@@ -214,17 +214,17 @@ async def update_project_endpoint(
             scene_principal=scene.scene_principal,
             assigned_user_ids=scene.assigned_user_ids,
         )
-        for scene in payload.project.scenes
+        for scene in item.project.scenes
     ]
 
     updated_project = await update_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project.project_id,
-        project_name=payload.project.project_name,
-        description=payload.project.description,
-        assigned_user_ids=payload.project.assigned_user_ids,
+        project_id=item.project.project_id,
+        project_name=item.project.project_name,
+        description=item.project.description,
+        assigned_user_ids=item.project.assigned_user_ids,
         scenes=core_scene_inputs,
-        expected_version=payload.project.version,
+        expected_version=item.project.version,
         user=user,
     )
 

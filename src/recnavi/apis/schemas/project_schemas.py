@@ -14,6 +14,8 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 
@@ -220,24 +222,13 @@ class ProjectInput(BaseModel):
     )
 
 
-class UpdateProjectRequest(BaseModel):
+class UpdateProjectRequest(BaseItemModel):
     """Request payload for POST /updateProject."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
 
     project: ProjectInput = Field(..., description="Project data to update")
 
 
-class UpdateProjectResponse(BaseModel):
+class UpdateProjectResponse(BaseApiResponseModel):
     """Response for POST /updateProject."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    status: str = Field(default="ok", description="Response status")
     project: Project = Field(..., description="Updated project")
