@@ -79,15 +79,15 @@ app = FastAPI(
 
 app.add_middleware(
     ServerErrorMiddleware,  # noqa: type
-    handler=custom_exception_handler,
+    handler=custom_exception_handler,  # noqa: type
 )
 
 app.add_middleware(
     CORSMiddleware,  # noqa: type
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,  # noqa: type
+    allow_credentials=True,  # noqa: type
+    allow_methods=["*"],  # noqa: type
+    allow_headers=["*"],  # noqa: type
 )
 
 

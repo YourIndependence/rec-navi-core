@@ -3,6 +3,198 @@
 export default {
   rules: {
     /**
+     * Every application use case must have a focused unit test. The test is
+     * identified by its reference to the use-case function rather than by a
+     * rigid filename convention, because existing modules use both
+     * `test_<action>.py` and `test_<action>_<entity>.py` naming styles.
+     */
+    "every-application-usecase-has-unit-test": {
+      description:
+        "Every application use case must be referenced by a unit test under tests/unittests/application/.",
+      severity: "error",
+      check: async (ctx) => {
+        const applicationFiles = await ctx.glob(
+          "src/recnavi/application/**/*.py",
+        );
+        const testFiles = await ctx.glob(
+          "tests/unittests/application/**/*.py",
+        );
+        const testContents = await Promise.all(
+          testFiles.map(async (file) => ({
+            file,
+            content: await ctx.readFile(file),
+          })),
+        );
+
+        for (const file of applicationFiles) {
+          const content = await ctx.readFile(file);
+          for (const match of content.matchAll(
+            /async\s+def\s+(\w+_usecase)\s*\(/g,
+          )) {
+            const useCaseName = match[1];
+            if (
+              testContents.some(({ content: testContent }) =>
+                testContent.includes(useCaseName),
+              )
+            ) {
+              continue;
+            }
+
+            ctx.report.violation({
+              message:
+                `Application use case '${useCaseName}' has no corresponding unit test under tests/unittests/application/.`,
+              file,
+              line: content.slice(0, match.index ?? 0).split("\n").length,
+              fix: `Add a unit test that references '${useCaseName}' under tests/unittests/application/.`,
+            });
+          }
+        }
+      },
+    },
+
+    /**
+     * Application use-case tests must isolate the core collaborator at the
+     * import binding used by the application module.
+     */
+    "application-usecase-must-patch-core-collaborator": {
+      description:
+        "Application use-case unit tests must patch the core collaborator at the application's import binding.",
+      severity: "error",
+      check: async (ctx) => {
+        const applicationFiles = await ctx.glob(
+          "src/recnavi/application/**/*.py",
+        );
+        const testFiles = await ctx.glob(
+          "tests/unittests/application/**/*.py",
+        );
+        const testContents = await Promise.all(
+          testFiles.map(async (file) => ({
+            file,
+            content: await ctx.readFile(file),
+          })),
+        );
+
+        for (const file of applicationFiles) {
+          const content = await ctx.readFile(file);
+          const useCaseNames = [
+            ...content.matchAll(/async\s+def\s+(\w+_usecase)\s*\(/g),
+          ].map((match) => match[1]);
+          if (useCaseNames.length === 0) continue;
+
+          const coreCollaborators = [
+            ...content.matchAll(
+              /from\s+(recnavi\.core(?:\.[\w]+)+)\s+import\s+([a-z_]\w*)/g,
+            ),
+          ]
+            .map((match) => match[2])
+            .filter((name) =>
+              new RegExp(`\\b${name}\\s*\\(`).test(content),
+            );
+          if (coreCollaborators.length === 0) continue;
+
+          const modulePath = file
+            .replace(/^src\\?\//, "")
+            .replace(/\.py$/, "")
+            .replace(/[\\/]/g, ".");
+
+          for (const useCaseName of useCaseNames) {
+            const matchingTests = testContents.filter(({ content: testContent }) =>
+              testContent.includes(useCaseName),
+            );
+            if (matchingTests.length === 0) continue;
+            for (const collaborator of coreCollaborators) {
+              const patchPattern = new RegExp(
+                `patch\\s*\\(\\s*["']${modulePath}\\.${collaborator}["']`,
+              );
+              if (
+                matchingTests.some(({ content: testContent }) =>
+                  patchPattern.test(testContent),
+                )
+              ) {
+                continue;
+              }
+
+              const testFile = matchingTests[0].file;
+              const testContent = matchingTests[0]?.content ?? "";
+              const useCaseLine = testContent
+                ? testContent
+                    .split("\n")
+                    .findIndex((line) => line.includes(useCaseName)) + 1
+                : 1;
+              ctx.report.violation({
+                message:
+                  `Application use-case test for '${useCaseName}' does not patch core collaborator '${collaborator}' at '${modulePath}.${collaborator}'.`,
+                file: testFile,
+                line: useCaseLine > 0 ? useCaseLine : 1,
+                fix: `Patch '${modulePath}.${collaborator}' with AsyncMock in the application use-case test.`,
+              });
+            }
+          }
+        }
+      },
+    },
+
+    /**
+     * A patched core collaborator must have its returned value propagated by
+     * the application use case without reconstructing or replacing it.
+     */
+    "application-usecase-must-propagate-mock-output": {
+      description:
+        "Application use-case tests must verify that a patched collaborator's output is returned unchanged.",
+      severity: "error",
+      check: async (ctx) => {
+        const applicationFiles = await ctx.glob(
+          "src/recnavi/application/**/*.py",
+        );
+        const testFiles = await ctx.glob(
+          "tests/unittests/application/**/*.py",
+        );
+        const testContents = await Promise.all(
+          testFiles.map(async (file) => ({
+            file,
+            content: await ctx.readFile(file),
+          })),
+        );
+
+        for (const applicationFile of applicationFiles) {
+          const applicationContent = await ctx.readFile(applicationFile);
+          const useCaseNames = [
+            ...applicationContent.matchAll(/async\s+def\s+(\w+_usecase)\s*\(/g),
+          ].map((match) => match[1]);
+
+          for (const useCaseName of useCaseNames) {
+            for (const { file, content } of testContents) {
+              if (!content.includes(useCaseName)) continue;
+
+              const returnedValues = [
+                ...content.matchAll(
+                  /AsyncMock\s*\(\s*return_value\s*=\s*(\w+)/g,
+                ),
+              ].map((match) => match[1]);
+              const hasPropagationAssertion = returnedValues.some((value) =>
+                new RegExp(
+                  `assert\\s+result\\s+(?:is|==)\\s+${value}\\b`,
+                ).test(content),
+              );
+              if (hasPropagationAssertion) continue;
+
+              const line = content
+                .split("\n")
+                .findIndex((currentLine) => currentLine.includes(useCaseName));
+              ctx.report.violation({
+                message:
+                  `Application use-case test for '${useCaseName}' does not verify unchanged propagation of the core collaborator output.`,
+                file,
+                line: line >= 0 ? line + 1 : 1,
+                fix: "Patch the core collaborator with AsyncMock(return_value=expected_output) and assert that the use-case result is or equals expected_output.",
+              });
+            }
+          }
+        }
+      },
+    },
+
+    /**
      * Every FastAPI endpoint must be exercised by an integration test.
      * This source/test topology check catches a new route being added without
      * the corresponding HTTP-boundary test.

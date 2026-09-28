@@ -24,9 +24,6 @@ async def get_projects(
 ) -> tuple[list[Project], str | None]:
     """Get projects for a group with pagination.
 
-    Queries the projects table GSI1 (groupId + createdAt) in descending order
-    to return newest projects first.
-
     Args:
         projects_db: Database instance for projects table.
         group_id: Group identifier (from authenticated user token).

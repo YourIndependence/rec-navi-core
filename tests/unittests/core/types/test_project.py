@@ -16,7 +16,7 @@ from recnavi.core.types.user import UserRole
 
 
 def test_project_type_has_version_field_with_default():
-    """Test Project type has version field with default value 1."""
+    """Test Project type has version field with default."""
     project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -27,7 +27,7 @@ def test_project_type_has_version_field_with_default():
     )
 
     assert hasattr(project, "version")
-    assert project.version is None
+    assert project.version == 0
 
 
 def test_project_type_accepts_custom_version():

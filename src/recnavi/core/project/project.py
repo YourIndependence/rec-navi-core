@@ -12,7 +12,7 @@
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 
 
@@ -22,7 +22,7 @@ async def get_project(
     project_id: str,
     user: User,
 ) -> Project:
-    """Get project if user is authorized."""
+    """Get project."""
     item = await projects_db.get_item(key={"projectId": project_id})
 
     if not item:
@@ -33,6 +33,6 @@ async def get_project(
     if project.is_accessible(user=user):
         return project
 
-    raise ClientAuthorizationError(
-        "User does not have access to this project",
+    raise ClientPermissionError(
+        "User does not have access permission to this project",
     )

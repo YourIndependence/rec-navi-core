@@ -39,3 +39,24 @@ class GetProjectResponse(BaseApiResponseModel):
 
     status: str = Field(default="ok", description="Response status")
     project: Project = Field(..., description="Project with all scenes")
+
+
+class CreateProjectRequest(BaseApiResponseModel):
+    """Request payload for POST /createProject."""
+
+    project_name: str = Field(..., description="Name shown to members")
+    description: str = Field(default="", description="Free text notes")
+    scene_principals: list[str] = Field(
+        ...,
+        description="Scene principals expanded by client",
+    )
+    assigned_user_ids: list[str] = Field(
+        default_factory=list,
+        description="Staff assigned to the project",
+    )
+
+
+class CreateProjectResponse(BaseApiResponseModel):
+    """Response for POST /createProject."""
+
+    project: Project = Field(..., description="Created project")

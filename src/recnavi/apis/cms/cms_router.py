@@ -15,21 +15,21 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import CreateProjectRequest
+from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
-from recnavi.application.project.get_projects_usecase import (
-    get_projects_usecase,
-)
-from recnavi.application.scene.get_scene_masters_usecase import (
+from recnavi.application.project.create_project import create_project_usecase
+from recnavi.application.project.get_project import get_project_usecase
+from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
-from recnavi.application.scene.get_templates_usecase import (
-    get_templates_usecase,
-)
+from recnavi.application.scene.get_templates import get_templates_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -106,14 +106,33 @@ async def get_project_endpoint(
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
-    from recnavi.application.project.get_project import get_project_use_case
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    project = await get_project_use_case(
+    project = await get_project_usecase(
         projects_db=projects_db,
         project_id=payload.project_id,
         user=user,
     )
 
     return GetProjectResponse(project=project)
+
+
+@cms_router.post("/createProject")
+async def create_project_endpoint(
+    request: Request,
+    payload: CreateProjectRequest,
+    user: User = Depends(verify_user),
+) -> CreateProjectResponse:
+    """Create a new project."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project = await create_project_usecase(
+        projects_db=projects_db,
+        project_name=payload.project_name,
+        description=payload.description,
+        scene_principals=payload.scene_principals,
+        assigned_user_ids=payload.assigned_user_ids,
+        owner=user,
+    )
+
+    return CreateProjectResponse(project=project)

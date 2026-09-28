@@ -43,7 +43,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 @pytest.fixture(scope="session", autouse=True)
 def client():
     """FastAPI test client with CI infrastructure and auth isolation."""
-    app.dependency_overrides[verify_user] = get_mock_x_user
+    app.dependency_overrides[verify_user] = mock_verify_user
 
     with TestClient(app, raise_server_exceptions=False) as client:
         mock_infrastracture_injection_when_ci(app)
@@ -79,7 +79,16 @@ def mock_x_user() -> User:
     return get_mock_x_user()
 
 
-def get_mock_x_user(request: Request):
+def get_mock_x_user() -> User:
+    return User(
+        user_id="test-user-123",
+        user_name="Test User",
+        role=UserRole.ADMIN,
+        group_id="it-group",
+    )
+
+
+def mock_verify_user(request: Request) -> User:
     authorization = request.headers.get("authorization")
     if not authorization:
         raise ClientPermissionError("Authorization header is required.")
@@ -87,9 +96,4 @@ def get_mock_x_user(request: Request):
         raise ClientPermissionError(
             "Authorization header must start with 'Bearer '",
         )
-    return User(
-        user_id="test-user-123",
-        user_name="Test User",
-        role=UserRole.ADMIN,
-        group_id="it-group",
-    )
+    return get_mock_x_user()
