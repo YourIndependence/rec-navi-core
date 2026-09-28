@@ -62,7 +62,54 @@ attribute exists on the target object. When a collaborator is instantiated
 inside a method, patch the class at its import binding instead of an instance
 attribute that may not exist.
 
-### 6. AWS Resource Cleanup
+### 6. Application Use-Case Tests
+
+Application use cases are responsible for orchestration and delegation. When a
+use case delegates to a core function, its unit test should isolate the core
+collaborator and verify only the application-layer contract:
+
+1. The core collaborator is called once with the intended arguments.
+2. The value returned by the core collaborator is returned unchanged by the
+   use case.
+
+Application tests should not duplicate core-layer domain behavior, such as
+project construction, authorization rules, scene generation, or persistence
+serialization. Those behaviors belong in core-layer tests. Persistence and
+component wiring belong in integration tests when they need to be verified
+together.
+
+Patch the collaborator at the import binding used by the application module,
+not necessarily at the collaborator's definition module. For example:
+
+```python
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
+import pytest
+
+from application.foo import hoge_usecase
+
+
+@pytest.mark.asyncio
+async def test_hoge_usecase_delegates_to_core():
+    expected_output = object()
+    with patch(
+        "application.foo.hoge_function",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_hoge_function:
+        result = await hoge_usecase(
+            key_1="val_1",
+            key_2="val_2",
+        )
+
+    mock_hoge_function.assert_awaited_once_with(
+        key_1="val_1",
+        key_2="val_2",
+    )
+    assert result is expected_output
+```
+
+### 7. AWS Resource Cleanup
 
 Integration tests outside CI may access real AWS resources. Tests that create
 temporary AWS resources or data must clean them up reliably. Temporary AWS
@@ -96,6 +143,9 @@ source inspection.
 
 The following implementation rules are active:
 
+- `every-application-usecase-has-unit-test`
+- `application-usecase-must-patch-core-collaborator`
+- `application-usecase-must-propagate-mock-output`
 - `every-api-endpoint-has-integration-test`
 - `no-patch-in-integration-tests`
 - `no-monkeypatch-setattr-component-in-integration`
@@ -117,6 +167,8 @@ violated.
 - Use `@pytest_asyncio.fixture` for asynchronous fixtures
 - Use `module` or `session` scope for expensive shared fixtures
 - Mock outbound HTTP in unit tests
+- In application use-case unit tests, isolate core collaborators and verify
+  intended calls and unchanged return-value propagation
 - Verify private attributes before patching them
 - Prefix temporary AWS resource names with `it_`
 - Inject module-owned test data and clean it up with `fixture + yield + cleanup`
@@ -128,6 +180,7 @@ violated.
 - Define reusable `Base*` mock classes inside test files
 - Recreate database tables, HTTP clients, or indexes per test unnecessarily
 - Make unit tests call real external URLs
+- Duplicate core-layer domain behavior in application use-case tests
 - Assume a private attribute exists merely because it has an underscore prefix
 - Leave temporary AWS resources or injected test data behind after integration tests
 

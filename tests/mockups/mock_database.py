@@ -12,6 +12,7 @@
 from typing import Any
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.database.base_database import DatabaseQueryResult
 
 
 class MockDatabase(BaseDatabase):
@@ -116,7 +117,7 @@ class MockDatabase(BaseDatabase):
         index: str | None = None,
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    ) -> DatabaseQueryResult:
         """Query items by key condition with optional pagination.
 
         Args:
@@ -127,8 +128,7 @@ class MockDatabase(BaseDatabase):
             exclusive_start_key: Primary key to start from (for pagination).
 
         Returns:
-            Tuple of (items, last_evaluated_key). last_evaluated_key is None
-            if there are no more items.
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         results = self._filter_items(key_condition, filter_expression)
@@ -154,7 +154,7 @@ class MockDatabase(BaseDatabase):
         results: list[dict[str, Any]],
         limit: int | None,
         exclusive_start_key: dict[str, Any] | None,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    ) -> DatabaseQueryResult:
         """Paginate query results with limit and exclusive start key."""
         start_index = self._find_start_index(results, exclusive_start_key)
 
@@ -168,7 +168,10 @@ class MockDatabase(BaseDatabase):
             paginated_results = results[start_index:]
             last_evaluated_key = None
 
-        return (paginated_results, last_evaluated_key)
+        return DatabaseQueryResult(
+            items=paginated_results,
+            last_evaluated_key=last_evaluated_key,
+        )
 
     def _find_start_index(
         self,
@@ -200,21 +203,27 @@ class MockDatabase(BaseDatabase):
     async def scan(
         self,
         filter_expression: dict[str, Any] | None = None,
-    ) -> list[dict[str, Any]]:
-        """Scan all items in the database.
+        limit: int | None = None,
+        exclusive_start_key: dict[str, Any] | None = None,
+    ) -> DatabaseQueryResult:
+        """Scan all items in the database with optional pagination.
 
         Args:
             filter_expression: Optional filter expression.
+            limit: Maximum number of items to return.
+            exclusive_start_key: Primary key to start from (for pagination).
 
         Returns:
-            List of all items (or matching the filter).
+            DatabaseQueryResult with items and optional last_evaluated_key.
 
         """
         if not filter_expression:
-            return self.items.copy()
+            results = self.items.copy()
+        else:
+            results = [
+                item
+                for item in self.items
+                if all(item.get(k) == v for k, v in filter_expression.items())
+            ]
 
-        return [
-            item
-            for item in self.items
-            if all(item.get(k) == v for k, v in filter_expression.items())
-        ]
+        return self._paginate_results(results, limit, exclusive_start_key)

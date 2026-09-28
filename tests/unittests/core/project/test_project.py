@@ -11,16 +11,17 @@
 
 import pytest
 
-from recnavi.core.project.project import get_project_if_authorized
+from recnavi.core.project.project import get_project
 from recnavi.core.types.user import User
-from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientNotFoundError
+from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_project_if_authorized_returns_project_for_owner():
-    """Test get_project_if_authorized returns project when user is owner."""
+async def test_get_project_returns_project_for_owner():
+    """Test get_project returns project when user is owner."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -42,14 +43,10 @@ async def test_get_project_if_authorized_returns_project_for_owner():
         user_id="user-789",
         user_name="Test Owner",
         group_id="group-456",
-        role="owner",
-        email="owner@test.com",
-        phone_number="000-0000-0000",
-        birthday="1990-01-01",
-        profile_image_uri="s3://bucket/profile.jpg",
+        role=UserRole.OWNER,
     )
 
-    project = await get_project_if_authorized(
+    project = await get_project(
         projects_db=projects_db,
         project_id="proj-123",
         user=user,
@@ -61,8 +58,8 @@ async def test_get_project_if_authorized_returns_project_for_owner():
 
 
 @pytest.mark.asyncio
-async def test_get_project_if_authorized_returns_project_for_assigned_staff():
-    """Test get_project_if_authorized returns project for assigned staff."""
+async def test_get_project_returns_project_for_assigned_staff():
+    """Test get_project returns project for assigned staff."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -81,17 +78,13 @@ async def test_get_project_if_authorized_returns_project_for_assigned_staff():
     )
 
     user = User(
-        user_id="user-002",  # Assigned staff
+        user_id="user-002",
         user_name="Test Staff",
         group_id="group-789",
-        role="staff",
-        email="staff@test.com",
-        phone_number="000-0000-0001",
-        birthday="1995-01-01",
-        profile_image_uri="s3://bucket/staff.jpg",
+        role=UserRole.STAFF,
     )
 
-    project = await get_project_if_authorized(
+    project = await get_project(
         projects_db=projects_db,
         project_id="proj-456",
         user=user,
@@ -103,23 +96,22 @@ async def test_get_project_if_authorized_returns_project_for_assigned_staff():
 
 
 @pytest.mark.asyncio
-async def test_get_project_if_authorized_raises_404_for_missing_project():
-    """Test get_project_if_authorized raises 404 when project does not exist."""
+async def test_get_project_raises_404_for_missing_project():
+    """Test get_project raises 404 when project does not exist."""
     projects_db = MockDatabase(initial_items=[])
 
     user = User(
         user_id="user-123",
         user_name="Test User",
         group_id="group-456",
-        role="owner",
-        email="test@test.com",
-        phone_number="000-0000-0002",
-        birthday="1992-01-01",
-        profile_image_uri="s3://bucket/user.jpg",
+        role=UserRole.OWNER,
     )
 
-    with pytest.raises(ClientNotFoundError, match="Project not found"):
-        await get_project_if_authorized(
+    with pytest.raises(
+        ClientResourcesNotFoundError,
+        match="Project not found",
+    ):
+        await get_project(
             projects_db=projects_db,
             project_id="nonexistent-project",
             user=user,
@@ -127,8 +119,8 @@ async def test_get_project_if_authorized_raises_404_for_missing_project():
 
 
 @pytest.mark.asyncio
-async def test_get_project_if_authorized_raises_403_for_other_group():
-    """Test get_project_if_authorized raises 403 for other group's project."""
+async def test_get_project_raises_403_for_other_group():
+    """Test get_project raises 403 for other group's project."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -149,19 +141,15 @@ async def test_get_project_if_authorized_raises_403_for_other_group():
     user = User(
         user_id="user-bbb",
         user_name="User BBB",
-        group_id="group-bbb",  # Different group
-        role="owner",
-        email="bbb@test.com",
-        phone_number="000-0000-0003",
-        birthday="1993-01-01",
-        profile_image_uri="s3://bucket/bbb.jpg",
+        group_id="group-bbb",
+        role=UserRole.OWNER,
     )
 
     with pytest.raises(
-        ClientAuthorizationError,
-        match="Access to other group's project",
+        ClientPermissionError,
+        match="User does not have access",
     ):
-        await get_project_if_authorized(
+        await get_project(
             projects_db=projects_db,
             project_id="proj-999",
             user=user,
@@ -169,8 +157,8 @@ async def test_get_project_if_authorized_raises_403_for_other_group():
 
 
 @pytest.mark.asyncio
-async def test_get_project_if_authorized_raises_403_for_non_assigned_user():
-    """Test get_project_if_authorized raises 403 for non-assigned same-group user."""
+async def test_get_project_raises_403_for_non_assigned_user():
+    """Test get_project raises 403 for non-assigned same-group user."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -189,21 +177,17 @@ async def test_get_project_if_authorized_raises_403_for_non_assigned_user():
     )
 
     user = User(
-        user_id="user-staff-3",  # Same group but not assigned
+        user_id="user-staff-3",
         user_name="Staff 3",
         group_id="group-ccc",
-        role="staff",
-        email="staff3@test.com",
-        phone_number="000-0000-0004",
-        birthday="1994-01-01",
-        profile_image_uri="s3://bucket/staff3.jpg",
+        role=UserRole.STAFF,
     )
 
     with pytest.raises(
-        ClientAuthorizationError,
-        match="not the owner or assigned staff",
+        ClientPermissionError,
+        match="User does not have access",
     ):
-        await get_project_if_authorized(
+        await get_project(
             projects_db=projects_db,
             project_id="proj-777",
             user=user,

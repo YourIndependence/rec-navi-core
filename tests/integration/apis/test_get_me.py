@@ -43,5 +43,5 @@ def test_get_me_with_real_aws(client, auth_headers):
     user = data["user"]
     assert user["userId"] == "test-user-123"
     assert user["userName"] == "Test User"
-    assert user["groupId"] == "group-999"
+    assert user["groupId"] == "it-group"
     assert user["role"] == "admin"
