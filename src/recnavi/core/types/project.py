@@ -18,6 +18,7 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.core.types.scene import Scene
+from recnavi.core.types.user import User
 
 
 class ProjectStatus(StrEnum):
@@ -73,3 +74,13 @@ class Project(BaseModel):
         default=None,
         description="Datetime the project was created",
     )
+
+    def is_accessible(self, *, user: User) -> bool:
+        """Check if user can access this project."""
+        if self.group_id != user.group_id:
+            return False
+
+        is_owner = self.owner_user_id == user.user_id
+        is_assigned_staff = user.user_id in self.assigned_user_ids
+
+        return is_owner or is_assigned_staff

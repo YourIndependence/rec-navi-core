@@ -26,3 +26,16 @@ class GetProjectsResponse(BaseApiResponseModel):
         None,
         description="Opaque pagination cursor. None if last page.",
     )
+
+
+class GetProjectRequest(BaseApiResponseModel):
+    """Request payload for POST /getProject."""
+
+    project_id: str = Field(..., description="Project ID to retrieve")
+
+
+class GetProjectResponse(BaseApiResponseModel):
+    """Response for POST /getProject."""
+
+    status: str = Field(default="ok", description="Response status")
+    project: Project = Field(..., description="Project with all scenes")

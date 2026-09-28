@@ -15,6 +15,8 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import GetProjectRequest
+from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
@@ -95,3 +97,23 @@ async def get_projects_endpoint(
         projects=projects,
         next_cursor=next_cursor,
     )
+
+
+@cms_router.post("/getProject")
+async def get_project_endpoint(
+    request: Request,
+    payload: GetProjectRequest,
+    user: User = Depends(verify_user),
+) -> GetProjectResponse:
+    """Get a project with all scenes."""
+    from recnavi.application.project.get_project import get_project_use_case
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project = await get_project_use_case(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        user=user,
+    )
+
+    return GetProjectResponse(project=project)
