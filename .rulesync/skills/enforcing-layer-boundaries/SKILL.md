@@ -97,7 +97,7 @@ async def get_projects_endpoint(
         cursor=cursor,
     )
     return GetProjectsResponse(
-        projects=[ProjectSummaryView(...) for p in projects],
+        projects=projects,
         next_cursor=next_cursor,
     )
 ```

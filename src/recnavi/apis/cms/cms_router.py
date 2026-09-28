@@ -22,7 +22,6 @@ from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
@@ -30,19 +29,17 @@ from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
-from recnavi.application.project.get_projects_usecase import (
-    get_projects_usecase,
-)
-from recnavi.application.scene.get_scene_masters_usecase import (
+from recnavi.application.project.create_project import create_project_usecase
+from recnavi.application.project.get_project import get_project_usecase
+from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
-from recnavi.application.scene.get_templates_usecase import (
-    get_templates_usecase,
-)
+from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
-from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
 
 
@@ -103,20 +100,8 @@ async def get_projects_endpoint(
         cursor=cursor,
     )
 
-    project_views = [
-        ProjectSummaryView(
-            project_id=p.project_id,
-            project_name=p.project_name,
-            description=p.description,
-            owner_user_id=p.owner_user_id,
-            created_at=p.created_at,
-            status=p.status,
-        )
-        for p in projects
-    ]
-
     return GetProjectsResponse(
-        projects=project_views,
+        projects=projects,
         next_cursor=next_cursor,
     )
 
@@ -124,74 +109,36 @@ async def get_projects_endpoint(
 @cms_router.post("/getProject")
 async def get_project_endpoint(
     request: Request,
-    payload: GetProjectRequest,
+    item: GetProjectRequest,
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
-    from recnavi.apis.schemas.project_schemas import ProjectView
-    from recnavi.apis.schemas.project_schemas import SceneView
-    from recnavi.application.project.get_project import get_project_use_case
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    project, scene_urls = await get_project_use_case(
+    project = await get_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project_id,
+        project_id=item.project_id,
         user=user,
-        video_bucket_name=VIDEO_BUCKET_NAME,
     )
 
-    scene_views = [
-        SceneView(
-            scene_id=scene.scene_id,
-            scene_principal=scene.scene_principal,
-            status=scene.status.value,
-            video_url=scene_urls[scene.scene_id]["video_url"],
-            thumbnail_url=scene_urls[scene.scene_id]["thumbnail_url"],
-            created_by=scene.created_by,
-            created_at=scene.created_at,
-            assigned_at=scene.assigned_at,
-            assigned_user_ids=scene.assigned_user_ids,
-        )
-        for scene in project.scenes
-    ]
-
-    project_view = ProjectView(
-        project_id=project.project_id,
-        group_id=project.group_id,
-        project_name=project.project_name,
-        description=project.description,
-        owner_user_id=project.owner_user_id,
-        assigned_user_ids=project.assigned_user_ids,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        status=project.status,
-        version=project.version,
-        scenes=scene_views,
-    )
-
-    return GetProjectResponse(project=project_view)
+    return GetProjectResponse(project=project)
 
 
 @cms_router.post("/createProject")
 async def create_project_endpoint(
     request: Request,
-    payload: CreateProjectRequest,
+    item: CreateProjectRequest,
     user: User = Depends(verify_user),
 ) -> CreateProjectResponse:
     """Create a new project."""
-    from recnavi.application.project.create_project import (
-        create_project_usecase,
-    )
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     project = await create_project_usecase(
         projects_db=projects_db,
-        project_name=payload.project_name,
-        description=payload.description,
-        scene_principals=payload.scene_principals,
-        assigned_user_ids=payload.assigned_user_ids,
+        project_name=item.project_name,
+        description=item.description,
+        scene_principals=item.scene_principals,
+        assigned_user_ids=item.assigned_user_ids,
         owner=user,
     )
 
@@ -201,7 +148,7 @@ async def create_project_endpoint(
 @cms_router.post("/updateProject")
 async def update_project_endpoint(
     request: Request,
-    payload: UpdateProjectRequest,
+    item: UpdateProjectRequest,
     user: User = Depends(verify_user),
 ) -> UpdateProjectResponse:
     """Update project with optimistic locking."""
@@ -218,17 +165,17 @@ async def update_project_endpoint(
             scene_principal=scene.scene_principal,
             assigned_user_ids=scene.assigned_user_ids,
         )
-        for scene in payload.project.scenes
+        for scene in item.project.scenes
     ]
 
     updated_project = await update_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project.project_id,
-        project_name=payload.project.project_name,
-        description=payload.project.description,
-        assigned_user_ids=payload.project.assigned_user_ids,
+        project_id=item.project.project_id,
+        project_name=item.project.project_name,
+        description=item.project.description,
+        assigned_user_ids=item.project.assigned_user_ids,
         scenes=core_scene_inputs,
-        expected_version=payload.project.version,
+        expected_version=item.project.version,
         user=user,
     )
 
@@ -238,7 +185,7 @@ async def update_project_endpoint(
 @cms_router.post("/deleteProject")
 async def delete_project_endpoint(
     request: Request,
-    payload: DeleteProjectRequest,
+    item: DeleteProjectRequest,
     user: User = Depends(verify_user),
 ) -> DeleteProjectResponse:
     """Delete a project and its recordings."""
@@ -250,9 +197,9 @@ async def delete_project_endpoint(
 
     project_id = await delete_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project_id,
+        project_id=item.project_id,
         user=user,
-        video_bucket_name=VIDEO_BUCKET_NAME,
+        video_bucket_name=MEDIA_BUCKET_NAME,
     )
 
     return DeleteProjectResponse(project_id=project_id)
@@ -261,7 +208,7 @@ async def delete_project_endpoint(
 @cms_router.post("/reviewScene")
 async def review_scene_endpoint(
     request: Request,
-    payload: ReviewSceneRequest,
+    item: ReviewSceneRequest,
     user: User = Depends(verify_user),
 ) -> ReviewSceneResponse:
     """Review a recorded scene (owner-only operation)."""
@@ -273,10 +220,10 @@ async def review_scene_endpoint(
 
     updated_project = await review_scene_usecase(
         projects_db=projects_db,
-        project_id=payload.project_id,
-        scene_id=payload.scene_id,
-        result=payload.result,
-        review_comment=payload.comment,
+        project_id=item.project_id,
+        scene_id=item.scene_id,
+        result=item.result,
+        review_comment=item.comment,
         user=user,
     )
 

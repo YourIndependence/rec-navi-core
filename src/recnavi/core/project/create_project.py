@@ -13,17 +13,19 @@ from datetime import UTC
 from datetime import datetime
 from uuid import uuid4
 
+from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientPermissionError
 
 
-def create_project(
+async def create_project(
     *,
+    projects_db: BaseDatabase,
     project_name: str,
     description: str,
     scene_principals: list[str],
@@ -31,8 +33,8 @@ def create_project(
     owner: User,
 ) -> Project:
     """Create a new project with scenes."""
-    if owner.role != UserRole.OWNER:
-        raise ClientAuthorizationError("Only owners can create projects")
+    if owner.role not in [UserRole.OWNER, UserRole.ADMIN]:
+        raise ClientPermissionError("Only owners can create projects")
 
     project_id = str(uuid4())
     now = datetime.now(UTC).isoformat()
@@ -47,7 +49,7 @@ def create_project(
         for principal in scene_principals
     ]
 
-    return Project(
+    project = Project(
         project_id=project_id,
         group_id=owner.group_id,
         project_name=project_name,
@@ -60,3 +62,7 @@ def create_project(
         version=0,
         scenes=scenes,
     )
+
+    await projects_db.put_item(project.model_dump(by_alias=True))
+
+    return project

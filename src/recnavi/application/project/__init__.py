@@ -12,9 +12,6 @@
 from recnavi.application.project.delete_project_usecase import (
     delete_project_usecase,
 )
-from recnavi.application.project.get_my_projects_usecase import (
-    get_my_projects_usecase,
-)
 from recnavi.application.project.update_project_usecase import (
     update_project_usecase,
 )
@@ -22,6 +19,5 @@ from recnavi.application.project.update_project_usecase import (
 
 __all__ = [
     "delete_project_usecase",
-    "get_my_projects_usecase",
     "update_project_usecase",
 ]
