@@ -11,17 +11,17 @@
 
 import pytest
 
-from recnavi.application.project.get_project import get_project_use_case
+from recnavi.application.project.get_project import get_project_usecase
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientPermissionError
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_project_use_case_returns_project():
-    """Test get_project_use_case returns Project."""
+async def test_get_project_usecase_returns_project():
+    """Test get_project_usecase returns Project."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -59,7 +59,7 @@ async def test_get_project_use_case_returns_project():
         role=UserRole.OWNER,
     )
 
-    project = await get_project_use_case(
+    project = await get_project_usecase(
         projects_db=projects_db,
         project_id="proj-123",
         user=user,
@@ -76,8 +76,8 @@ async def test_get_project_use_case_returns_project():
 
 
 @pytest.mark.asyncio
-async def test_get_project_use_case_propagates_authorization_error():
-    """Test get_project_use_case propagates authorization errors from Core layer."""
+async def test_get_project_usecase_propagates_authorization_error():
+    """Test get_project_usecase propagates authorization errors from Core layer."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -104,10 +104,10 @@ async def test_get_project_use_case_propagates_authorization_error():
     )
 
     with pytest.raises(
-        ClientAuthorizationError,
+        ClientPermissionError,
         match="User does not have access",
     ):
-        await get_project_use_case(
+        await get_project_usecase(
             projects_db=projects_db,
             project_id="proj-999",
             user=user,

@@ -70,8 +70,8 @@ class Project(BaseModel):
         default=None,
         description="Datetime the project was created",
     )
-    version: str | int | None = Field(
-        default=None,
+    version: int = Field(
+        default=0,
         description="Datetime the project was created",
     )
 

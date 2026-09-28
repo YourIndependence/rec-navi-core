@@ -15,7 +15,7 @@ from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 
 
-async def get_project_use_case(
+async def get_project_usecase(
     *,
     projects_db: BaseDatabase,
     project_id: str,

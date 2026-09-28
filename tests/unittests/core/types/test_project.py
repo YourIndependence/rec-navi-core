@@ -27,7 +27,7 @@ def test_project_type_has_version_field_with_default():
     )
 
     assert hasattr(project, "version")
-    assert project.version is None
+    assert project.version == 0
 
 
 def test_project_type_accepts_custom_version():
