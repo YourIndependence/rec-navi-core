@@ -16,7 +16,7 @@ from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientPermissionError
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -220,7 +220,7 @@ async def test_create_project_raises_403_for_staff(projects_db: MockDatabase):
     )
 
     with pytest.raises(
-        ClientAuthorizationError,
+        ClientPermissionError,
         match="Only owners can create projects",
     ):
         await create_project(

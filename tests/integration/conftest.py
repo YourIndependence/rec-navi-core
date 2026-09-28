@@ -79,7 +79,7 @@ def mock_x_user() -> User:
     return get_mock_x_user()
 
 
-def get_mock_x_user():
+def get_mock_x_user() -> User:
     return User(
         user_id="test-user-123",
         user_name="Test User",
@@ -88,7 +88,7 @@ def get_mock_x_user():
     )
 
 
-def mock_verify_user(request: Request):
+def mock_verify_user(request: Request) -> User:
     authorization = request.headers.get("authorization")
     if not authorization:
         raise ClientPermissionError("Authorization header is required.")
@@ -96,4 +96,4 @@ def mock_verify_user(request: Request):
         raise ClientPermissionError(
             "Authorization header must start with 'Bearer '",
         )
-    return get_mock_x_user
+    return get_mock_x_user()

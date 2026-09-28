@@ -9,106 +9,42 @@
 
 """Tests for get_project use case."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
 import pytest
 
 from recnavi.application.project.get_project import get_project_usecase
-from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_project_usecase_returns_project():
-    """Test get_project_usecase returns Project."""
-    projects_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-123",
-                "groupId": "group-456",
-                "projectName": "Test Project",
-                "description": "Test description",
-                "ownerUserId": "user-789",
-                "assignedUserIds": [],
-                "createdAt": "2026-01-01T00:00:00Z",
-                "updatedAt": "2026-01-02T00:00:00Z",
-                "status": "in_progress",
-                "version": 1,
-                "scenes": [
-                    {
-                        "sceneId": "scene-001",
-                        "scenePrincipal": "opening",
-                        "status": "approve",
-                        "videoKey": "videos/scene-001.mp4",
-                        "thumbnailKey": "thumbnails/scene-001.jpg",
-                        "createdBy": "user-789",
-                        "createdAt": "2026-01-01T10:00:00Z",
-                        "assignedAt": "2026-01-01T09:00:00Z",
-                        "assignedUserIds": ["user-789"],
-                    },
-                ],
-            },
-        ],
-    )
-
+async def test_get_project_usecase_delegates_to_core():
+    """Test get_project_usecase delegates and returns the core output."""
+    projects_db = MockDatabase()
     user = User(
         user_id="user-789",
         user_name="Test User",
         group_id="group-456",
         role=UserRole.OWNER,
     )
+    expected_output = object()
 
-    project = await get_project_usecase(
+    with patch(
+        "recnavi.application.project.get_project.get_project",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_get_project:
+        result = await get_project_usecase(
+            projects_db=projects_db,
+            project_id="proj-123",
+            user=user,
+        )
+
+    mock_get_project.assert_awaited_with(
         projects_db=projects_db,
         project_id="proj-123",
         user=user,
     )
-
-    assert isinstance(project, Project)
-    assert project.project_id == "proj-123"
-    assert project.group_id == "group-456"
-    assert project.version == 1
-    assert len(project.scenes) == 1
-    assert project.scenes[0].scene_id == "scene-001"
-    assert project.scenes[0].video_key == "videos/scene-001.mp4"
-    assert project.scenes[0].thumbnail_key == "thumbnails/scene-001.jpg"
-
-
-@pytest.mark.asyncio
-async def test_get_project_usecase_propagates_authorization_error():
-    """Test get_project_usecase propagates authorization errors from Core layer."""
-    projects_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-999",
-                "groupId": "group-aaa",
-                "projectName": "Private Project",
-                "description": "",
-                "ownerUserId": "user-aaa",
-                "assignedUserIds": [],
-                "createdAt": "2026-01-01T00:00:00Z",
-                "updatedAt": "2026-01-01T00:00:00Z",
-                "status": "in_progress",
-                "version": 1,
-                "scenes": [],
-            },
-        ],
-    )
-
-    user = User(
-        user_id="user-bbb",
-        user_name="User BBB",
-        group_id="group-bbb",
-        role=UserRole.OWNER,
-    )
-
-    with pytest.raises(
-        ClientPermissionError,
-        match="User does not have access",
-    ):
-        await get_project_usecase(
-            projects_db=projects_db,
-            project_id="proj-999",
-            user=user,
-        )
+    assert result is expected_output
