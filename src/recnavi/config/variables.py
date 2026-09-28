@@ -32,7 +32,7 @@ TEMPLATES_TABLE_NAME = os.environ.get(
 )
 PROJECTS_TABLE_NAME = os.environ.get(
     "PROJECTS_TABLE_NAME",
-    "recnavi-local-projects",
+    "rec-navi-dev-projects",
 )
 
 APP_DOMAINS = "rec-navi.com"

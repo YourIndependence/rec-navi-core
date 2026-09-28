@@ -18,6 +18,7 @@ Other tests verify basic HTTP behavior without AWS dependencies.
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import cast
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -37,7 +38,7 @@ async def scene_master_data() -> AsyncIterator[dict[str, object]]:
         app.state.database,
     )[SCENES_TABLE_NAME]
     item = {
-        "scenePrincipal": "it_scene_master",
+        "scenePrincipal": f"it_{uuid4()}",
         "title": "Integration Test Scene",
         "thumbnailUri": "s3://it-test/thumbnail.jpg",
         "guideUri": "s3://it-test/guide.png",
@@ -62,7 +63,7 @@ async def template_data() -> AsyncIterator[dict[str, object]]:
         app.state.database,
     )[TEMPLATES_TABLE_NAME]
     item = {
-        "templateId": "it_template",
+        "templateId": f"it_{uuid4()}",
         "title": "Integration Test Template",
         "scenePrincipals": ["it_scene_master"],
         "thumbnailUri": "s3://it-test/template.jpg",
@@ -86,8 +87,8 @@ async def project_data() -> AsyncIterator[dict[str, object]]:
         app.state.database,
     )[PROJECTS_TABLE_NAME]
     item = {
-        "projectId": "it_project_001",
-        "groupId": "dummy_group_id",
+        "projectId": f"it_{uuid4()}",
+        "groupId": "it-group",
         "projectName": "Integration Test Project",
         "description": "Test project for integration testing",
         "ownerUserId": "dummy_user_id",
@@ -189,13 +190,4 @@ async def test_get_projects_returns_injected_project(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert {
-        "projectId": project_data["projectId"],
-        "groupId": project_data["groupId"],
-        "projectName": project_data["projectName"],
-        "description": project_data["description"],
-        "ownerUserId": project_data["ownerUserId"],
-        "assignedUserIds": project_data["assignedUserIds"],
-        "status": project_data["status"],
-        "version": project_data["version"],
-    } in data["projects"]
+    assert project_data in data["projects"]
