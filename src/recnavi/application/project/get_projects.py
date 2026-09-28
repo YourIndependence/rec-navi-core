@@ -18,14 +18,14 @@ async def get_projects_usecase(
     *,
     projects_db: BaseDatabase,
     group_id: str,
-    limit: int,
+    limit: int = 64,
     cursor: str | None,
 ) -> tuple[list[Project], str | None]:
     """List the projects a group can see, newest first.
 
     Args:
-        projects_db: Database instance for the projects table.
-        group_id: Group identifier taken from the authenticated user.
+        projects_db: Database instance.
+        group_id: User group identifier.
         limit: Maximum items per page.
         cursor: Opaque pagination cursor from the previous response.
 

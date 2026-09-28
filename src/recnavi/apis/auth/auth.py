@@ -72,7 +72,7 @@ async def decode_token(request: Request) -> dict[str, object]:
 
         payload = jwt.decode(
             token,
-            key,
+            key,  # noqa: type
             audience=client_id,
             issuer=f"https://cognito-idp.{REGION}.amazonaws.com/{COGNITO_USER_POOL_ID}",
             options={"verify_at_hash": False},
