@@ -14,8 +14,10 @@ from recnavi.core.types.scene_master import SceneMaster
 
 
 async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
-    """Retrieve all scene masters from the database.
+    """Retrieve all scene masters from the database."""
+    result = await scenes_db.scan()
 
+<<<<<<< HEAD
     This performs a full table scan. The scenes table is small (dozens of rows,
     shared across all tenants), so a scan is acceptable here.
 
@@ -53,3 +55,6 @@ async def get_scene_master_by_principal(
             return SceneMaster.model_validate(item)
 
     return None
+=======
+    return [SceneMaster.model_validate(item) for item in result.items]
+>>>>>>> origin/dev

@@ -18,5 +18,5 @@ async def get_scene_masters_usecase(
     *,
     scenes_db: BaseDatabase,
 ) -> list[SceneMaster]:
-    """Get list all scene masters."""
+    """List every scene master."""
     return await get_scene_masters(scenes_db=scenes_db)
