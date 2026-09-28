@@ -68,11 +68,11 @@ class Project(BaseModel):
     )
     updated_at: str | None = Field(
         default=None,
-        description="Datetime the project was created",
+        description="Datetime the project was last updated",
     )
     version: int = Field(
         default=0,
-        description="Datetime the project was created",
+        description="Optimistic lock version (incremented on each update)",
     )
 
     def is_accessible(self, *, user: User) -> bool:
