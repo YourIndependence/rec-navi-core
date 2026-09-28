@@ -11,6 +11,7 @@
 
 from pydantic import Field
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 
@@ -28,7 +29,7 @@ class GetProjectsResponse(BaseApiResponseModel):
     )
 
 
-class GetProjectRequest(BaseApiResponseModel):
+class GetProjectRequest(BaseItemModel):
     """Request payload for POST /getProject."""
 
     project_id: str = Field(..., description="Project ID to retrieve")
@@ -37,11 +38,10 @@ class GetProjectRequest(BaseApiResponseModel):
 class GetProjectResponse(BaseApiResponseModel):
     """Response for POST /getProject."""
 
-    status: str = Field(default="ok", description="Response status")
     project: Project = Field(..., description="Project with all scenes")
 
 
-class CreateProjectRequest(BaseApiResponseModel):
+class CreateProjectRequest(BaseItemModel):
     """Request payload for POST /createProject."""
 
     project_name: str = Field(..., description="Name shown to members")

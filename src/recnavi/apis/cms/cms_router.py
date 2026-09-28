@@ -102,7 +102,7 @@ async def get_projects_endpoint(
 @cms_router.post("/getProject")
 async def get_project_endpoint(
     request: Request,
-    payload: GetProjectRequest,
+    item: GetProjectRequest,
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
@@ -110,7 +110,7 @@ async def get_project_endpoint(
 
     project = await get_project_usecase(
         projects_db=projects_db,
-        project_id=payload.project_id,
+        project_id=item.project_id,
         user=user,
     )
 
@@ -120,7 +120,7 @@ async def get_project_endpoint(
 @cms_router.post("/createProject")
 async def create_project_endpoint(
     request: Request,
-    payload: CreateProjectRequest,
+    item: CreateProjectRequest,
     user: User = Depends(verify_user),
 ) -> CreateProjectResponse:
     """Create a new project."""
@@ -128,10 +128,10 @@ async def create_project_endpoint(
 
     project = await create_project_usecase(
         projects_db=projects_db,
-        project_name=payload.project_name,
-        description=payload.description,
-        scene_principals=payload.scene_principals,
-        assigned_user_ids=payload.assigned_user_ids,
+        project_name=item.project_name,
+        description=item.description,
+        scene_principals=item.scene_principals,
+        assigned_user_ids=item.assigned_user_ids,
         owner=user,
     )
 
