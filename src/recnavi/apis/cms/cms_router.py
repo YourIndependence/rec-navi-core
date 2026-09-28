@@ -20,7 +20,6 @@ from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
@@ -32,6 +31,9 @@ from recnavi.application.scene.get_scene_masters_usecase import (
 )
 from recnavi.application.scene.get_templates_usecase import (
     get_templates_usecase,
+)
+from recnavi.application.project.create_project import (
+    create_project_usecase,
 )
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
@@ -97,20 +99,8 @@ async def get_projects_endpoint(
         cursor=cursor,
     )
 
-    project_views = [
-        ProjectSummaryView(
-            project_id=p.project_id,
-            project_name=p.project_name,
-            description=p.description,
-            owner_user_id=p.owner_user_id,
-            created_at=p.created_at,
-            status=p.status,
-        )
-        for p in projects
-    ]
-
     return GetProjectsResponse(
-        projects=project_views,
+        projects=projects,
         next_cursor=next_cursor,
     )
 
@@ -122,49 +112,17 @@ async def get_project_endpoint(
     user: User = Depends(verify_user),
 ) -> GetProjectResponse:
     """Get a project with all scenes."""
-    from recnavi.apis.schemas.project_schemas import ProjectView
-    from recnavi.apis.schemas.project_schemas import SceneView
     from recnavi.application.project.get_project import get_project_use_case
 
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    project, scene_urls = await get_project_use_case(
+    project = await get_project_use_case(
         projects_db=projects_db,
         project_id=payload.project_id,
         user=user,
-        video_bucket_name=VIDEO_BUCKET_NAME,
     )
 
-    scene_views = [
-        SceneView(
-            scene_id=scene.scene_id,
-            scene_principal=scene.scene_principal,
-            status=scene.status.value,
-            video_url=scene_urls[scene.scene_id]["video_url"],
-            thumbnail_url=scene_urls[scene.scene_id]["thumbnail_url"],
-            created_by=scene.created_by,
-            created_at=scene.created_at,
-            assigned_at=scene.assigned_at,
-            assigned_user_ids=scene.assigned_user_ids,
-        )
-        for scene in project.scenes
-    ]
-
-    project_view = ProjectView(
-        project_id=project.project_id,
-        group_id=project.group_id,
-        project_name=project.project_name,
-        description=project.description,
-        owner_user_id=project.owner_user_id,
-        assigned_user_ids=project.assigned_user_ids,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-        status=project.status,
-        version=project.version,
-        scenes=scene_views,
-    )
-
-    return GetProjectResponse(project=project_view)
+    return GetProjectResponse(project=project)
 
 
 @cms_router.post("/createProject")
@@ -174,10 +132,6 @@ async def create_project_endpoint(
     user: User = Depends(verify_user),
 ) -> CreateProjectResponse:
     """Create a new project."""
-    from recnavi.application.project.create_project import (
-        create_project_usecase,
-    )
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     project = await create_project_usecase(

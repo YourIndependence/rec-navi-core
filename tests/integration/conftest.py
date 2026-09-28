@@ -23,6 +23,7 @@ from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.main import app
 from tests.mockups.mock_database import MockDatabase
@@ -89,6 +90,6 @@ def get_mock_x_user(request: Request):
     return User(
         user_id="test-user-123",
         user_name="Test User",
-        role="admin",
-        group_id="group-999",
+        role=UserRole.ADMIN,
+        group_id="it-group",
     )
