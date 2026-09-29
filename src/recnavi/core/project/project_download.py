@@ -33,21 +33,17 @@ def validate_project_for_download(
         ClientUnprocessableEntityError: Project has no scenes or not all approved.
 
     """
-    # Authorization: Owner-only operation
     if user.role != UserRole.OWNER:
         raise ClientAuthorizationError("forbidden")
 
-    # Group isolation
     if user.group_id != project.group_id:
         raise ClientAuthorizationError("forbidden")
 
-    # Validation: At least one scene
     if not project.scenes:
         raise ClientUnprocessableEntityError(
             "Project has no scenes. Cannot create archive.",
         )
 
-    # Validation: All scenes must be approved
     unapproved_scenes = [
         scene
         for scene in project.scenes
