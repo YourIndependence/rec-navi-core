@@ -31,20 +31,14 @@ TEMPLATES_TABLE_NAME = os.environ.get(
     "rec-navi-dev-scene-templates",
 )
 
-<<<<<<< HEAD
-VIDEO_BUCKET_NAME = os.environ.get(
-    "VIDEO_BUCKET_NAME",
-    "recnavi-local-videos",
+MEDIA_BUCKET_NAME = os.environ.get(
+    "MEDIA_BUCKET_NAME",
+    "rec-navi-dev-media",
 )
 
 SCENE_IMAGES_BUCKET_NAME = os.environ.get(
     "SCENE_IMAGES_BUCKET_NAME",
     "recnavi-scene-images-dev",
-=======
-MEDIA_BUCKET_NAME = os.environ.get(
-    "MEDIA_BUCKET_NAME",
-    "rec-navi-dev-media",
->>>>>>> origin/dev
 )
 
 APP_DOMAINS = "rec-navi.com"
