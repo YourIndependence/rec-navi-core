@@ -74,27 +74,6 @@ async def test_get_scene_masters_returns_injected_scene(
         "title": scene_master_data["title"],
         "maxDurationSeconds": scene_master_data["maxDurationSeconds"],
     } in data["scenes"]
-<<<<<<< HEAD:tests/integration/apis/test_cms.py
-
-
-@pytest.mark.asyncio
-async def test_get_templates_returns_injected_template(
-    client,
-    auth_headers,
-    template_data: dict[str, object],
-):
-    """Return the template injected for this integration test."""
-    response = client.get("/getTemplates", headers=auth_headers)
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert {
-        "templateId": template_data["templateId"],
-        "title": template_data["title"],
-        "scenePrincipals": template_data["scenePrincipals"],
-        "thumbnailUri": template_data["thumbnailUri"],
-    } in data["templates"]
 
 
 def test_download_project_returns_400_when_no_token(client):
@@ -104,7 +83,4 @@ def test_download_project_returns_400_when_no_token(client):
         json={"projectId": "proj-123"},
     )
 
-    # Expect 400 because Authorization header is missing
     assert response.status_code == 400
-=======
->>>>>>> origin/dev:tests/integration/apis/test_get_scene_masters.py

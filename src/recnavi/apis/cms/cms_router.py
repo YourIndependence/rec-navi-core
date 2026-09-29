@@ -15,28 +15,17 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
-<<<<<<< HEAD
-from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
-from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
-from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
-from recnavi.apis.schemas.scene_schemas import SceneMasterView
-from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
-from recnavi.application.project import download_project_usecase
-from recnavi.application.scene.get_scene_masters_usecase import (
-    get_scene_masters_usecase,
-)
-from recnavi.application.scene.get_templates_usecase import (
-    get_templates_usecase,
-)
-=======
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
+from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
+from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.application.project import download_project_usecase
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
@@ -44,11 +33,10 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
->>>>>>> origin/dev
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
-from recnavi.config.variables import VIDEO_BUCKET_NAME
 from recnavi.core.types.user import User
 
 
@@ -93,38 +81,6 @@ async def get_templates_endpoint(
     return GetTemplatesResponse(templates=templates)
 
 
-<<<<<<< HEAD
-@cms_router.post(
-    "/downloadProject",
-    response_model=DownloadProjectResponse,
-)
-async def download_project_endpoint(
-    request: Request,
-    item: DownloadProjectRequest,
-    user: User = Depends(verify_user),
-) -> DownloadProjectResponse:
-    """Download approved project as zip archive."""
-    from recnavi.core.types.project import Project
-    from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
-
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    project_item = await projects_db.get_item({"projectId": item.project_id})
-    if not project_item:
-        raise ClientResourcesNotFoundError(
-            f"Project '{item.project_id}' not found.",
-        )
-
-    project = Project.model_validate(project_item)
-
-    presigned_url = await download_project_usecase(
-        user=user,
-        project=project,
-        bucket_name=VIDEO_BUCKET_NAME,
-    )
-
-    return DownloadProjectResponse(download_url=presigned_url)
-=======
 @cms_router.get("/getProjects")
 async def get_projects_endpoint(
     request: Request,
@@ -184,4 +140,35 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
->>>>>>> origin/dev
+
+
+@cms_router.post(
+    "/downloadProject",
+    response_model=DownloadProjectResponse,
+)
+async def download_project_endpoint(
+    request: Request,
+    item: DownloadProjectRequest,
+    user: User = Depends(verify_user),
+) -> DownloadProjectResponse:
+    """Download approved project as zip archive."""
+    from recnavi.core.types.project import Project
+    from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project_item = await projects_db.get_item({"projectId": item.project_id})
+    if not project_item:
+        raise ClientResourcesNotFoundError(
+            f"Project '{item.project_id}' not found.",
+        )
+
+    project = Project.model_validate(project_item)
+
+    presigned_url = await download_project_usecase(
+        user=user,
+        project=project,
+        bucket_name=MEDIA_BUCKET_NAME,
+    )
+
+    return DownloadProjectResponse(download_url=presigned_url)

@@ -7,40 +7,12 @@
 # For internal use only.
 # developer team.
 
-<<<<<<< HEAD
-"""Project API schemas."""
-=======
 """Project-related API schemas."""
->>>>>>> origin/dev
 
 from pydantic import Field
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
-<<<<<<< HEAD
-
-
-class DownloadProjectRequest(BaseItemModel):
-    """Request schema for POST /downloadProject."""
-
-    project_id: str = Field(
-        ...,
-        alias="projectId",
-        description="Project identifier",
-    )
-
-
-class DownloadProjectResponse(BaseApiResponseModel):
-    """Response schema for POST /downloadProject."""
-
-    download_url: str = Field(
-        ...,
-        alias="downloadUrl",
-        description=(
-            "Presigned S3 URL for zip archive download (1-hour expiration)"
-        ),
-    )
-=======
 from recnavi.core.types.project import Project
 
 
@@ -88,4 +60,25 @@ class CreateProjectResponse(BaseApiResponseModel):
     """Response for POST /createProject."""
 
     project: Project = Field(..., description="Created project")
->>>>>>> origin/dev
+
+
+class DownloadProjectRequest(BaseItemModel):
+    """Request schema for POST /downloadProject."""
+
+    project_id: str = Field(
+        ...,
+        alias="projectId",
+        description="Project identifier",
+    )
+
+
+class DownloadProjectResponse(BaseApiResponseModel):
+    """Response schema for POST /downloadProject."""
+
+    download_url: str = Field(
+        ...,
+        alias="downloadUrl",
+        description=(
+            "Presigned S3 URL for zip archive download (1-hour expiration)"
+        ),
+    )
