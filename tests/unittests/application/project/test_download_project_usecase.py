@@ -29,6 +29,73 @@ from recnavi.core.types.user import UserRole
 
 
 @pytest.mark.asyncio
+async def test_download_project_usecase_delegates_validation_to_core():
+    """Test usecase delegates validation to core collaborator."""
+    owner = User(
+        user_id="owner-1",
+        user_name="Owner",
+        role=UserRole.OWNER,
+        group_id="group-1",
+    )
+
+    project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        description="Test Description",
+        assigned_user_ids=[],
+        scenes=[
+            Scene(
+                scene_id="scene-1",
+                scene_principal="cooking",
+                status=SceneStatus.APPROVE,
+                video_key="projects/proj-123/scenes/scene-1/shot-1.mp4",
+                thumbnail_key="projects/proj-123/scenes/scene-1/shot-1_thumb.jpg",
+                created_by="staff-1",
+                created_at="2026-09-20T10:00:00Z",
+                assigned_user_ids=["staff-1"],
+            ),
+        ],
+        status=ProjectStatus.SUBMITTED,
+        version=0,
+        created_at="2026-09-20T09:00:00Z",
+        updated_at="2026-09-20T10:10:00Z",
+    )
+
+    mock_download_object = AsyncMock(return_value=b"fake video data")
+    mock_upload_base64 = AsyncMock()
+    mock_generate_presigned_url = AsyncMock(
+        return_value="https://test.s3.amazonaws.com/test.zip",
+    )
+
+    with (
+        patch(
+            "recnavi.application.project.download_project_usecase.validate_project_for_download",
+        ) as mock_validate,
+        patch(
+            "recnavi.application.project.download_project_usecase.download_object",
+            mock_download_object,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.upload_base64",
+            mock_upload_base64,
+        ),
+        patch(
+            "recnavi.application.project.download_project_usecase.generate_presigned_url",
+            mock_generate_presigned_url,
+        ),
+    ):
+        await download_project_usecase(
+            user=owner,
+            project=project,
+            bucket_name="test-bucket",
+        )
+
+    mock_validate.assert_called_once_with(user=owner, project=project)
+
+
+@pytest.mark.asyncio
 async def test_download_project_usecase_creates_zip_with_videos_and_metadata():
     """Test usecase creates zip archive with videos and metadata.json."""
     owner = User(
