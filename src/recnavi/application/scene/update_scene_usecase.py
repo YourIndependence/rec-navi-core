@@ -107,7 +107,7 @@ async def update_scene_usecase(
         guide_uri=guide_uri,
     )
 
-    all_items = await scenes_db.scan()
-    all_scenes = [SceneMaster.model_validate(item) for item in all_items]
+    result = await scenes_db.scan()
+    all_scenes = [SceneMaster.model_validate(item) for item in result.items]
 
     return all_scenes

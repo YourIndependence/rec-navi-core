@@ -7,14 +7,10 @@
 # For internal use only.
 # developer team.
 
-<<<<<<< HEAD
 """S3 client for presigned URL generation and object deletion."""
 
 import base64
 from collections.abc import AsyncIterator
-=======
-"""S3 client for presigned URL generation."""
->>>>>>> origin/dev
 
 import aioboto3
 
@@ -45,7 +41,6 @@ async def generate_presigned_url(
             ExpiresIn=expiration,
         )
         return url
-<<<<<<< HEAD
 
 
 async def delete_objects_by_prefix(
@@ -181,5 +176,3 @@ async def download_object_stream(
         response = await s3.get_object(Bucket=bucket_name, Key=object_key)
         async for chunk in response["Body"]:
             yield chunk
-=======
->>>>>>> origin/dev

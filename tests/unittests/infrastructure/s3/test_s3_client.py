@@ -7,32 +7,19 @@
 # For internal use only.
 # developer team.
 
-<<<<<<< HEAD
 """Tests for S3 client operations."""
 
 import base64
-=======
-"""Tests for S3 client presigned URL generation.
-
-These are smoke tests verifying the function signature and basic structure.
-Full integration testing with real/mocked S3 is covered in integration tests.
-"""
-
->>>>>>> origin/dev
 from unittest.mock import AsyncMock
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
 
-<<<<<<< HEAD
 from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
 from recnavi.infrastructure.s3.s3_client import download_object
 from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 from recnavi.infrastructure.s3.s3_client import upload_base64
-=======
-from recnavi.infrastructure.s3.s3_client import generate_presigned_url
->>>>>>> origin/dev
 
 
 @pytest.mark.asyncio
@@ -110,7 +97,6 @@ async def test_generate_presigned_url_respects_custom_expiration():
             Params={"Bucket": "test-bucket", "Key": "videos/scene-456.mp4"},
             ExpiresIn=7200,  # Custom expiration
         )
-<<<<<<< HEAD
 
 
 @pytest.mark.asyncio
@@ -352,5 +338,3 @@ async def test_download_object_returns_bytes():
         Bucket="test-bucket",
         Key="videos/scene-123.mp4",
     )
-=======
->>>>>>> origin/dev
