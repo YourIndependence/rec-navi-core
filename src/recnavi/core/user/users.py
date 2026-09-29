@@ -35,15 +35,16 @@ async def get_group_users(
     last_evaluated_key: dict | None = None
 
     while True:
-        items, last_evaluated_key = await users_db.query(
+        result = await users_db.query(
             key_condition={"groupId": group_id},
             index="groupId-index",
             exclusive_start_key=last_evaluated_key,
         )
 
-        users = [User.model_validate(item) for item in items]
+        users = [User.model_validate(item) for item in result.items]
         all_users.extend(users)
 
+        last_evaluated_key = result.last_evaluated_key
         if last_evaluated_key is None:
             break
 

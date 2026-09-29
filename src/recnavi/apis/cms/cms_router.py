@@ -22,37 +22,14 @@ from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-<<<<<<< HEAD
-from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
-=======
->>>>>>> origin/dev
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
-<<<<<<< HEAD
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
-from recnavi.application.project.get_projects_usecase import (
-    get_projects_usecase,
-)
-from recnavi.application.scene.get_scene_masters_usecase import (
-    get_scene_masters_usecase,
-)
-from recnavi.application.scene.get_templates_usecase import (
-    get_templates_usecase,
-)
-from recnavi.application.user.get_group_users_usecase import (
-    get_group_users_usecase,
-)
-from recnavi.config.variables import PROJECTS_TABLE_NAME
-from recnavi.config.variables import SCENES_TABLE_NAME
-from recnavi.config.variables import TEMPLATES_TABLE_NAME
-from recnavi.config.variables import USERS_TABLE_NAME
-from recnavi.config.variables import VIDEO_BUCKET_NAME
-=======
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
@@ -60,10 +37,14 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.user.get_group_users_usecase import (
+    get_group_users_usecase,
+)
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
->>>>>>> origin/dev
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -237,7 +218,7 @@ async def delete_project_endpoint(
         projects_db=projects_db,
         project_id=payload.project_id,
         user=user,
-        video_bucket_name=VIDEO_BUCKET_NAME,
+        video_bucket_name=MEDIA_BUCKET_NAME,
     )
 
     return DeleteProjectResponse(project_id=project_id)

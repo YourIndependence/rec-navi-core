@@ -122,3 +122,15 @@ class ClientConflictError(BaseClientExceptionError):
     """Conflict error for optimistic locking failure (409 Conflict)."""
 
     pass
+
+
+class ClientPayloadTooLargeError(BaseClientExceptionError):
+    """Payload too large error (413 Payload Too Large)."""
+
+    status_code = 413
+
+
+class ClientUnprocessableEntityError(BaseClientExceptionError):
+    """Unprocessable entity error (422 Unprocessable Entity)."""
+
+    status_code = 422
