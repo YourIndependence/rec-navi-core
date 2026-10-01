@@ -13,14 +13,93 @@ from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
-from mockups.mock_database import MockDatabase
 
 from recnavi.application.scene.update_scene_record_usecase import (
     update_scene_record_usecase,
 )
+from recnavi.core.types.project import Project
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_update_scene_record():
+    """Test usecase delegates to core update_scene_record collaborator."""
+    mock_db = AsyncMock()
+    staff = User(
+        user_id="staff-789",
+        user_name="Staff",
+        group_id="group-456",
+        role=UserRole.STAFF,
+    )
+
+    mock_project_dict = {
+        "projectId": "proj-123",
+        "groupId": "group-456",
+        "ownerUserId": "owner-1",
+        "projectName": "Test Project",
+        "description": "Test Description",
+        "assignedUserIds": [],
+        "scenes": [],
+        "status": "in_progress",
+        "version": 1,
+        "createdAt": "2026-01-01T00:00:00Z",
+        "updatedAt": "2026-01-01T00:00:00Z",
+    }
+
+    mock_project = Project(
+        project_id="proj-123",
+        group_id="group-456",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        description="Test Description",
+        assigned_user_ids=[],
+        scenes=[],
+        status="in_progress",
+        version=1,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+
+    mock_db.update_item = AsyncMock(return_value=mock_project_dict)
+    mock_db.get_item = AsyncMock(return_value=mock_project_dict)
+
+    with patch(
+        "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
+        new=AsyncMock(
+            return_value=(
+                mock_project,
+                0,
+                "shot-abc",
+                "projects/proj-123/scenes/scene-1/shot-abc.mp4",
+                None,
+            ),
+        ),
+    ) as mock_update, patch(
+        "recnavi.application.scene.update_scene_record_usecase.upload_base64",
+        new=AsyncMock(),
+    ), patch(
+        "recnavi.application.scene.update_scene_record_usecase.delete_objects_by_prefix",
+        new=AsyncMock(),
+    ):
+        await update_scene_record_usecase(
+            projects_db=mock_db,
+            project_id="proj-123",
+            scene_id="scene-1",
+            video_base64="ZmFrZSB2aWRlbyBkYXRh",
+            thumbnail_base64="ZmFrZSB0aHVtYm5haWw=",
+            user=staff,
+            video_bucket_name="test-bucket",
+        )
+
+    mock_update.assert_awaited_once_with(
+        projects_db=mock_db,
+        project_id="proj-123",
+        scene_id="scene-1",
+        user=staff,
+    )
 
 
 @pytest.mark.asyncio
