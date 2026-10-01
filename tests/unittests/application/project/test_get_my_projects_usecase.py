@@ -9,42 +9,59 @@
 
 """Tests for get_my_projects_usecase."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
 import pytest
 
 from recnavi.application.project.get_my_projects_usecase import (
     get_my_projects_usecase,
 )
+from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_my_projects_usecase_calls_core_correctly():
-    """Test get_my_projects_usecase passes correct args to core layer."""
-    mock_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-1",
-                "groupId": "group-123",
-                "projectName": "Project 1",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
-        ],
-    )
+async def test_get_my_projects_usecase_delegates_to_get_my_projects():
+    """Test usecase delegates to core get_my_projects collaborator."""
+    database = MockDatabase()
 
-    projects, next_cursor = await get_my_projects_usecase(
-        projects_db=mock_db,
-        group_id="group-123",
-        user_id="staff-1",
+    expected_projects = [
+        Project(
+            project_id="proj-1",
+            group_id="group-1",
+            owner_user_id="owner-1",
+            project_name="Project 1",
+            description="Description",
+            assigned_user_ids=["user-1"],
+            scenes=[],
+            status=ProjectStatus.IN_PROGRESS,
+            version=0,
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+    ]
+    expected_cursor = "cursor123"
+
+    with patch(
+        "recnavi.application.project.get_my_projects_usecase.get_my_projects",
+        new=AsyncMock(return_value=(expected_projects, expected_cursor)),
+    ) as mock_get_my_projects:
+        result_projects, result_cursor = await get_my_projects_usecase(
+            projects_db=database,
+            group_id="group-1",
+            user_id="user-1",
+            limit=20,
+            cursor="prev-cursor",
+        )
+
+    mock_get_my_projects.assert_awaited_once_with(
+        projects_db=database,
+        group_id="group-1",
+        user_id="user-1",
         limit=20,
-        cursor=None,
+        cursor="prev-cursor",
     )
-
-    assert len(projects) == 1
-    assert projects[0].project_id == "proj-1"
-    assert next_cursor is None
+    assert result_projects is expected_projects
+    assert result_cursor is expected_cursor

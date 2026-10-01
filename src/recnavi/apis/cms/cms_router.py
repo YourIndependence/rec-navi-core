@@ -20,6 +20,7 @@ from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import ProjectSummaryView
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
@@ -93,8 +94,20 @@ async def get_projects_endpoint(
         cursor=cursor,
     )
 
+    project_views = [
+        ProjectSummaryView(
+            project_id=p.project_id,
+            project_name=p.project_name,
+            description=p.description,
+            owner_user_id=p.owner_user_id,
+            created_at=p.created_at,
+            status=p.status,
+        )
+        for p in projects
+    ]
+
     return GetProjectsResponse(
-        projects=projects,
+        projects=project_views,
         next_cursor=next_cursor,
     )
 
