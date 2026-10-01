@@ -33,12 +33,15 @@ async def test_delete_project_usecase_delegates_to_delete_project():
         role=UserRole.OWNER,
     )
 
-    with patch(
-        "recnavi.application.project.delete_project_usecase.delete_project",
-        new=AsyncMock(return_value="proj-123"),
-    ) as mock_delete, patch(
-        "recnavi.application.project.delete_project_usecase.delete_objects_by_prefix",
-        new=AsyncMock(return_value=3),
+    with (
+        patch(
+            "recnavi.application.project.delete_project_usecase.delete_project",
+            new=AsyncMock(return_value="proj-123"),
+        ) as mock_delete,
+        patch(
+            "recnavi.application.project.delete_project_usecase.delete_objects_by_prefix",
+            new=AsyncMock(return_value=3),
+        ),
     ):
         result = await delete_project_usecase(
             projects_db=database,
