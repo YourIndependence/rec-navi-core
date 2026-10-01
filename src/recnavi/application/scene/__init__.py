@@ -9,9 +9,7 @@
 
 """Scene application use cases."""
 
-from recnavi.application.scene.review_scene_usecase import (
-    review_scene_usecase,
-)
+from recnavi.application.scene.review_scene_usecase import review_scene_usecase
 from recnavi.application.scene.update_scene_record_usecase import (
     update_scene_record_usecase,
 )

@@ -66,23 +66,27 @@ async def test_usecase_delegates_to_update_scene_record():
     mock_db.update_item = AsyncMock(return_value=mock_project_dict)
     mock_db.get_item = AsyncMock(return_value=mock_project_dict)
 
-    with patch(
-        "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
-        new=AsyncMock(
-            return_value=(
-                mock_project,
-                0,
-                "shot-abc",
-                "projects/proj-123/scenes/scene-1/shot-abc.mp4",
-                None,
+    with (
+        patch(
+            "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
+            new=AsyncMock(
+                return_value=(
+                    mock_project,
+                    0,
+                    "shot-abc",
+                    "projects/proj-123/scenes/scene-1/shot-abc.mp4",
+                    None,
+                ),
             ),
+        ) as mock_update,
+        patch(
+            "recnavi.application.scene.update_scene_record_usecase.upload_base64",
+            new=AsyncMock(),
         ),
-    ) as mock_update, patch(
-        "recnavi.application.scene.update_scene_record_usecase.upload_base64",
-        new=AsyncMock(),
-    ), patch(
-        "recnavi.application.scene.update_scene_record_usecase.delete_objects_by_prefix",
-        new=AsyncMock(),
+        patch(
+            "recnavi.application.scene.update_scene_record_usecase.delete_objects_by_prefix",
+            new=AsyncMock(),
+        ),
     ):
         await update_scene_record_usecase(
             projects_db=mock_db,
