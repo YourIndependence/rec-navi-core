@@ -20,6 +20,73 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
+async def test_update_scene_usecase_delegates_to_upsert_scene_master():
+    """Test usecase delegates to core upsert_scene_master collaborator."""
+    scenes_db = MockDatabase()
+    await scenes_db.put_item(
+        {
+            "scenePrincipal": "existing_scene",
+            "title": "Old Title",
+            "maxDurationSeconds": 3,
+            "thumbnailUri": "s3://test-bucket/scenes/existing_scene/example.jpg",
+            "guideUri": "s3://test-bucket/scenes/existing_scene/guide.jpg",
+        },
+    )
+
+    with (
+        patch(
+            "recnavi.application.scene.update_scene_usecase.upload_base64",
+            new=AsyncMock(),
+        ),
+        patch(
+            "recnavi.application.scene.update_scene_usecase.upsert_scene_master",
+            new=AsyncMock(),
+        ) as mock_upsert,
+        patch.object(
+            scenes_db,
+            "scan",
+            new=AsyncMock(
+                return_value=type(
+                    "Result",
+                    (),
+                    {
+                        "items": [
+                            {
+                                "scenePrincipal": "existing_scene",
+                                "title": "Updated Title",
+                                "maxDurationSeconds": 7,
+                                "thumbnailUri": "s3://test-bucket/scenes/existing_scene/example.jpg",
+                                "guideUri": "s3://test-bucket/scenes/existing_scene/guide.jpg",
+                            },
+                        ],
+                    },
+                )(),
+            ),
+        ),
+    ):
+        result = await update_scene_usecase(
+            scenes_db=scenes_db,
+            scene_principal="existing_scene",
+            title="Updated Title",
+            max_duration_seconds=7,
+            example_image=None,
+            guide_image=None,
+            bucket_name="test-bucket",
+        )
+
+    mock_upsert.assert_awaited_once_with(
+        scenes_db=scenes_db,
+        scene_principal="existing_scene",
+        title="Updated Title",
+        max_duration_seconds=7,
+        thumbnail_uri="s3://test-bucket/scenes/existing_scene/example.jpg",
+        guide_uri="s3://test-bucket/scenes/existing_scene/guide.jpg",
+    )
+    assert len(result) == 1
+    assert result[0].scene_principal == "existing_scene"
+
+
+@pytest.mark.asyncio
 async def test_update_scene_usecase_creates_scene_with_images():
     """Test usecase creates new scene with uploaded images."""
     scenes_db = MockDatabase()
