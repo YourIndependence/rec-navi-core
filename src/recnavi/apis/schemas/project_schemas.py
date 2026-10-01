@@ -17,6 +17,18 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
+
+
+class ProjectSummaryView(BaseModel):
+    """Project summary for list views."""
+
+    project_id: str = Field(..., description="Project ID")
+    project_name: str = Field(..., description="Project name")
+    description: str = Field(..., description="Project description")
+    owner_user_id: str = Field(..., description="Owner user ID")
+    created_at: str = Field(..., description="Creation timestamp")
+    status: ProjectStatus = Field(..., description="Project status")
 
 
 class GetProjectsResponse(BaseApiResponseModel):
