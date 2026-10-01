@@ -25,14 +25,11 @@ async def create_project_usecase(
     owner: User,
 ) -> Project:
     """Create a new project and save to database."""
-    project = create_project(
+    return await create_project(
+        projects_db=projects_db,
         project_name=project_name,
         description=description,
         scene_principals=scene_principals,
         assigned_user_ids=assigned_user_ids,
         owner=owner,
     )
-
-    await projects_db.put_item(project.model_dump(by_alias=True))
-
-    return project

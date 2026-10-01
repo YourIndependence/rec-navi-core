@@ -9,7 +9,48 @@
 
 """Integration tests for POST /getProject endpoint."""
 
+from collections.abc import AsyncIterator
+from contextlib import suppress
+from typing import cast
+from uuid import uuid4
+
 import pytest
+import pytest_asyncio
+
+from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.core.database.base_database import BaseDatabase
+from recnavi.main import app
+
+
+@pytest_asyncio.fixture
+async def project_data() -> AsyncIterator[dict[str, object]]:
+    """Insert and remove a project used by this module."""
+    database = cast(
+        dict[str, BaseDatabase],
+        app.state.database,
+    )[PROJECTS_TABLE_NAME]
+    item = {
+        "projectId": f"it_{uuid4()}",
+        "groupId": "it-group",
+        "projectName": "Integration Test Project",
+        "description": "Test project for integration testing",
+        "ownerUserId": "dummy_user_id",
+        "assignedUserIds": ["dummy_user_id"],
+        "createdAt": "2026-09-21T00:00:00Z",
+        "updatedAt": "2026-09-21T00:00:00Z",
+        "status": "in_progress",
+        "version": 0,
+        "scenes": [],
+    }
+    await database.put_item(item)
+
+    try:
+        yield item
+    finally:
+        with suppress(Exception):
+            await database.delete_item(
+                {"projectId": item["projectId"]},
+            )
 
 
 def test_get_project_returns_400_when_no_token(client):
@@ -37,33 +78,17 @@ def test_get_project_returns_400_when_missing_project_id(client, auth_headers):
     assert "detail" in data
 
 
+@pytest.mark.asyncio
 @pytest.mark.real_aws
-def test_get_project_with_real_aws(client, auth_headers):
-    """Test POST /getProject with real AWS credentials.
+async def test_get_projects_returns_injected_project(
+    client,
+    auth_headers,
+    project_data: dict[str, object],
+):
+    """Return the project injected for this integration test."""
+    response = client.get("/getProjects", headers=auth_headers)
 
-    Prerequisites:
-    - DynamoDB projects table must exist
-    - Valid project record with projectId
-    - User must be owner or assigned staff
-    - S3 bucket with videos/thumbnails (optional)
-    - PROJECTS_TABLE_NAME and VIDEO_BUCKET_NAME environment variables set
-
-    """
-    response = client.post(
-        "/getProject",
-        headers=auth_headers,
-        json={"projectId": "test-project-123"},
-    )
-
-    # May return 404 if test project doesn't exist
-    # or 403 if user not authorized
-    # or 200 if project exists and user is authorized
-    assert response.status_code in [200, 403, 404]
-
-    if response.status_code == 200:
-        data = response.json()
-        assert data["status"] == "ok"
-        project = data["project"]
-        assert project["projectId"] == "test-project-123"
-        assert "scenes" in project
-        assert "version" in project
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert project_data in data["projects"]
