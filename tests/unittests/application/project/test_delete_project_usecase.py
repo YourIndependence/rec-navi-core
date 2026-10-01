@@ -23,6 +23,44 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
+async def test_delete_project_usecase_delegates_to_delete_project():
+    """Test usecase delegates to core delete_project collaborator."""
+    database = MockDatabase()
+    owner = User(
+        user_id="owner-789",
+        user_name="Owner User",
+        group_id="group-456",
+        role=UserRole.OWNER,
+    )
+
+    expected_project_id = "proj-123"
+
+    with (
+        patch(
+            "recnavi.application.project.delete_project_usecase.delete_project",
+            new=AsyncMock(return_value=expected_project_id),
+        ) as mock_delete,
+        patch(
+            "recnavi.application.project.delete_project_usecase.delete_objects_by_prefix",
+            new=AsyncMock(return_value=3),
+        ),
+    ):
+        result = await delete_project_usecase(
+            projects_db=database,
+            project_id="proj-123",
+            user=owner,
+            video_bucket_name="test-bucket",
+        )
+
+    mock_delete.assert_awaited_once_with(
+        projects_db=database,
+        project_id="proj-123",
+        user=owner,
+    )
+    assert result is expected_project_id
+
+
+@pytest.mark.asyncio
 async def test_delete_project_usecase_deletes_from_database_and_returns_project_id():
     """Test delete_project_usecase deletes project and returns project_id."""
     database = MockDatabase(
