@@ -33,10 +33,12 @@ async def test_delete_project_usecase_delegates_to_delete_project():
         role=UserRole.OWNER,
     )
 
+    expected_project_id = "proj-123"
+
     with (
         patch(
             "recnavi.application.project.delete_project_usecase.delete_project",
-            new=AsyncMock(return_value="proj-123"),
+            new=AsyncMock(return_value=expected_project_id),
         ) as mock_delete,
         patch(
             "recnavi.application.project.delete_project_usecase.delete_objects_by_prefix",
@@ -55,7 +57,7 @@ async def test_delete_project_usecase_delegates_to_delete_project():
         project_id="proj-123",
         user=owner,
     )
-    assert result == "proj-123"
+    assert result is expected_project_id
 
 
 @pytest.mark.asyncio
