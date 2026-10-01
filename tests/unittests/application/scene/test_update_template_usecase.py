@@ -23,6 +23,72 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
+async def test_update_template_usecase_delegates_to_upsert_template():
+    """Test usecase delegates to core upsert_template collaborator."""
+    templates_db = MockDatabase()
+    scenes_db = MockDatabase()
+    await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
+    await templates_db.put_item(
+        {
+            "templateId": "existing_template",
+            "title": "Old Title",
+            "scenePrincipals": ["cooking"],
+            "thumbnailUri": "s3://test-bucket/templates/existing_template/thumbnail.jpg",
+        },
+    )
+
+    with (
+        patch(
+            "recnavi.application.scene.update_template_usecase.upload_base64",
+            new=AsyncMock(),
+        ),
+        patch(
+            "recnavi.application.scene.update_template_usecase.upsert_template",
+            new=AsyncMock(),
+        ) as mock_upsert,
+        patch.object(
+            templates_db,
+            "scan",
+            new=AsyncMock(
+                return_value=type(
+                    "Result",
+                    (),
+                    {
+                        "items": [
+                            {
+                                "templateId": "existing_template",
+                                "title": "Updated Title",
+                                "scenePrincipals": ["cooking"],
+                                "thumbnailUri": "s3://test-bucket/templates/existing_template/thumbnail.jpg",
+                            },
+                        ],
+                    },
+                )(),
+            ),
+        ),
+    ):
+        result = await update_template_usecase(
+            templates_db=templates_db,
+            scenes_db=scenes_db,
+            template_id="existing_template",
+            title="Updated Title",
+            scene_principals=["cooking"],
+            thumbnail=None,
+            bucket_name="test-bucket",
+        )
+
+    mock_upsert.assert_awaited_once_with(
+        templates_db=templates_db,
+        template_id="existing_template",
+        title="Updated Title",
+        scene_principals=["cooking"],
+        thumbnail_uri="s3://test-bucket/templates/existing_template/thumbnail.jpg",
+    )
+    assert len(result) == 1
+    assert result[0].template_id == "existing_template"
+
+
+@pytest.mark.asyncio
 async def test_update_template_usecase_creates_template_with_thumbnail():
     """Test usecase creates new template with uploaded thumbnail."""
     templates_db = MockDatabase()
