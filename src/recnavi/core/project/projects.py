@@ -56,7 +56,7 @@ async def get_projects(
 ) -> tuple[list[Project], str | None]:
     """Get projects for a group with pagination.
 
-    Queries the projects table GSI1 (groupId + createdAt) in descending order
+    Queries the projects table groupId-createdAt-index in descending order
     to return newest projects first.
 
     Args:
@@ -73,7 +73,7 @@ async def get_projects(
 
     items, last_evaluated_key = await projects_db.query(
         key_condition={"groupId": group_id},
-        index="GSI1",
+        index="groupId-createdAt-index",
         limit=limit,
         exclusive_start_key=exclusive_start_key,
     )
@@ -94,7 +94,7 @@ async def get_my_projects(
 ) -> tuple[list[Project], str | None]:
     """Get projects assigned to a specific user with pagination.
 
-    Queries GSI1 (groupId + createdAt) for the user's group, then filters
+    Queries groupId-createdAt-index for the user's group, then filters
     server-side by assignedUserIds. DynamoDB cannot index list elements.
 
     Important: `limit` is the number of items to QUERY from DynamoDB,
@@ -117,7 +117,7 @@ async def get_my_projects(
 
     items, last_evaluated_key = await projects_db.query(
         key_condition={"groupId": group_id},
-        index="GSI1",
+        index="groupId-createdAt-index",
         limit=limit,
         exclusive_start_key=exclusive_start_key,
     )

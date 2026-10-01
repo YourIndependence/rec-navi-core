@@ -22,7 +22,7 @@ class ProjectSummaryView(BaseModel):
     """Project summary for list view.
 
     Excludes scenes array to keep response lightweight. Scenes are not
-    included in GSI1 projection and are not needed for list display.
+    included in groupId-createdAt-index projection and are not needed for list display.
     """
 
     model_config = ConfigDict(
