@@ -413,3 +413,64 @@ async def test_get_my_projects_pagination_with_filtering():
     assert len(projects) == 1
     assert projects[0].project_id == "proj-1"
     assert next_cursor is not None
+
+
+@pytest.mark.asyncio
+async def test_get_my_projects_returns_cursor_even_when_all_filtered():
+    """Test nextCursor is present even when all queried items are filtered out.
+
+    Scenario: limit=2 queries 2 items, but both are filtered out (not assigned).
+    The nextCursor should still be present because more data exists in DynamoDB.
+    """
+    from recnavi.core.project.projects import get_my_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-1",
+                "groupId": "group-123",
+                "projectName": "Project 1",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-2",
+                "groupId": "group-123",
+                "projectName": "Project 2",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-3",
+                "groupId": "group-123",
+                "projectName": "Project 3",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-03T00:00:00Z",
+                "updatedAt": "2026-09-03T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, next_cursor = await get_my_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+        limit=2,
+    )
+
+    assert projects == []
+    assert next_cursor is not None
