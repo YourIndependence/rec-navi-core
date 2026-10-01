@@ -16,10 +16,7 @@ from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-from recnavi.apis.schemas.project_schemas import ProjectSummaryView
-from recnavi.application.project.get_my_projects_usecase import (
-    get_my_projects_usecase,
-)
+from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.user import User
 
@@ -36,27 +33,14 @@ async def get_my_projects_endpoint(
 ) -> GetProjectsResponse:
     """List projects assigned to the authenticated user."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-    projects, next_cursor = await get_my_projects_usecase(
+    projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
         group_id=user.group_id,
-        user_id=user.user_id,
         limit=limit,
         cursor=cursor,
     )
 
-    project_views = [
-        ProjectSummaryView(
-            project_id=p.project_id,
-            project_name=p.project_name,
-            description=p.description,
-            owner_user_id=p.owner_user_id,
-            created_at=p.created_at,
-            status=p.status,
-        )
-        for p in projects
-    ]
-
     return GetProjectsResponse(
-        projects=project_views,
+        projects=projects,
         next_cursor=next_cursor,
     )
