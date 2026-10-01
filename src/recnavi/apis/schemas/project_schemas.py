@@ -17,12 +17,29 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
+
+
+class ProjectSummaryView(BaseModel):
+    """Project summary for list views (excludes scenes array)."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID")
+    project_name: str = Field(..., description="Name shown to members")
+    description: str = Field(..., description="Free text notes")
+    owner_user_id: str = Field(..., description="Owner who created it")
+    created_at: str = Field(..., description="Creation timestamp")
+    status: ProjectStatus = Field(..., description="Project status")
 
 
 class GetProjectsResponse(BaseApiResponseModel):
     """Response for GET /getProjects."""
 
-    projects: list[Project] = Field(
+    projects: list[ProjectSummaryView] = Field(
         ...,
         description="Projects in descending order by creation date",
     )
