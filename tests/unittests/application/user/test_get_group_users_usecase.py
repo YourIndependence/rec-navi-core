@@ -9,13 +9,49 @@
 
 """Unit tests for get_group_users_usecase."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
 import pytest
-from mockups.mock_database import MockDatabase
 
 from recnavi.application.user.get_group_users_usecase import (
     get_group_users_usecase,
 )
+from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_get_group_users():
+    """Test usecase delegates to core get_group_users collaborator."""
+    mock_db = AsyncMock()
+    expected_users = [
+        User(
+            user_id="user-1",
+            user_name="Alice",
+            group_id="group-1",
+            role=UserRole.OWNER,
+        ),
+        User(
+            user_id="user-2",
+            user_name="Bob",
+            group_id="group-1",
+            role=UserRole.STAFF,
+        ),
+    ]
+
+    with patch(
+        "recnavi.application.user.get_group_users_usecase.get_group_users",
+        new=AsyncMock(return_value=expected_users),
+    ) as mock_get:
+        result = await get_group_users_usecase(
+            users_db=mock_db,
+            group_id="group-1",
+        )
+
+    mock_get.assert_awaited_once_with(users_db=mock_db, group_id="group-1")
+    assert result is expected_users
 
 
 @pytest.mark.asyncio
