@@ -9,6 +9,9 @@
 
 """Tests for review_scene_usecase."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
 import pytest
 
 from recnavi.application.scene.review_scene_usecase import review_scene_usecase
@@ -19,6 +22,57 @@ from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_review_scene():
+    """Test usecase delegates to core review_scene collaborator."""
+    mock_db = AsyncMock()
+    user = User(
+        user_id="owner-1",
+        user_name="Test Owner",
+        group_id="group-1",
+        role=UserRole.OWNER,
+    )
+
+    mock_project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        description="Test Description",
+        assigned_user_ids=[],
+        scenes=[],
+        status="in_progress",
+        version=1,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+
+    mock_project_dict = mock_project.model_dump(by_alias=True)
+    mock_db.update_item = AsyncMock(return_value=mock_project_dict)
+    mock_db.get_item = AsyncMock(return_value=mock_project_dict)
+
+    with patch(
+        "recnavi.application.scene.review_scene_usecase.review_scene",
+        new=AsyncMock(return_value=(mock_project, 0, "pending")),
+    ) as mock_review:
+        await review_scene_usecase(
+            projects_db=mock_db,
+            project_id="proj-123",
+            scene_id="scene-456",
+            result="approve",
+            review_comment="Looks great!",
+            user=user,
+        )
+
+    mock_review.assert_awaited_once_with(
+        projects_db=mock_db,
+        project_id="proj-123",
+        scene_id="scene-456",
+        result="approve",
+        user=user,
+    )
 
 
 @pytest.mark.asyncio
