@@ -43,12 +43,13 @@ async def test_get_my_projects_usecase_delegates_to_get_my_projects():
         ),
     ]
     expected_cursor = "cursor123"
+    expected_result = (expected_projects, expected_cursor)
 
     with patch(
         "recnavi.application.project.get_my_projects_usecase.get_my_projects",
-        new=AsyncMock(return_value=(expected_projects, expected_cursor)),
+        new=AsyncMock(return_value=expected_result),
     ) as mock_get_my_projects:
-        result_projects, result_cursor = await get_my_projects_usecase(
+        result = await get_my_projects_usecase(
             projects_db=database,
             group_id="group-1",
             user_id="user-1",
@@ -63,5 +64,4 @@ async def test_get_my_projects_usecase_delegates_to_get_my_projects():
         limit=20,
         cursor="prev-cursor",
     )
-    assert result_projects is expected_projects
-    assert result_cursor is expected_cursor
+    assert result is expected_result
