@@ -30,16 +30,7 @@ def merge_scenes(
     existing_scenes: list[Scene],
     scene_inputs: list[SceneInput],
 ) -> list[Scene]:
-    """Merge scene inputs with existing scenes.
-
-    Args:
-        existing_scenes: Current scenes in the project.
-        scene_inputs: Scene inputs from update request.
-
-    Returns:
-        Merged list of scenes with recording state preserved.
-
-    """
+    """Merge scene inputs with existing scenes, preserving recording state."""
     existing_by_id = {scene.scene_id: scene for scene in existing_scenes}
     merged = []
 
@@ -85,27 +76,7 @@ async def update_project(
     expected_version: int,
     user: User,
 ) -> Project:
-    """Update project with optimistic locking.
-
-    Args:
-        projects_db: Projects database.
-        project_id: Project ID to update.
-        project_name: New project name.
-        description: New description.
-        assigned_user_ids: New assigned user IDs.
-        scenes: New scenes array.
-        expected_version: Expected version for optimistic locking.
-        user: User performing the update.
-
-    Returns:
-        Updated project.
-
-    Raises:
-        ClientResourcesNotFoundError: Project not found.
-        ClientAuthorizationError: User is not owner.
-        ClientConflictError: Version mismatch.
-
-    """
+    """Update project with optimistic locking."""
     existing_item = await projects_db.get_item({"projectId": project_id})
     if not existing_item:
         raise ClientResourcesNotFoundError(f"Project {project_id} not found")
