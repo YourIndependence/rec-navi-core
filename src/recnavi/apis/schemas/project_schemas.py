@@ -9,41 +9,17 @@
 
 """Project-related API schemas."""
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
-from recnavi.core.types.project import ProjectStatus
-
-
-class ProjectSummaryView(BaseModel):
-    """Project summary for list view.
-
-    Excludes scenes array to keep response lightweight. Scenes are not
-    included in groupId-createdAt-index projection and are not needed for list display.
-    """
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    project_id: str = Field(..., description="Identifier of the project")
-    project_name: str = Field(..., description="Name shown to members")
-    description: str = Field(..., description="Free text notes")
-    owner_user_id: str = Field(..., description="Owner who created it")
-    created_at: str = Field(..., description="Creation datetime")
-    status: ProjectStatus = Field(..., description="Progress status")
 
 
 class GetProjectsResponse(BaseApiResponseModel):
     """Response for GET /getProjects."""
 
-    projects: list[ProjectSummaryView] = Field(
+    projects: list[Project] = Field(
         ...,
         description="Projects in descending order by creation date",
     )

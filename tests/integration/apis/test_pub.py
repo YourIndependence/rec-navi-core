@@ -12,7 +12,7 @@
 
 def test_get_my_projects_returns_400_when_no_token(client):
     """Test GET /getMyProjects returns 400 when no authorization header."""
-    response = client.get("/getMyProjects")
+    response = client.get("/getProjects")
     assert response.status_code == 400
     data = response.json()
     assert data["status"] == "error"

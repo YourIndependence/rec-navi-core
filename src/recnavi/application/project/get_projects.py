@@ -17,17 +17,12 @@ from recnavi.core.types.project import Project
 async def get_projects_usecase(
     *,
     projects_db: BaseDatabase,
+    user_id: str,
     group_id: str,
     limit: int = 64,
     cursor: str | None,
 ) -> tuple[list[Project], str | None]:
     """List the projects a group can see, newest first.
-
-    Args:
-        projects_db: Database instance.
-        group_id: User group identifier.
-        limit: Maximum items per page.
-        cursor: Opaque pagination cursor from the previous response.
 
     Returns:
         Tuple of (projects, next_cursor). next_cursor is None on the last page.
@@ -35,6 +30,7 @@ async def get_projects_usecase(
     """
     return await get_projects(
         projects_db=projects_db,
+        user_id=user_id,
         group_id=group_id,
         limit=limit,
         cursor=cursor,
