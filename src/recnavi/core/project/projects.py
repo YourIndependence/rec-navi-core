@@ -62,23 +62,25 @@ async def get_my_projects(
 ) -> tuple[list[Project], str | None]:
     """Get projects assigned to a specific user with pagination.
 
-    Queries groupId-createdAt-index for the user's group, then filters
-    server-side by assignedUserIds. DynamoDB cannot index list elements.
+    Filters projects from the user's group by checking if user_id is in
+    assignedUserIds. Uses groupId-createdAt-index to query all group projects,
+    then applies server-side filtering (DynamoDB cannot index array elements).
 
-    Important: `limit` is the number of items to QUERY from DynamoDB,
-    NOT the number of items to RETURN after filtering. A page may have
-    fewer items than `limit` if many are filtered out, and `nextCursor`
-    may still be present (this is expected behavior).
+    Note: The `limit` parameter controls how many items DynamoDB queries,
+    not the final count after filtering. The returned list may contain fewer
+    items than `limit` if many projects are filtered out, and `next_cursor`
+    may still be present when more unfiltered data exists.
 
     Args:
-        projects_db: Database instance for projects table.
-        group_id: Group identifier from authenticated user token.
-        user_id: User identifier to filter by assignedUserIds.
-        limit: Maximum items to query per page (1-100, default 20).
-        cursor: Opaque pagination cursor from previous response.
+        projects_db: Projects table database interface.
+        group_id: Group ID extracted from the authenticated user's token.
+        user_id: User ID to match against assignedUserIds in each project.
+        limit: Maximum number of items to query from DynamoDB (1-100, default 20).
+        cursor: Pagination cursor from the previous response, or None for first page.
 
     Returns:
-        Tuple of (filtered_projects, next_cursor).
+        Tuple of (projects_assigned_to_user, cursor_for_next_page).
+        The cursor is None if this is the last page.
 
     """
     exclusive_start_key = _decode_cursor(cursor)
