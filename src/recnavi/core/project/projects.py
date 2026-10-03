@@ -60,28 +60,9 @@ async def get_my_projects(
     limit: int = 20,
     cursor: str | None = None,
 ) -> tuple[list[Project], str | None]:
-    """Get projects assigned to a specific user with pagination.
+    """Get projects assigned to user_id with pagination.
 
-    Filters projects from the user's group by checking if user_id is in
-    assignedUserIds. Uses groupId-createdAt-index to query all group projects,
-    then applies server-side filtering (DynamoDB cannot index array elements).
-
-    Note: The `limit` parameter controls how many items DynamoDB queries,
-    not the final count after filtering. The returned list may contain fewer
-    items than `limit` if many projects are filtered out, and `next_cursor`
-    may still be present when more unfiltered data exists.
-
-    Args:
-        projects_db: Projects table database interface.
-        group_id: Group ID extracted from the authenticated user's token.
-        user_id: User ID to match against assignedUserIds in each project.
-        limit: Maximum number of items to query from DynamoDB (1-100, default 20).
-        cursor: Pagination cursor from the previous response, or None for first page.
-
-    Returns:
-        Tuple of (projects_assigned_to_user, cursor_for_next_page).
-        The cursor is None if this is the last page.
-
+    Note: limit is the query size, not result count after filtering.
     """
     exclusive_start_key = _decode_cursor(cursor)
 
