@@ -29,7 +29,9 @@ async def test_get_projects_returns_projects_for_group():
                 "updatedAt": "2026-09-01T00:00:00Z",
                 "description": "Description 1",
                 "status": "in_progress",
-                "assignedUserIds": [],
+                "assignedUserIds": [
+                    "test-user-id",
+                ],
                 "scenes": [],
             },
             {
@@ -49,6 +51,7 @@ async def test_get_projects_returns_projects_for_group():
 
     projects, next_cursor = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-123",
     )
 
@@ -65,6 +68,7 @@ async def test_get_projects_returns_empty_list_for_empty_group():
 
     projects, next_cursor = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-empty",
     )
 
@@ -81,7 +85,7 @@ async def test_get_projects_paginates_correctly():
                 "projectId": f"proj-{i}",
                 "groupId": "group-123",
                 "projectName": f"Project {i}",
-                "ownerUserId": "user-1",
+                "ownerUserId": "test-user-id",
                 "createdAt": f"2026-09-{i:02d}T00:00:00Z",
                 "updatedAt": f"2026-09-{i:02d}T00:00:00Z",
                 "description": f"Description {i}",
@@ -96,6 +100,7 @@ async def test_get_projects_paginates_correctly():
     # Page 1: limit=2
     page1_projects, page1_cursor = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-123",
         limit=2,
     )
@@ -106,6 +111,7 @@ async def test_get_projects_paginates_correctly():
     # Page 2: use cursor
     page2_projects, page2_cursor = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-123",
         limit=2,
         cursor=page1_cursor,
@@ -117,6 +123,7 @@ async def test_get_projects_paginates_correctly():
     # Page 3: last page
     page3_projects, page3_cursor = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-123",
         limit=2,
         cursor=page2_cursor,
@@ -135,7 +142,7 @@ async def test_get_projects_does_not_mix_groups():
                 "projectId": "proj-g1-1",
                 "groupId": "group-123",
                 "projectName": "G1 Project 1",
-                "ownerUserId": "user-1",
+                "ownerUserId": "test-user-id",
                 "createdAt": "2026-09-01T00:00:00Z",
                 "updatedAt": "2026-09-01T00:00:00Z",
                 "description": "",
@@ -159,7 +166,7 @@ async def test_get_projects_does_not_mix_groups():
                 "projectId": "proj-g1-2",
                 "groupId": "group-123",
                 "projectName": "G1 Project 2",
-                "ownerUserId": "user-1",
+                "ownerUserId": "test-user-id",
                 "createdAt": "2026-09-03T00:00:00Z",
                 "updatedAt": "2026-09-03T00:00:00Z",
                 "description": "",
@@ -172,6 +179,7 @@ async def test_get_projects_does_not_mix_groups():
 
     projects, _ = await get_projects(
         projects_db=mock_db,
+        user_id="test-user-id",
         group_id="group-123",
     )
 
@@ -179,3 +187,273 @@ async def test_get_projects_does_not_mix_groups():
     assert all(p.group_id == "group-123" for p in projects)
     project_ids = {p.project_id for p in projects}
     assert project_ids == {"proj-g1-1", "proj-g1-2"}
+
+
+@pytest.mark.asyncio
+async def test_get_projects_filters_by_assigned_user():
+    """Test get_projects returns only projects where user is assigned."""
+    from recnavi.core.project.projects import get_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-assigned-1",
+                "groupId": "group-123",
+                "projectName": "Assigned Project 1",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1", "staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-not-assigned",
+                "groupId": "group-123",
+                "projectName": "Not Assigned Project",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-assigned-2",
+                "groupId": "group-123",
+                "projectName": "Assigned Project 2",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-03T00:00:00Z",
+                "updatedAt": "2026-09-03T00:00:00Z",
+                "description": "",
+                "status": "submitted",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, next_cursor = await get_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+    )
+
+    assert len(projects) == 2
+    project_ids = {p.project_id for p in projects}
+    assert project_ids == {"proj-assigned-1", "proj-assigned-2"}
+    assert next_cursor is None
+
+
+@pytest.mark.asyncio
+async def test_get_projects_returns_empty_when_no_assignment():
+    """Test get_projects returns empty list when all projects filtered out."""
+    from recnavi.core.project.projects import get_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-1",
+                "groupId": "group-123",
+                "projectName": "Project 1",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2", "staff-3"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-2",
+                "groupId": "group-123",
+                "projectName": "Project 2",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": [],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, next_cursor = await get_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+    )
+
+    assert projects == []
+    assert next_cursor is None
+
+
+@pytest.mark.asyncio
+async def test_get_projects_does_not_return_other_group():
+    """Test get_projects excludes assigned projects from other groups."""
+    from recnavi.core.project.projects import get_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-my-group",
+                "groupId": "group-123",
+                "projectName": "My Group Project",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-other-group",
+                "groupId": "group-456",
+                "projectName": "Other Group Project",
+                "ownerUserId": "owner-2",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, _ = await get_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+    )
+
+    assert len(projects) == 1
+    assert projects[0].project_id == "proj-my-group"
+    assert projects[0].group_id == "group-123"
+
+
+@pytest.mark.asyncio
+async def test_get_projects_pagination_with_filtering():
+    """Test get_projects pagination returns nextCursor even with filtering.
+
+    Important: limit is the number of items to QUERY, not RETURN.
+    nextCursor may be present even when returned items < limit.
+    """
+    from recnavi.core.project.projects import get_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-1",
+                "groupId": "group-123",
+                "projectName": "Project 1",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-2",
+                "groupId": "group-123",
+                "projectName": "Project 2",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-3",
+                "groupId": "group-123",
+                "projectName": "Project 3",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-03T00:00:00Z",
+                "updatedAt": "2026-09-03T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, next_cursor = await get_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+        limit=2,
+    )
+
+    assert len(projects) == 1
+    assert projects[0].project_id == "proj-1"
+    assert next_cursor is not None
+
+
+@pytest.mark.asyncio
+async def test_get_projects_returns_cursor_even_when_all_filtered():
+    """Test nextCursor is present even when all queried items are filtered out.
+
+    Scenario: limit=2 queries 2 items, but both are filtered out (not assigned).
+    The nextCursor should still be present because more data exists in DynamoDB.
+    """
+    from recnavi.core.project.projects import get_projects
+
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-1",
+                "groupId": "group-123",
+                "projectName": "Project 1",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-01T00:00:00Z",
+                "updatedAt": "2026-09-01T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-2",
+                "groupId": "group-123",
+                "projectName": "Project 2",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-02T00:00:00Z",
+                "updatedAt": "2026-09-02T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-2"],
+                "scenes": [],
+            },
+            {
+                "projectId": "proj-3",
+                "groupId": "group-123",
+                "projectName": "Project 3",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-09-03T00:00:00Z",
+                "updatedAt": "2026-09-03T00:00:00Z",
+                "description": "",
+                "status": "in_progress",
+                "assignedUserIds": ["staff-1"],
+                "scenes": [],
+            },
+        ],
+    )
+
+    projects, next_cursor = await get_projects(
+        projects_db=mock_db,
+        group_id="group-123",
+        user_id="staff-1",
+        limit=2,
+    )
+
+    assert projects == []
+    assert next_cursor is not None

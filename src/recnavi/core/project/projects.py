@@ -17,21 +17,23 @@ from recnavi.core.types.project import Project
 
 
 async def get_projects(
+    *,
     projects_db: BaseDatabase,
+    user_id: str,
     group_id: str,
     limit: int = 20,
     cursor: str | None = None,
 ) -> tuple[list[Project], str | None]:
-    """Get projects for a group with pagination.
+    """Get projects assigned to user_id with pagination.
 
     Args:
-        projects_db: Database instance for projects table.
-        group_id: Group identifier (from authenticated user token).
-        limit: Maximum items per page (1-100, default 20).
-        cursor: Opaque pagination cursor from previous response.
+        projects_db: Database instance.
+        user_id: User identifier.
+        group_id: User group identifier.
+        limit: Maximum items per page.
+        cursor: Opaque pagination cursor from the previous response.
 
-    Returns:
-        Tuple of (projects, next_cursor). next_cursor is None if last page.
+    Note: limit is the query size, not result count after filtering.
 
     """
     exclusive_start_key = _decode_cursor(cursor)
@@ -42,8 +44,17 @@ async def get_projects(
         limit=limit,
         exclusive_start_key=exclusive_start_key,
     )
-
     projects = [Project.model_validate(item) for item in result.items]
+
+    projects = [
+        project
+        for project in projects
+        if (
+            user_id in project.assigned_user_ids
+            or user_id in project.owner_user_id
+        )
+    ]
+
     next_cursor = _encode_cursor(result.last_evaluated_key)
 
     return projects, next_cursor

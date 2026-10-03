@@ -34,7 +34,7 @@ async def project_data() -> AsyncIterator[dict[str, object]]:
         "groupId": "it-group",
         "projectName": "Integration Test Project",
         "description": "Test project for integration testing",
-        "ownerUserId": "dummy_user_id",
+        "ownerUserId": "test-user-123",
         "assignedUserIds": ["dummy_user_id"],
         "createdAt": "2026-09-21T00:00:00Z",
         "updatedAt": "2026-09-21T00:00:00Z",
