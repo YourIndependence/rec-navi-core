@@ -35,20 +35,6 @@ async def test_usecase_delegates_to_update_scene_record():
         role=UserRole.STAFF,
     )
 
-    mock_project_dict = {
-        "projectId": "proj-123",
-        "groupId": "group-456",
-        "ownerUserId": "owner-1",
-        "projectName": "Test Project",
-        "description": "Test Description",
-        "assignedUserIds": [],
-        "scenes": [],
-        "status": "in_progress",
-        "version": 1,
-        "createdAt": "2026-01-01T00:00:00Z",
-        "updatedAt": "2026-01-01T00:00:00Z",
-    }
-
     mock_project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -63,8 +49,7 @@ async def test_usecase_delegates_to_update_scene_record():
         updated_at="2026-01-01T00:00:00Z",
     )
 
-    mock_db.update_item = AsyncMock(return_value=mock_project_dict)
-    mock_db.get_item = AsyncMock(return_value=mock_project_dict)
+    mock_db.get_item = AsyncMock(return_value=mock_project.model_dump(by_alias=True))
 
     with (
         patch(
@@ -88,7 +73,7 @@ async def test_usecase_delegates_to_update_scene_record():
             new=AsyncMock(),
         ),
     ):
-        await update_scene_record_usecase(
+        result = await update_scene_record_usecase(
             projects_db=mock_db,
             project_id="proj-123",
             scene_id="scene-1",
@@ -104,6 +89,8 @@ async def test_usecase_delegates_to_update_scene_record():
         scene_id="scene-1",
         user=staff,
     )
+    assert isinstance(result, Project)
+    assert result.project_id == "proj-123"
 
 
 @pytest.mark.asyncio

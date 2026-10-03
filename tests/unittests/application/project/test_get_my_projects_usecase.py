@@ -17,38 +17,51 @@ import pytest
 from recnavi.application.project.get_my_projects_usecase import (
     get_my_projects_usecase,
 )
-from recnavi.core.types.user import User
-from recnavi.core.types.user import UserRole
+from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
 from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_get_my_projects_usecase_delegates_to_core():
-    """Test get_my_projects_usecase delegates to get_my_projects."""
-    projects_db = MockDatabase()
-    user = User(
-        user_id="user-123",
-        user_name="Test User",
-        group_id="group-456",
-        role=UserRole.STAFF,
-    )
-    expected_output = object()
+async def test_get_my_projects_usecase_delegates_to_get_my_projects():
+    """Test usecase delegates to core get_my_projects collaborator."""
+    database = MockDatabase()
+
+    expected_projects = [
+        Project(
+            project_id="proj-1",
+            group_id="group-1",
+            owner_user_id="owner-1",
+            project_name="Project 1",
+            description="Description",
+            assigned_user_ids=["user-1"],
+            scenes=[],
+            status=ProjectStatus.IN_PROGRESS,
+            version=0,
+            created_at="2026-01-01T00:00:00Z",
+            updated_at="2026-01-01T00:00:00Z",
+        ),
+    ]
+    expected_cursor = "cursor123"
+    expected_result = (expected_projects, expected_cursor)
 
     with patch(
         "recnavi.application.project.get_my_projects_usecase.get_my_projects",
-        new=AsyncMock(return_value=expected_output),
+        new=AsyncMock(return_value=expected_result),
     ) as mock_get_my_projects:
         result = await get_my_projects_usecase(
-            projects_db=projects_db,
-            user=user,
+            projects_db=database,
+            group_id="group-1",
+            user_id="user-1",
             limit=20,
-            cursor="cursor-1",
+            cursor="prev-cursor",
         )
 
-    mock_get_my_projects.assert_awaited_with(
-        projects_db=projects_db,
-        user=user,
+    mock_get_my_projects.assert_awaited_once_with(
+        projects_db=database,
+        group_id="group-1",
+        user_id="user-1",
         limit=20,
-        cursor="cursor-1",
+        cursor="prev-cursor",
     )
-    assert result is expected_output
+    assert result is expected_result

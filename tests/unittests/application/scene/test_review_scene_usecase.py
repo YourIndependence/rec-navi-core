@@ -9,6 +9,9 @@
 
 """Tests for review_scene_usecase."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import patch
+
 import pytest
 
 from recnavi.application.scene.review_scene_usecase import review_scene_usecase
@@ -19,6 +22,59 @@ from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_review_scene():
+    """Test usecase delegates to core review_scene collaborator."""
+    mock_db = AsyncMock()
+    user = User(
+        user_id="owner-1",
+        user_name="Test Owner",
+        group_id="group-1",
+        role=UserRole.OWNER,
+    )
+
+    mock_project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        scenes=[
+            Scene(
+                scene_id="scene-456",
+                scene_principal="cooking",
+                status=SceneStatus.PENDING,
+            ),
+        ],
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+
+    mock_db.get_item = AsyncMock(return_value=mock_project.model_dump(by_alias=True))
+
+    with patch(
+        "recnavi.application.scene.review_scene_usecase.review_scene",
+        new=AsyncMock(return_value=(mock_project, 0, SceneStatus.PENDING)),
+    ) as mock_review_scene:
+        result = await review_scene_usecase(
+            projects_db=mock_db,
+            project_id="proj-123",
+            scene_id="scene-456",
+            result="approve",
+            review_comment="Looks great!",
+            user=user,
+        )
+
+    mock_review_scene.assert_awaited_once_with(
+        projects_db=mock_db,
+        project_id="proj-123",
+        scene_id="scene-456",
+        result="approve",
+        user=user,
+    )
+    assert isinstance(result, Project)
+    assert result.project_id == "proj-123"
 
 
 @pytest.mark.asyncio

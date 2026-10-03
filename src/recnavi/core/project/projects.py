@@ -24,6 +24,9 @@ async def get_projects(
 ) -> tuple[list[Project], str | None]:
     """Get projects for a group with pagination.
 
+    Queries the projects table groupId-createdAt-index in descending order
+    to return newest projects first.
+
     Args:
         projects_db: Database instance for projects table.
         group_id: Group identifier (from authenticated user token).
@@ -44,6 +47,38 @@ async def get_projects(
     )
 
     projects = [Project.model_validate(item) for item in result.items]
+    next_cursor = _encode_cursor(result.last_evaluated_key)
+
+    return projects, next_cursor
+
+
+async def get_my_projects(
+    *,
+    projects_db: BaseDatabase,
+    group_id: str,
+    user_id: str,
+    limit: int = 20,
+    cursor: str | None = None,
+) -> tuple[list[Project], str | None]:
+    """Get projects assigned to user_id with pagination.
+
+    Note: limit is the query size, not result count after filtering.
+    """
+    exclusive_start_key = _decode_cursor(cursor)
+
+    result = await projects_db.query(
+        key_condition={"groupId": group_id},
+        index="groupId-createdAt-index",
+        limit=limit,
+        exclusive_start_key=exclusive_start_key,
+    )
+
+    projects = [
+        Project.model_validate(item)
+        for item in result.items
+        if user_id in item.get("assignedUserIds", [])
+    ]
+
     next_cursor = _encode_cursor(result.last_evaluated_key)
 
     return projects, next_cursor
