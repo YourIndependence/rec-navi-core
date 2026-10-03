@@ -33,8 +33,13 @@ async def get_projects_endpoint(
 ) -> GetProjectsResponse:
     """List projects assigned to the authenticated user."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-    projects, next_cursor = await get_projects_usecase(projects_db=projects_db, group_id=user.group_id,
-                                                       user_id=user.user_id, limit=limit, cursor=cursor)
+    projects, next_cursor = await get_projects_usecase(
+        projects_db=projects_db,
+        group_id=user.group_id,
+        user_id=user.user_id,
+        limit=limit,
+        cursor=cursor,
+    )
 
     return GetProjectsResponse(
         projects=projects,

@@ -44,15 +44,14 @@ async def get_projects(
         limit=limit,
         exclusive_start_key=exclusive_start_key,
     )
-    projects = [
-        Project.model_validate(item)
-        for item in result.items
-    ]
+    projects = [Project.model_validate(item) for item in result.items]
 
-    projects = [project for project in projects
+    projects = [
+        project
+        for project in projects
         if (
-                user_id in project.assigned_user_ids
-                or user_id in project.owner_user_id
+            user_id in project.assigned_user_ids
+            or user_id in project.owner_user_id
         )
     ]
 
