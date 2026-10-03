@@ -27,25 +27,12 @@ class DynamoDb(BaseDatabase):
     """DynamoDB"""
 
     def __init__(self, table_name: str):
-        """Initialize DynamoDb with table name.
-
-        Args:
-            table_name: Name of the DynamoDB table.
-
-        """
+        """Initialize DynamoDb with table name."""
         self.table_name = table_name
         self.session = aioboto3.Session(region_name=REGION)
 
     async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
-        """Get an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        Returns:
-            Item as a dictionary with Python native types if found, None otherwise.
-
-        """
+        """Get an item by primary key."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             response = await table.get_item(Key=key)
@@ -58,17 +45,7 @@ class DynamoDb(BaseDatabase):
         condition_expression: str | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> None:
-        """Put an item into the table with optional condition.
-
-        Args:
-            item: Item to store with Python native types.
-            condition_expression: Optional DynamoDB condition expression.
-            expression_attribute_values: Values for condition expression placeholders.
-
-        Raises:
-            ClientConflictError: Condition check failed (409).
-
-        """
+        """Put an item into the table with optional condition."""
         from botocore.exceptions import ClientError
 
         from recnavi.exceptions.exceptions import ClientConflictError
@@ -104,20 +81,7 @@ class DynamoDb(BaseDatabase):
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
     ) -> DatabaseQueryResult:
-        """Query items by key condition with optional pagination.
-
-        Args:
-            key_condition: Key condition for the query.
-            filter_expression: Optional attribute equality filters.
-            Multiple filters are combined with AND.
-            index: Optional global or local secondary index name.
-            limit: Maximum number of items to return.
-            exclusive_start_key: Primary key of item to start from (for pagination).
-
-        Returns:
-            DatabaseQueryResult with items and optional last_evaluated_key.
-
-        """
+        """Query items by key condition with optional pagination."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             query_kwargs = _build_query_kwargs(key_condition)
@@ -139,12 +103,7 @@ class DynamoDb(BaseDatabase):
             )
 
     async def delete_item(self, key: dict[str, Any]) -> None:
-        """Delete an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        """
+        """Delete an item by primary key."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             await table.delete_item(Key=key)
@@ -155,20 +114,7 @@ class DynamoDb(BaseDatabase):
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
     ) -> DatabaseQueryResult:
-        """Scan all items in the table with optional pagination.
-
-        Warning: Full table scan. Only use for small tables.
-
-        Args:
-            filter_expression: Optional attribute equality filters.
-            Multiple filters are combined with AND.
-            limit: Maximum number of items to return.
-            exclusive_start_key: Primary key of item to start from (for pagination).
-
-        Returns:
-            DatabaseQueryResult with items and optional last_evaluated_key.
-
-        """
+        """Scan all items in the table with optional pagination. Warning: Full table scan."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             scan_kwargs: dict[str, object] = {}
