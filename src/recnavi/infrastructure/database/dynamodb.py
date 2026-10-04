@@ -182,12 +182,7 @@ class DynamoDb(BaseDatabase):
                 raise
 
     async def delete_item(self, key: dict[str, Any]) -> None:
-        """Delete an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        """
+        """Delete an item by primary key."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             await table.delete_item(Key=key)

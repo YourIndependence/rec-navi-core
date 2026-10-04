@@ -19,24 +19,11 @@ class MockDatabase(BaseDatabase):
     """In-memory mock database for unit testing."""
 
     def __init__(self, initial_items: list[dict[str, Any]] | None = None):
-        """Initialize mock database with optional initial items.
-
-        Args:
-            initial_items: List of items to pre-populate the database.
-
-        """
+        """Initialize mock database with optional initial items."""
         self.items: list[dict[str, Any]] = initial_items or []
 
     async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
-        """Get an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        Returns:
-            Item if found, None otherwise.
-
-        """
+        """Get an item by primary key."""
         for item in self.items:
             if all(item.get(k) == v for k, v in key.items()):
                 return item
@@ -48,17 +35,7 @@ class MockDatabase(BaseDatabase):
         condition_expression: str | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> None:
-        """Put an item into the database with optional condition.
-
-        Args:
-            item: Item to store.
-            condition_expression: Optional condition expression (e.g., "version = :expected_version").
-            expression_attribute_values: Values for expression placeholders.
-
-        Raises:
-            ClientConflictError: Condition check failed.
-
-        """
+        """Put an item into the database with optional condition."""
         from recnavi.exceptions.exceptions import ClientConflictError
 
         if (
@@ -118,19 +95,7 @@ class MockDatabase(BaseDatabase):
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
     ) -> DatabaseQueryResult:
-        """Query items by key condition with optional pagination.
-
-        Args:
-            key_condition: Key condition for the query.
-            filter_expression: Optional filter expression.
-            index: Optional index name (ignored in mock).
-            limit: Maximum number of items to return.
-            exclusive_start_key: Primary key to start from (for pagination).
-
-        Returns:
-            DatabaseQueryResult with items and optional last_evaluated_key.
-
-        """
+        """Query items by key condition with optional pagination."""
         results = self._filter_items(key_condition, filter_expression)
         return self._paginate_results(results, limit, exclusive_start_key)
 
@@ -196,23 +161,7 @@ class MockDatabase(BaseDatabase):
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Update item with UpdateExpression (simplified for testing).
-
-        Args:
-            key: Primary key of item to update.
-            update_expression: DynamoDB UpdateExpression (e.g., "SET scenes[0].status = :status").
-            condition_expression: Optional condition (e.g., "scenes[0].sceneId = :sceneId").
-            expression_attribute_names: Attribute name substitutions.
-            expression_attribute_values: Value substitutions.
-
-        Returns:
-            Updated item.
-
-        Raises:
-            ClientNotFoundError: Item not found.
-            ClientConflictError: Condition check failed.
-
-        """
+        """Update item with UpdateExpression (simplified for testing)."""
         from recnavi.exceptions.exceptions import ClientConflictError
         from recnavi.exceptions.exceptions import ClientNotFoundError
 
@@ -315,12 +264,7 @@ class MockDatabase(BaseDatabase):
         return field
 
     async def delete_item(self, key: dict[str, Any]) -> None:
-        """Delete an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        """
+        """Delete an item by primary key."""
         self.items = [
             item
             for item in self.items
@@ -333,17 +277,7 @@ class MockDatabase(BaseDatabase):
         limit: int | None = None,
         exclusive_start_key: dict[str, Any] | None = None,
     ) -> DatabaseQueryResult:
-        """Scan all items in the database with optional pagination.
-
-        Args:
-            filter_expression: Optional filter expression.
-            limit: Maximum number of items to return.
-            exclusive_start_key: Primary key to start from (for pagination).
-
-        Returns:
-            DatabaseQueryResult with items and optional last_evaluated_key.
-
-        """
+        """Scan all items in the database with optional pagination."""
         if not filter_expression:
             results = self.items.copy()
         else:
