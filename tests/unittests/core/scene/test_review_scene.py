@@ -25,7 +25,7 @@ from tests.mockups.mock_database import MockDatabase
 
 @pytest.mark.asyncio
 async def test_review_scene_approve_returns_correct_data():
-    """Test review_scene returns project, scene_index, old_status for approve."""
+    """Test review_scene updates project with APPROVE status."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -49,22 +49,24 @@ async def test_review_scene_approve_returns_correct_data():
         role=UserRole.OWNER,
     )
 
-    result_project, scene_index, old_status = await review_scene(
+    result_project = await review_scene(
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
         result="approve",
+        review_comment=None,
         user=user,
     )
 
     assert result_project.project_id == "proj-123"
-    assert scene_index == 0
-    assert old_status == SceneStatus.PENDING
+    assert result_project.scenes[0].status == SceneStatus.APPROVE
+    assert result_project.scenes[0].reviewed_by == "owner-1"
+    assert result_project.scenes[0].reviewed_at is not None
 
 
 @pytest.mark.asyncio
 async def test_review_scene_reject_returns_correct_data():
-    """Test review_scene returns project, scene_index, old_status for reject."""
+    """Test review_scene updates project with REJECT status."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -88,17 +90,19 @@ async def test_review_scene_reject_returns_correct_data():
         role=UserRole.OWNER,
     )
 
-    result_project, scene_index, old_status = await review_scene(
+    result_project = await review_scene(
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
         result="reject",
+        review_comment=None,
         user=user,
     )
 
     assert result_project.project_id == "proj-123"
-    assert scene_index == 0
-    assert old_status == SceneStatus.APPROVE
+    assert result_project.scenes[0].status == SceneStatus.REJECT
+    assert result_project.scenes[0].reviewed_by == "owner-1"
+    assert result_project.scenes[0].reviewed_at is not None
 
 
 @pytest.mark.asyncio
@@ -133,6 +137,7 @@ async def test_review_scene_raises_403_for_non_owner():
             project_id="proj-123",
             scene_id="scene-456",
             result="approve",
+            review_comment=None,
             user=staff_user,
         )
 
@@ -169,6 +174,7 @@ async def test_review_scene_raises_403_for_wrong_group():
             project_id="proj-123",
             scene_id="scene-456",
             result="approve",
+            review_comment=None,
             user=other_owner,
         )
 
@@ -205,6 +211,7 @@ async def test_review_scene_raises_404_when_scene_not_found():
             project_id="proj-123",
             scene_id="nonexistent-scene",
             result="approve",
+            review_comment=None,
             user=user,
         )
 
@@ -241,6 +248,7 @@ async def test_review_scene_raises_422_for_invalid_result():
             project_id="proj-123",
             scene_id="scene-456",
             result="pending",
+            review_comment=None,
             user=user,
         )
 
@@ -271,13 +279,14 @@ async def test_review_scene_allows_re_review():
         role=UserRole.OWNER,
     )
 
-    _result_project, scene_index, old_status = await review_scene(
+    result_project = await review_scene(
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
         result="reject",
+        review_comment=None,
         user=user,
     )
 
-    assert old_status == SceneStatus.APPROVE
-    assert scene_index == 0
+    assert result_project.scenes[0].status == SceneStatus.REJECT
+    assert result_project.scenes[0].scene_id == "scene-456"

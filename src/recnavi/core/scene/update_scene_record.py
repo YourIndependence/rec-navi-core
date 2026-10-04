@@ -9,10 +9,12 @@
 
 """Scene recording update domain logic."""
 
-import uuid
+from datetime import UTC
+from datetime import datetime
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientNotFoundError
@@ -23,27 +25,29 @@ async def update_scene_record(
     projects_db: BaseDatabase,
     project_id: str,
     scene_id: str,
+    video_key: str,
+    thumbnail_key: str,
     user: User,
-) -> tuple[Project, int, str, str, str | None]:
-    """Prepare scene recording update with authorization checks.
+) -> tuple[Project, str | None]:
+    """Update scene recording in DynamoDB after S3 upload.
 
     Args:
         projects_db: Database instance for projects table.
         project_id: ID of project containing the scene.
         scene_id: ID of scene to update.
+        video_key: S3 key for uploaded video.
+        thumbnail_key: S3 key for uploaded thumbnail.
         user: Authenticated user (must be assigned staff).
 
     Returns:
         Tuple of:
         - Updated project
-        - Scene index in scenes array
-        - New shot ID (UUID)
-        - New video S3 key
-        - Old video S3 key (for cleanup, None if first recording)
+        - Old video S3 key prefix (for cleanup, None if first recording)
 
     Raises:
         ClientNotFoundError: Project or scene not found.
         ClientAuthorizationError: User not in same group or not assigned to scene.
+        ClientConflictError: Concurrent modification detected.
 
     """
     item = await projects_db.get_item(key={"projectId": project_id})
@@ -71,8 +75,38 @@ async def update_scene_record(
     if user.user_id not in scene.assigned_user_ids:
         raise ClientAuthorizationError("Not assigned to this scene")
 
-    shot_id = str(uuid.uuid4())
-    new_video_key = f"projects/{project_id}/scenes/{scene_id}/{shot_id}.mp4"
     old_video_key = scene.video_key
+    timestamp = datetime.now(UTC).isoformat()
 
-    return project, scene_index, shot_id, new_video_key, old_video_key
+    await projects_db.update_item(
+        key={"projectId": project_id},
+        update_expression=(
+            f"SET scenes[{scene_index}].#sceneStatus = :status, "
+            f"scenes[{scene_index}].videoKey = :videoKey, "
+            f"scenes[{scene_index}].thumbnailKey = :thumbnailKey, "
+            f"scenes[{scene_index}].createdBy = :createdBy, "
+            f"scenes[{scene_index}].createdAt = :createdAt"
+        ),
+        condition_expression=f"scenes[{scene_index}].sceneId = :sceneId",
+        expression_attribute_names={"#sceneStatus": "status"},
+        expression_attribute_values={
+            ":status": SceneStatus.PENDING.value,
+            ":videoKey": video_key,
+            ":thumbnailKey": thumbnail_key,
+            ":createdBy": user.user_id,
+            ":createdAt": timestamp,
+            ":sceneId": scene_id,
+        },
+    )
+
+    updated_item = await projects_db.get_item(key={"projectId": project_id})
+    updated_project = Project.model_validate(updated_item)
+
+    old_key_prefix = None
+    if old_video_key:
+        old_shot_id = old_video_key.split("/")[-1].replace(".mp4", "")
+        old_key_prefix = (
+            f"projects/{project_id}/scenes/{scene_id}/{old_shot_id}"
+        )
+
+    return updated_project, old_key_prefix

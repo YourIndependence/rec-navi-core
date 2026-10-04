@@ -9,13 +9,11 @@
 
 """Update scene record use case."""
 
-from datetime import UTC
-from datetime import datetime
+import uuid
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.update_scene_record import update_scene_record
 from recnavi.core.types.project import Project
-from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
 from recnavi.infrastructure.s3.s3_client import upload_base64
@@ -51,66 +49,39 @@ async def update_scene_record_usecase(
         ClientConflictError: Concurrent modification detected.
 
     """
-    (
-        _project,
-        scene_index,
-        shot_id,
-        new_video_key,
-        old_video_key,
-    ) = await update_scene_record(
-        projects_db=projects_db,
-        project_id=project_id,
-        scene_id=scene_id,
-        user=user,
-    )
-
-    new_thumbnail_key = (
+    shot_id = str(uuid.uuid4())
+    video_key = f"projects/{project_id}/scenes/{scene_id}/{shot_id}.mp4"
+    thumbnail_key = (
         f"projects/{project_id}/scenes/{scene_id}/{shot_id}_thumb.jpg"
     )
 
     await upload_base64(
         bucket_name=video_bucket_name,
-        object_key=new_video_key,
+        object_key=video_key,
         base64_data=video_base64,
         content_type="video/mp4",
     )
 
     await upload_base64(
         bucket_name=video_bucket_name,
-        object_key=new_thumbnail_key,
+        object_key=thumbnail_key,
         base64_data=thumbnail_base64,
         content_type="image/jpeg",
     )
 
-    timestamp = datetime.now(UTC).isoformat()
-
-    await projects_db.update_item(
-        key={"projectId": project_id},
-        update_expression=(
-            f"SET scenes[{scene_index}].#sceneStatus = :status, "
-            f"scenes[{scene_index}].videoKey = :videoKey, "
-            f"scenes[{scene_index}].thumbnailKey = :thumbnailKey, "
-            f"scenes[{scene_index}].createdBy = :createdBy, "
-            f"scenes[{scene_index}].createdAt = :createdAt"
-        ),
-        condition_expression=f"scenes[{scene_index}].sceneId = :sceneId",
-        expression_attribute_names={"#sceneStatus": "status"},
-        expression_attribute_values={
-            ":status": SceneStatus.PENDING.value,
-            ":videoKey": new_video_key,
-            ":thumbnailKey": new_thumbnail_key,
-            ":createdBy": user.user_id,
-            ":createdAt": timestamp,
-            ":sceneId": scene_id,
-        },
+    updated_project, old_key_prefix = await update_scene_record(
+        projects_db=projects_db,
+        project_id=project_id,
+        scene_id=scene_id,
+        video_key=video_key,
+        thumbnail_key=thumbnail_key,
+        user=user,
     )
 
-    if old_video_key:
-        old_shot_id = old_video_key.split("/")[-1].replace(".mp4", "")
+    if old_key_prefix:
         await delete_objects_by_prefix(
             bucket_name=video_bucket_name,
-            prefix=f"projects/{project_id}/scenes/{scene_id}/{old_shot_id}",
+            prefix=old_key_prefix,
         )
 
-    updated_item = await projects_db.get_item(key={"projectId": project_id})
-    return Project.model_validate(updated_item)
+    return updated_project

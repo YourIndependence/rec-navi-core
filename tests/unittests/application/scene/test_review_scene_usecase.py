@@ -51,13 +51,9 @@ async def test_usecase_delegates_to_review_scene():
         updated_at="2026-01-01T00:00:00Z",
     )
 
-    expected_project_dict = mock_project.model_dump(by_alias=True)
-    mock_db.get_item = AsyncMock(return_value=expected_project_dict)
-    expected_output = Project.model_validate(expected_project_dict)
-
     with patch(
         "recnavi.application.scene.review_scene_usecase.review_scene",
-        new=AsyncMock(return_value=(mock_project, 0, SceneStatus.PENDING)),
+        new=AsyncMock(return_value=mock_project),
     ) as mock_review_scene:
         result = await review_scene_usecase(
             projects_db=mock_db,
@@ -73,10 +69,10 @@ async def test_usecase_delegates_to_review_scene():
         project_id="proj-123",
         scene_id="scene-456",
         result="approve",
+        review_comment="Looks great!",
         user=user,
     )
-    assert result.project_id == expected_output.project_id
-    assert result.model_dump() == expected_output.model_dump()
+    assert result is mock_project
 
 
 @pytest.mark.asyncio

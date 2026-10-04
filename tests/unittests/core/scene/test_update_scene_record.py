@@ -21,7 +21,7 @@ from tests.mockups.mock_database import MockDatabase
 
 @pytest.mark.asyncio
 async def test_update_scene_record_returns_shot_id_and_keys():
-    """Test update_scene_record returns necessary data for S3 upload."""
+    """Test update_scene_record updates DynamoDB with video keys."""
     database = MockDatabase(
         initial_items=[
             {
@@ -52,30 +52,28 @@ async def test_update_scene_record_returns_shot_id_and_keys():
         role=UserRole.STAFF,
     )
 
-    (
-        project,
-        scene_index,
-        shot_id,
-        new_video_key,
-        old_video_key,
-    ) = await update_scene_record(
+    video_key = "projects/proj-123/scenes/scene-1/shot-abc.mp4"
+    thumbnail_key = "projects/proj-123/scenes/scene-1/shot-abc_thumb.jpg"
+
+    updated_project, old_key_prefix = await update_scene_record(
         projects_db=database,
         project_id="proj-123",
         scene_id="scene-1",
+        video_key=video_key,
+        thumbnail_key=thumbnail_key,
         user=staff,
     )
 
-    assert project.project_id == "proj-123"
-    assert scene_index == 0
-    assert isinstance(shot_id, str)
-    assert len(shot_id) == 36  # UUID format
-    assert new_video_key == f"projects/proj-123/scenes/scene-1/{shot_id}.mp4"
-    assert old_video_key is None
+    assert updated_project.project_id == "proj-123"
+    assert updated_project.scenes[0].video_key == video_key
+    assert updated_project.scenes[0].thumbnail_key == thumbnail_key
+    assert updated_project.scenes[0].status.value == "pending"
+    assert old_key_prefix is None
 
 
 @pytest.mark.asyncio
 async def test_update_scene_record_returns_none_for_old_key_on_first_recording():
-    """Test update_scene_record returns None for old_video_key on first recording."""
+    """Test update_scene_record returns None for old_key_prefix on first recording."""
     database = MockDatabase(
         initial_items=[
             {
@@ -104,19 +102,21 @@ async def test_update_scene_record_returns_none_for_old_key_on_first_recording()
         role=UserRole.STAFF,
     )
 
-    _, _, _, _, old_video_key = await update_scene_record(
+    _, old_key_prefix = await update_scene_record(
         projects_db=database,
         project_id="proj-456",
         scene_id="scene-2",
+        video_key="projects/proj-456/scenes/scene-2/new-shot.mp4",
+        thumbnail_key="projects/proj-456/scenes/scene-2/new-shot_thumb.jpg",
         user=staff,
     )
 
-    assert old_video_key is None
+    assert old_key_prefix is None
 
 
 @pytest.mark.asyncio
 async def test_update_scene_record_returns_old_key_on_subsequent_recording():
-    """Test update_scene_record returns old_video_key on subsequent recording."""
+    """Test update_scene_record returns old_key_prefix on subsequent recording."""
     database = MockDatabase(
         initial_items=[
             {
@@ -145,14 +145,16 @@ async def test_update_scene_record_returns_old_key_on_subsequent_recording():
         role=UserRole.STAFF,
     )
 
-    _, _, _, _, old_video_key = await update_scene_record(
+    _, old_key_prefix = await update_scene_record(
         projects_db=database,
         project_id="proj-999",
         scene_id="scene-3",
+        video_key="projects/proj-999/scenes/scene-3/new-shot.mp4",
+        thumbnail_key="projects/proj-999/scenes/scene-3/new-shot_thumb.jpg",
         user=staff,
     )
 
-    assert old_video_key == "projects/proj-999/scenes/scene-3/old-shot-123.mp4"
+    assert old_key_prefix == "projects/proj-999/scenes/scene-3/old-shot-123"
 
 
 @pytest.mark.asyncio
@@ -172,6 +174,8 @@ async def test_update_scene_record_raises_404_when_project_not_found():
             projects_db=database,
             project_id="nonexistent-project",
             scene_id="scene-1",
+            video_key="projects/nonexistent-project/scenes/scene-1/shot.mp4",
+            thumbnail_key="projects/nonexistent-project/scenes/scene-1/shot_thumb.jpg",
             user=staff,
         )
 
@@ -211,6 +215,8 @@ async def test_update_scene_record_raises_404_when_scene_not_found():
             projects_db=database,
             project_id="proj-777",
             scene_id="nonexistent-scene",
+            video_key="projects/proj-777/scenes/nonexistent-scene/shot.mp4",
+            thumbnail_key="projects/proj-777/scenes/nonexistent-scene/shot_thumb.jpg",
             user=staff,
         )
 
@@ -253,6 +259,8 @@ async def test_update_scene_record_raises_403_when_wrong_group():
             projects_db=database,
             project_id="proj-111",
             scene_id="scene-1",
+            video_key="projects/proj-111/scenes/scene-1/shot.mp4",
+            thumbnail_key="projects/proj-111/scenes/scene-1/shot_thumb.jpg",
             user=other_staff,
         )
 
@@ -295,5 +303,7 @@ async def test_update_scene_record_raises_403_when_not_assigned():
             projects_db=database,
             project_id="proj-222",
             scene_id="scene-1",
+            video_key="projects/proj-222/scenes/scene-1/shot.mp4",
+            thumbnail_key="projects/proj-222/scenes/scene-1/shot_thumb.jpg",
             user=unassigned_staff,
         )

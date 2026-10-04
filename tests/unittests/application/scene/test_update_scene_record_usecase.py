@@ -49,22 +49,10 @@ async def test_usecase_delegates_to_update_scene_record():
         updated_at="2026-01-01T00:00:00Z",
     )
 
-    expected_project_dict = mock_project.model_dump(by_alias=True)
-    mock_db.get_item = AsyncMock(return_value=expected_project_dict)
-    expected_output = Project.model_validate(expected_project_dict)
-
     with (
         patch(
             "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
-            new=AsyncMock(
-                return_value=(
-                    mock_project,
-                    0,
-                    "shot-abc",
-                    "projects/proj-123/scenes/scene-1/shot-abc.mp4",
-                    None,
-                ),
-            ),
+            new=AsyncMock(return_value=(mock_project, None)),
         ) as mock_update,
         patch(
             "recnavi.application.scene.update_scene_record_usecase.upload_base64",
@@ -85,14 +73,15 @@ async def test_usecase_delegates_to_update_scene_record():
             video_bucket_name="test-bucket",
         )
 
-    mock_update.assert_awaited_once_with(
-        projects_db=mock_db,
-        project_id="proj-123",
-        scene_id="scene-1",
-        user=staff,
-    )
-    assert result.project_id == expected_output.project_id
-    assert result.model_dump() == expected_output.model_dump()
+    assert mock_update.await_count == 1
+    call_kwargs = mock_update.call_args[1]
+    assert call_kwargs["projects_db"] is mock_db
+    assert call_kwargs["project_id"] == "proj-123"
+    assert call_kwargs["scene_id"] == "scene-1"
+    assert call_kwargs["user"] is staff
+    assert "video_key" in call_kwargs
+    assert "thumbnail_key" in call_kwargs
+    assert result is mock_project
 
 
 @pytest.mark.asyncio
