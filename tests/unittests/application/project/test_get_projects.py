@@ -30,6 +30,7 @@ async def test_get_projects_usecase_delegates_to_core():
     ) as mock_get_projects:
         result = await get_projects_usecase(
             projects_db=projects_db,
+            user_id="test-user-id",
             group_id="group-123",
             limit=20,
             cursor="cursor-1",
@@ -37,6 +38,7 @@ async def test_get_projects_usecase_delegates_to_core():
 
     mock_get_projects.assert_awaited_with(
         projects_db=projects_db,
+        user_id="test-user-id",
         group_id="group-123",
         limit=20,
         cursor="cursor-1",
