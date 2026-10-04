@@ -17,6 +17,8 @@ from fastapi import Request
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
+from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
+from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
@@ -137,3 +139,27 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/deleteProject")
+async def delete_project_endpoint(
+    request: Request,
+    item: DeleteProjectRequest,
+    user: User = Depends(verify_user),
+) -> DeleteProjectResponse:
+    """Delete project and associated S3 files."""
+    from recnavi.application.project.delete_project_usecase import (
+        delete_project_usecase,
+    )
+    from recnavi.config.variables import MEDIA_BUCKET_NAME
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    await delete_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        user=user,
+        media_bucket_name=MEDIA_BUCKET_NAME,
+    )
+
+    return DeleteProjectResponse(success=True)

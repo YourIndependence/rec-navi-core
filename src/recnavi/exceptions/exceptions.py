@@ -110,3 +110,9 @@ class ClientAuthorizationError(BaseClientExceptionError):
     """User authorization/permission error (403 Forbidden)."""
 
     pass
+
+
+class ClientNotFoundError(BaseClientExceptionError):
+    """Resource not found error (404 Not Found)."""
+
+    pass
