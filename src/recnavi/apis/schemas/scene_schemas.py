@@ -9,10 +9,19 @@
 
 """Scene-related API schemas."""
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+
+
+if TYPE_CHECKING:
+    from recnavi.core.types.project import Project
 
 
 class SceneMasterView(BaseModel):
@@ -51,3 +60,37 @@ class GetSceneMastersResponse(BaseModel):
         ...,
         description="List of all scene masters",
     )
+
+
+class UpdateSceneRecordRequest(BaseItemModel):
+    """Request for POST /updateSceneRecord."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    video: str = Field(..., description="Base64-encoded video data")
+    thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
+
+
+class UpdateSceneRecordResponse(BaseApiResponseModel):
+    """Response for POST /updateSceneRecord."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: "Project" = Field(..., description="Updated project")
+
+
+class ReviewSceneRequest(BaseItemModel):
+    """Request for POST /reviewScene."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    result: str = Field(..., description="Review result (approve or reject)")
+    comment: str | None = Field(default=None, description="Review comment")
+
+
+class ReviewSceneResponse(BaseApiResponseModel):
+    """Response for POST /reviewScene."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: "Project" = Field(..., description="Updated project")
