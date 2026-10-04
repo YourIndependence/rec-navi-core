@@ -53,12 +53,7 @@ class DynamoDb(BaseDatabase):
             return _convert_from_dynamodb_format(item) if item else None
 
     async def put_item(self, item: dict[str, Any]) -> None:
-        """Put an item into the table.
-
-        Args:
-            item: Item to store with Python native types.
-
-        """
+        """Put an item into the table."""
         converted_item = _convert_to_dynamodb_format(item)
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
@@ -107,12 +102,7 @@ class DynamoDb(BaseDatabase):
             )
 
     async def delete_item(self, key: dict[str, Any]) -> None:
-        """Delete an item by primary key.
-
-        Args:
-            key: Primary key as a dictionary.
-
-        """
+        """Delete an item by primary key."""
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
             await table.delete_item(Key=key)

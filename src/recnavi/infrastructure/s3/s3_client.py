@@ -19,17 +19,7 @@ async def generate_presigned_url(
     object_key: str,
     expiration: int = 3600,
 ) -> str:
-    """Generate presigned URL for S3 object.
-
-    Args:
-        bucket_name: S3 bucket name.
-        object_key: S3 object key (e.g., "videos/scene-123.mp4").
-        expiration: URL expiration time in seconds (default 3600 = 1 hour).
-
-    Returns:
-        Presigned URL string.
-
-    """
+    """Generate presigned URL for S3 object."""
     session = aioboto3.Session()
     async with session.client("s3", region_name=REGION) as s3:
         url = s3.generate_presigned_url(
