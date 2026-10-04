@@ -28,7 +28,8 @@ async def update_scene_record(
     video_key: str,
     thumbnail_key: str,
     user: User,
-) -> tuple[Project, str | None]:
+    s3_delete_callback=None,
+) -> Project:
     """Update scene recording in DynamoDB after S3 upload.
 
     Args:
@@ -38,11 +39,10 @@ async def update_scene_record(
         video_key: S3 key for uploaded video.
         thumbnail_key: S3 key for uploaded thumbnail.
         user: Authenticated user (must be assigned staff).
+        s3_delete_callback: Optional async callback to delete old S3 objects.
 
     Returns:
-        Tuple of:
-        - Updated project
-        - Old video S3 key prefix (for cleanup, None if first recording)
+        Updated project.
 
     Raises:
         ClientNotFoundError: Project or scene not found.
@@ -99,14 +99,12 @@ async def update_scene_record(
         },
     )
 
-    updated_item = await projects_db.get_item(key={"projectId": project_id})
-    updated_project = Project.model_validate(updated_item)
-
-    old_key_prefix = None
-    if old_video_key:
+    if old_video_key and s3_delete_callback:
         old_shot_id = old_video_key.split("/")[-1].replace(".mp4", "")
         old_key_prefix = (
             f"projects/{project_id}/scenes/{scene_id}/{old_shot_id}"
         )
+        await s3_delete_callback(old_key_prefix)
 
-    return updated_project, old_key_prefix
+    updated_item = await projects_db.get_item(key={"projectId": project_id})
+    return Project.model_validate(updated_item)

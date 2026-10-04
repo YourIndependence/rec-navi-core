@@ -9,7 +9,6 @@
 
 """Review scene use case."""
 
-
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.review_scene import review_scene
 from recnavi.core.types.project import Project

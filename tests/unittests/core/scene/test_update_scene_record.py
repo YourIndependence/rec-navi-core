@@ -55,7 +55,7 @@ async def test_update_scene_record_returns_shot_id_and_keys():
     video_key = "projects/proj-123/scenes/scene-1/shot-abc.mp4"
     thumbnail_key = "projects/proj-123/scenes/scene-1/shot-abc_thumb.jpg"
 
-    updated_project, old_key_prefix = await update_scene_record(
+    updated_project = await update_scene_record(
         projects_db=database,
         project_id="proj-123",
         scene_id="scene-1",
@@ -68,12 +68,11 @@ async def test_update_scene_record_returns_shot_id_and_keys():
     assert updated_project.scenes[0].video_key == video_key
     assert updated_project.scenes[0].thumbnail_key == thumbnail_key
     assert updated_project.scenes[0].status.value == "pending"
-    assert old_key_prefix is None
 
 
 @pytest.mark.asyncio
 async def test_update_scene_record_returns_none_for_old_key_on_first_recording():
-    """Test update_scene_record returns None for old_key_prefix on first recording."""
+    """Test update_scene_record without old video key (first recording)."""
     database = MockDatabase(
         initial_items=[
             {
@@ -102,7 +101,7 @@ async def test_update_scene_record_returns_none_for_old_key_on_first_recording()
         role=UserRole.STAFF,
     )
 
-    _, old_key_prefix = await update_scene_record(
+    updated_project = await update_scene_record(
         projects_db=database,
         project_id="proj-456",
         scene_id="scene-2",
@@ -111,12 +110,13 @@ async def test_update_scene_record_returns_none_for_old_key_on_first_recording()
         user=staff,
     )
 
-    assert old_key_prefix is None
+    assert updated_project.project_id == "proj-456"
+    assert updated_project.scenes[0].video_key is not None
 
 
 @pytest.mark.asyncio
 async def test_update_scene_record_returns_old_key_on_subsequent_recording():
-    """Test update_scene_record returns old_key_prefix on subsequent recording."""
+    """Test update_scene_record calls callback when old video exists."""
     database = MockDatabase(
         initial_items=[
             {
@@ -145,16 +145,24 @@ async def test_update_scene_record_returns_old_key_on_subsequent_recording():
         role=UserRole.STAFF,
     )
 
-    _, old_key_prefix = await update_scene_record(
+    deleted_prefix = None
+
+    async def mock_delete(prefix: str) -> None:
+        nonlocal deleted_prefix
+        deleted_prefix = prefix
+
+    updated_project = await update_scene_record(
         projects_db=database,
         project_id="proj-999",
         scene_id="scene-3",
         video_key="projects/proj-999/scenes/scene-3/new-shot.mp4",
         thumbnail_key="projects/proj-999/scenes/scene-3/new-shot_thumb.jpg",
         user=staff,
+        s3_delete_callback=mock_delete,
     )
 
-    assert old_key_prefix == "projects/proj-999/scenes/scene-3/old-shot-123"
+    assert updated_project.project_id == "proj-999"
+    assert deleted_prefix == "projects/proj-999/scenes/scene-3/old-shot-123"
 
 
 @pytest.mark.asyncio

@@ -52,14 +52,10 @@ async def test_usecase_delegates_to_update_scene_record():
     with (
         patch(
             "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
-            new=AsyncMock(return_value=(mock_project, None)),
+            new=AsyncMock(return_value=mock_project),
         ) as mock_update,
         patch(
             "recnavi.application.scene.update_scene_record_usecase.upload_base64",
-            new=AsyncMock(),
-        ),
-        patch(
-            "recnavi.application.scene.update_scene_record_usecase.delete_objects_by_prefix",
             new=AsyncMock(),
         ),
     ):
@@ -81,6 +77,7 @@ async def test_usecase_delegates_to_update_scene_record():
     assert call_kwargs["user"] is staff
     assert "video_key" in call_kwargs
     assert "thumbnail_key" in call_kwargs
+    assert "s3_delete_callback" in call_kwargs
     assert result is mock_project
 
 

@@ -69,19 +69,18 @@ async def update_scene_record_usecase(
         content_type="image/jpeg",
     )
 
-    updated_project, old_key_prefix = await update_scene_record(
+    async def delete_old_shot(prefix: str) -> None:
+        await delete_objects_by_prefix(
+            bucket_name=video_bucket_name,
+            prefix=prefix,
+        )
+
+    return await update_scene_record(
         projects_db=projects_db,
         project_id=project_id,
         scene_id=scene_id,
         video_key=video_key,
         thumbnail_key=thumbnail_key,
         user=user,
+        s3_delete_callback=delete_old_shot,
     )
-
-    if old_key_prefix:
-        await delete_objects_by_prefix(
-            bucket_name=video_bucket_name,
-            prefix=old_key_prefix,
-        )
-
-    return updated_project
