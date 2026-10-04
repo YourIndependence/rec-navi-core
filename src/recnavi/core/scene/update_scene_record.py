@@ -30,26 +30,7 @@ async def update_scene_record(
     user: User,
     s3_delete_callback=None,
 ) -> Project:
-    """Update scene recording in DynamoDB after S3 upload.
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: ID of project containing the scene.
-        scene_id: ID of scene to update.
-        video_key: S3 key for uploaded video.
-        thumbnail_key: S3 key for uploaded thumbnail.
-        user: Authenticated user (must be assigned staff).
-        s3_delete_callback: Optional async callback to delete old S3 objects.
-
-    Returns:
-        Updated project.
-
-    Raises:
-        ClientNotFoundError: Project or scene not found.
-        ClientAuthorizationError: User not in same group or not assigned to scene.
-        ClientConflictError: Concurrent modification detected.
-
-    """
+    """Update scene recording in DynamoDB after S3 upload."""
     item = await projects_db.get_item(key={"projectId": project_id})
     if not item:
         raise ClientNotFoundError("Project not found")

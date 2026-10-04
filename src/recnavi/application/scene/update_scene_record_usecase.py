@@ -29,26 +29,7 @@ async def update_scene_record_usecase(
     user: User,
     video_bucket_name: str,
 ) -> Project:
-    """Upload scene recording to S3 and update DynamoDB.
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: Project ID.
-        scene_id: Scene ID.
-        video_base64: Base64-encoded video data.
-        thumbnail_base64: Base64-encoded thumbnail data.
-        user: Authenticated user.
-        video_bucket_name: S3 bucket name for videos.
-
-    Returns:
-        Updated project with new scene recording.
-
-    Raises:
-        ClientNotFoundError: Project/scene not found.
-        ClientAuthorizationError: Not authorized.
-        ClientConflictError: Concurrent modification detected.
-
-    """
+    """Upload scene recording to S3 and update DynamoDB."""
     shot_id = str(uuid.uuid4())
     video_key = f"projects/{project_id}/scenes/{scene_id}/{shot_id}.mp4"
     thumbnail_key = (
