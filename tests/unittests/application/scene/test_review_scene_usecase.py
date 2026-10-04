@@ -51,7 +51,9 @@ async def test_usecase_delegates_to_review_scene():
         updated_at="2026-01-01T00:00:00Z",
     )
 
-    mock_db.get_item = AsyncMock(return_value=mock_project.model_dump(by_alias=True))
+    mock_db.get_item = AsyncMock(
+        return_value=mock_project.model_dump(by_alias=True)
+    )
 
     with patch(
         "recnavi.application.scene.review_scene_usecase.review_scene",
