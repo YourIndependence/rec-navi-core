@@ -49,9 +49,9 @@ async def test_usecase_delegates_to_update_scene_record():
         updated_at="2026-01-01T00:00:00Z",
     )
 
-    mock_db.get_item = AsyncMock(
-        return_value=mock_project.model_dump(by_alias=True),
-    )
+    expected_project_dict = mock_project.model_dump(by_alias=True)
+    mock_db.get_item = AsyncMock(return_value=expected_project_dict)
+    expected_output = Project.model_validate(expected_project_dict)
 
     with (
         patch(
@@ -91,8 +91,8 @@ async def test_usecase_delegates_to_update_scene_record():
         scene_id="scene-1",
         user=staff,
     )
-    assert isinstance(result, Project)
-    assert result.project_id == "proj-123"
+    assert result.project_id == expected_output.project_id
+    assert result.model_dump() == expected_output.model_dump()
 
 
 @pytest.mark.asyncio
