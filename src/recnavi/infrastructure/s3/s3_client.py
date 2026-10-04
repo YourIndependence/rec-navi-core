@@ -21,17 +21,7 @@ async def generate_presigned_url(
     object_key: str,
     expiration: int = 3600,
 ) -> str:
-    """Generate presigned URL for S3 object.
-
-    Args:
-        bucket_name: S3 bucket name.
-        object_key: S3 object key (e.g., "videos/scene-123.mp4").
-        expiration: URL expiration time in seconds (default 3600 = 1 hour).
-
-    Returns:
-        Presigned URL string.
-
-    """
+    """Generate presigned URL for S3 object."""
     session = aioboto3.Session()
     async with session.client("s3", region_name=REGION) as s3:
         url = s3.generate_presigned_url(
@@ -47,16 +37,7 @@ async def delete_objects_by_prefix(
     bucket_name: str,
     prefix: str,
 ) -> int:
-    """Delete all S3 objects under a prefix.
-
-    Args:
-        bucket_name: S3 bucket name.
-        prefix: Object key prefix (e.g., "projects/proj-123/").
-
-    Returns:
-        Number of objects deleted.
-
-    """
+    """Delete all S3 objects under a prefix."""
     session = aioboto3.Session()
     deleted_count = 0
 
@@ -101,18 +82,7 @@ async def upload_base64(
     base64_data: str,
     content_type: str = "video/mp4",
 ) -> None:
-    """Upload base64-encoded data to S3.
-
-    Args:
-        bucket_name: S3 bucket name.
-        object_key: S3 object key (e.g., "projects/proj-123/scenes/scene-1/shot-abc.mp4").
-        base64_data: Base64-encoded binary data.
-        content_type: MIME type for Content-Type header.
-
-    Raises:
-        ValueError: Invalid base64 data.
-
-    """
+    """Upload base64-encoded data to S3."""
     try:
         binary_data = base64.b64decode(base64_data)
     except Exception as e:
