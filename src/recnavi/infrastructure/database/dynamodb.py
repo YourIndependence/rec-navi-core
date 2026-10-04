@@ -58,17 +58,7 @@ class DynamoDb(BaseDatabase):
         condition_expression: str | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> None:
-        """Put an item into the table with optional condition.
-
-        Args:
-            item: Item to store with Python native types.
-            condition_expression: Optional DynamoDB condition expression.
-            expression_attribute_values: Values for condition expression placeholders.
-
-        Raises:
-            ClientConflictError: Condition check failed (409).
-
-        """
+        """Put an item into the table with optional condition."""
         from botocore.exceptions import ClientError
 
         from recnavi.exceptions.exceptions import ClientConflictError
@@ -147,22 +137,7 @@ class DynamoDb(BaseDatabase):
         expression_attribute_names: dict[str, str] | None = None,
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Update item with UpdateExpression.
-
-        Args:
-            key: Primary key of item to update.
-            update_expression: DynamoDB UpdateExpression (e.g., "SET status = :status").
-            condition_expression: Optional condition (e.g., "sceneId = :sceneId").
-            expression_attribute_names: Attribute name substitutions.
-            expression_attribute_values: Value substitutions.
-
-        Returns:
-            Updated item with Python native types.
-
-        Raises:
-            ClientConflictError: Condition check failed.
-
-        """
+        """Update item with UpdateExpression."""
         from botocore.exceptions import ClientError
 
         from recnavi.exceptions.exceptions import ClientConflictError
