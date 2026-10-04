@@ -52,7 +52,7 @@ async def test_usecase_delegates_to_review_scene():
     )
 
     mock_db.get_item = AsyncMock(
-        return_value=mock_project.model_dump(by_alias=True)
+        return_value=mock_project.model_dump(by_alias=True),
     )
 
     with patch(
