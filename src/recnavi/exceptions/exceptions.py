@@ -110,3 +110,9 @@ class ClientAuthorizationError(BaseClientExceptionError):
     """User authorization/permission error (403 Forbidden)."""
 
     pass
+
+
+class ClientConflictError(BaseClientExceptionError):
+    """Conflict error for optimistic locking failure (409 Conflict)."""
+
+    pass
