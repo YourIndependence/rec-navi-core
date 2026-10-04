@@ -68,3 +68,15 @@ class Scene(BaseModel):
         default_factory=list,
         description="Identifiers of the staff who record the scene",
     )
+    reviewed_by: str | None = Field(
+        default=None,
+        description="Identifier of the owner who reviewed the scene",
+    )
+    reviewed_at: str | None = Field(
+        default=None,
+        description="Datetime the scene was reviewed",
+    )
+    review_comment: str | None = Field(
+        default=None,
+        description="Review comment from the owner",
+    )
