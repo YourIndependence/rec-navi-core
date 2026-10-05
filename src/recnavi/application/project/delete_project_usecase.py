@@ -22,18 +22,7 @@ async def delete_project_usecase(
     user: User,
     video_bucket_name: str,
 ) -> str:
-    """Delete project from database and S3.
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: ID of project to delete.
-        user: Authenticated user.
-        video_bucket_name: S3 bucket name for videos.
-
-    Returns:
-        Deleted project ID.
-
-    """
+    """Delete project from database and S3."""
     deleted_project_id = await delete_project(
         projects_db=projects_db,
         project_id=project_id,

@@ -23,21 +23,7 @@ async def delete_project(
     project_id: str,
     user: User,
 ) -> str:
-    """Delete a project (owner-only operation).
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: ID of project to delete.
-        user: Authenticated user attempting deletion.
-
-    Returns:
-        Deleted project ID.
-
-    Raises:
-        ClientNotFoundError: Project does not exist.
-        ClientAuthorizationError: User is not owner or not same group.
-
-    """
+    """Delete a project (owner-only operation)."""
     if user.role != UserRole.OWNER:
         raise ClientAuthorizationError("Only owners can delete projects")
 
