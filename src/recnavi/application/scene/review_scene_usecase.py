@@ -24,26 +24,7 @@ async def review_scene_usecase(
     review_comment: str | None,
     user: User,
 ) -> Project:
-    """Review a scene recording (approve or reject).
-
-    Args:
-        projects_db: Database instance for projects table.
-        project_id: Project ID.
-        scene_id: Scene ID.
-        result: Review result ("approve" or "reject").
-        review_comment: Optional review comment.
-        user: Authenticated user (must be owner).
-
-    Returns:
-        Updated project with reviewed scene.
-
-    Raises:
-        ClientAuthorizationError: User is not owner or different group.
-        ClientNotFoundError: Project or scene not found.
-        ClientUnprocessableEntityError: Invalid result value.
-        ClientConflictError: Concurrent modification detected.
-
-    """
+    """Review a scene recording (approve or reject)."""
     return await review_scene(
         projects_db=projects_db,
         project_id=project_id,
