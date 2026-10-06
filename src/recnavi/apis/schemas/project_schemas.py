@@ -60,3 +60,25 @@ class CreateProjectResponse(BaseApiResponseModel):
     """Response for POST /createProject."""
 
     project: Project = Field(..., description="Created project")
+
+
+class DownloadProjectRequest(BaseItemModel):
+    """Request schema for POST /downloadProject."""
+
+    project_id: str = Field(
+        ...,
+        alias="projectId",
+        description="Project identifier",
+    )
+
+
+class DownloadProjectResponse(BaseApiResponseModel):
+    """Response schema for POST /downloadProject."""
+
+    download_url: str = Field(
+        ...,
+        alias="downloadUrl",
+        description=(
+            "Presigned S3 URL for zip archive download (1-hour expiration)"
+        ),
+    )
