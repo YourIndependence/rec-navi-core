@@ -16,5 +16,19 @@ from recnavi.core.types.scene_master import SceneMaster
 async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
     """Retrieve all scene masters from the database."""
     result = await scenes_db.scan()
-
     return [SceneMaster.model_validate(item) for item in result.items]
+
+
+async def get_scene_master_by_principal(
+    *,
+    scenes_db: BaseDatabase,
+    scene_principal: str,
+) -> SceneMaster | None:
+    """Get a single scene master by principal."""
+    result = await scenes_db.scan()
+
+    for item in result.items:
+        if item.get("scenePrincipal") == scene_principal:
+            return SceneMaster.model_validate(item)
+
+    return None
