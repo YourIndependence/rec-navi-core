@@ -14,6 +14,7 @@ from fastapi import Depends
 from fastapi import Query
 from fastapi import Request
 
+from recnavi.apis.auth.auth import verify_admin
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
@@ -22,6 +23,8 @@ from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
+from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
+from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
@@ -30,7 +33,9 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.scene.update_scene_usecase import update_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.types.user import User
@@ -88,7 +93,6 @@ async def get_projects_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
-        user_id=user.user_id,
         group_id=user.group_id,
         limit=limit,
         cursor=cursor,
@@ -137,3 +141,37 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post(
+    "/updateScene",
+    response_model=UpdateSceneResponse,
+)
+async def update_scene_endpoint(
+    request: Request,
+    item: UpdateSceneRequest,
+    _user: User = Depends(verify_admin),
+) -> UpdateSceneResponse:
+    """Create or update scene master (admin-only)."""
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    scenes = await update_scene_usecase(
+        scenes_db=scenes_db,
+        scene_principal=item.scene_principal,
+        title=item.title,
+        max_duration_seconds=item.max_duration_seconds,
+        example_image=item.example_image,
+        guide_image=item.guide_image,
+        bucket_name=SCENE_IMAGES_BUCKET_NAME,
+    )
+
+    scene_views = [
+        SceneMasterView(
+            scene_principal=sm.scene_principal,
+            title=sm.title,
+            max_duration_seconds=sm.max_duration_seconds,
+        )
+        for sm in scenes
+    ]
+
+    return UpdateSceneResponse(scenes=scene_views)

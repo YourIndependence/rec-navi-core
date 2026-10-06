@@ -14,6 +14,9 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+
 
 class SceneMasterView(BaseModel):
     """Scene master view for API responses.
@@ -38,16 +41,51 @@ class SceneMasterView(BaseModel):
     )
 
 
-class GetSceneMastersResponse(BaseModel):
+class GetSceneMastersResponse(BaseApiResponseModel):
     """Response for GET /getSceneMasters."""
 
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    status: str = Field(default="ok", description="Response status")
     scenes: list[SceneMasterView] = Field(
         ...,
         description="List of all scene masters",
+    )
+
+
+class UpdateSceneRequest(BaseItemModel):
+    """Request for POST /updateScene (admin-only).
+
+    Creates a new scene master if scenePrincipal doesn't exist,
+    or updates existing scene master if it does (upsert pattern).
+    """
+
+    scene_principal: str = Field(
+        ...,
+        description="Identifier of the scene master",
+    )
+    title: str = Field(..., description="Name shown to the staff")
+    max_duration_seconds: int = Field(
+        ...,
+        description="How long the staff may record (1-10 seconds)",
+    )
+    example_image: str | None = Field(
+        None,
+        description=(
+            "Base64-encoded example photo "
+            "(required on create, optional on update)"
+        ),
+    )
+    guide_image: str | None = Field(
+        None,
+        description=(
+            "Base64-encoded framing guide "
+            "(required on create, optional on update)"
+        ),
+    )
+
+
+class UpdateSceneResponse(BaseApiResponseModel):
+    """Response for POST /updateScene."""
+
+    scenes: list[SceneMasterView] = Field(
+        ...,
+        description="List of all scene masters after update",
     )
