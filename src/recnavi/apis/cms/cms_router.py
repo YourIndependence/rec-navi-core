@@ -14,6 +14,7 @@ from fastapi import Depends
 from fastapi import Query
 from fastapi import Request
 
+from recnavi.apis.auth.auth import verify_admin
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
@@ -23,6 +24,8 @@ from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.template_schemas import UpdateTemplateRequest
+from recnavi.apis.schemas.template_schemas import UpdateTemplateResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
@@ -30,7 +33,11 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.scene.update_template_usecase import (
+    update_template_usecase,
+)
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.types.user import User
@@ -88,7 +95,6 @@ async def get_projects_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
-        user_id=user.user_id,
         group_id=user.group_id,
         limit=limit,
         cursor=cursor,
@@ -137,3 +143,29 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post(
+    "/updateTemplate",
+    response_model=UpdateTemplateResponse,
+)
+async def update_template_endpoint(
+    request: Request,
+    item: UpdateTemplateRequest,
+    _user: User = Depends(verify_admin),
+) -> UpdateTemplateResponse:
+    """Create or update template (admin-only)."""
+    templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    templates = await update_template_usecase(
+        templates_db=templates_db,
+        scenes_db=scenes_db,
+        template_id=item.template_id,
+        title=item.title,
+        scene_principals=item.scene_principals,
+        thumbnail=item.thumbnail,
+        bucket_name=SCENE_IMAGES_BUCKET_NAME,
+    )
+
+    return UpdateTemplateResponse(templates=templates)
