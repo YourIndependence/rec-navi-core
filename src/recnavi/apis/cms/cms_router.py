@@ -17,12 +17,19 @@ from fastapi import Request
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
+from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
+from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
+from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
+from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
+from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
@@ -30,9 +37,14 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.user.get_group_users_usecase import (
+    get_group_users_usecase,
+)
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -77,6 +89,20 @@ async def get_templates_endpoint(
     return GetTemplatesResponse(templates=templates)
 
 
+@cms_router.get("/getGroupUsers")
+async def get_group_users_endpoint(
+    request: Request,
+    user: User = Depends(verify_user),
+) -> GetGroupUsersResponse:
+    """List all users in the authenticated user's group."""
+    users_db = request.app.state.database[USERS_TABLE_NAME]
+    users = await get_group_users_usecase(
+        users_db=users_db,
+        group_id=user.group_id,
+    )
+    return GetGroupUsersResponse(users=users)
+
+
 @cms_router.get("/getProjects")
 async def get_projects_endpoint(
     request: Request,
@@ -88,7 +114,6 @@ async def get_projects_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
-        user_id=user.user_id,
         group_id=user.group_id,
         limit=limit,
         cursor=cursor,
@@ -137,3 +162,88 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/updateProject")
+async def update_project_endpoint(
+    request: Request,
+    payload: UpdateProjectRequest,
+    user: User = Depends(verify_user),
+) -> UpdateProjectResponse:
+    """Update project with optimistic locking."""
+    from recnavi.application.project.update_project_usecase import (
+        update_project_usecase,
+    )
+    from recnavi.core.types.scene_input import SceneInput as CoreSceneInput
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    core_scene_inputs = [
+        CoreSceneInput(
+            scene_id=scene.scene_id,
+            scene_principal=scene.scene_principal,
+            assigned_user_ids=scene.assigned_user_ids,
+        )
+        for scene in payload.project.scenes
+    ]
+
+    updated_project = await update_project_usecase(
+        projects_db=projects_db,
+        project_id=payload.project.project_id,
+        project_name=payload.project.project_name,
+        description=payload.project.description,
+        assigned_user_ids=payload.project.assigned_user_ids,
+        scenes=core_scene_inputs,
+        expected_version=payload.project.version,
+        user=user,
+    )
+
+    return UpdateProjectResponse(project=updated_project)
+
+
+@cms_router.post("/deleteProject")
+async def delete_project_endpoint(
+    request: Request,
+    payload: DeleteProjectRequest,
+    user: User = Depends(verify_user),
+) -> DeleteProjectResponse:
+    """Delete a project and its recordings."""
+    from recnavi.application.project.delete_project_usecase import (
+        delete_project_usecase,
+    )
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    project_id = await delete_project_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        user=user,
+        video_bucket_name=MEDIA_BUCKET_NAME,
+    )
+
+    return DeleteProjectResponse(project_id=project_id)
+
+
+@cms_router.post("/reviewScene")
+async def review_scene_endpoint(
+    request: Request,
+    payload: ReviewSceneRequest,
+    user: User = Depends(verify_user),
+) -> ReviewSceneResponse:
+    """Review a recorded scene (owner-only operation)."""
+    from recnavi.application.scene.review_scene_usecase import (
+        review_scene_usecase,
+    )
+
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await review_scene_usecase(
+        projects_db=projects_db,
+        project_id=payload.project_id,
+        scene_id=payload.scene_id,
+        result=payload.result,
+        review_comment=payload.comment,
+        user=user,
+    )
+
+    return ReviewSceneResponse(project=updated_project)
