@@ -11,6 +11,7 @@
 
 import pytest
 
+from recnavi.core.scene.scenes_template import get_template_by_id
 from recnavi.core.scene.scenes_template import get_templates
 from tests.mockups.mock_database import MockDatabase
 
@@ -100,3 +101,92 @@ async def test_get_templates_preserves_duplicates_in_scene_principals():
         "main_dish",
     ]
     assert len(result[0].scene_principals) == 3
+
+
+@pytest.mark.asyncio
+async def test_get_template_by_id_returns_template_when_found():
+    """Test get_template_by_id returns template when it exists."""
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "templateId": "cafe_standard",
+                "title": "Cafe Standard",
+                "scenePrincipals": ["shop_gaikan", "main_dish"],
+                "thumbnailUri": "s3://bucket/cafe_standard.jpg",
+            },
+            {
+                "templateId": "restaurant_deluxe",
+                "title": "Restaurant Deluxe",
+                "scenePrincipals": ["interior", "main_dish"],
+                "thumbnailUri": "s3://bucket/restaurant_deluxe.jpg",
+            },
+        ],
+    )
+
+    result = await get_template_by_id(
+        templates_db=mock_db,
+        template_id="cafe_standard",
+    )
+
+    assert result is not None
+    assert result.template_id == "cafe_standard"
+    assert result.title == "Cafe Standard"
+    assert result.thumbnail_uri == "s3://bucket/cafe_standard.jpg"
+
+
+@pytest.mark.asyncio
+async def test_get_template_by_id_returns_none_when_not_found():
+    """Test get_template_by_id returns None when template doesn't exist."""
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "templateId": "cafe_standard",
+                "title": "Cafe Standard",
+                "scenePrincipals": ["shop_gaikan"],
+                "thumbnailUri": "s3://bucket/cafe_standard.jpg",
+            },
+        ],
+    )
+
+    result = await get_template_by_id(
+        templates_db=mock_db,
+        template_id="nonexistent_template",
+    )
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_template_by_id_returns_correct_template_from_multiple():
+    """Test get_template_by_id returns correct template among multiple."""
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "templateId": "template_a",
+                "title": "Template A",
+                "scenePrincipals": ["scene_a"],
+                "thumbnailUri": "s3://bucket/a.jpg",
+            },
+            {
+                "templateId": "template_b",
+                "title": "Template B",
+                "scenePrincipals": ["scene_b"],
+                "thumbnailUri": "s3://bucket/b.jpg",
+            },
+            {
+                "templateId": "template_c",
+                "title": "Template C",
+                "scenePrincipals": ["scene_c"],
+                "thumbnailUri": "s3://bucket/c.jpg",
+            },
+        ],
+    )
+
+    result = await get_template_by_id(
+        templates_db=mock_db,
+        template_id="template_b",
+    )
+
+    assert result is not None
+    assert result.template_id == "template_b"
+    assert result.title == "Template B"
