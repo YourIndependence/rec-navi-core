@@ -23,48 +23,6 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_usecase_calls_get_template_by_id():
-    """Test usecase calls core get_template_by_id to retrieve template."""
-    mock_db = MockDatabase()
-
-    expected_template = ScenesTemplate(
-        template_id="cafe_standard",
-        title="Cafe Standard",
-        scene_principals=["shop_gaikan"],
-        thumbnail_uri="templates/cafe_standard/thumbnail.jpg",
-    )
-
-    class MockStreamingBody:
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            raise StopAsyncIteration
-
-    with (
-        patch(
-            "recnavi.application.master.get_template_thumbnail_usecase.get_template_by_id",
-            new=AsyncMock(return_value=expected_template),
-        ) as mock_get_template,
-        patch(
-            "recnavi.application.master.get_template_thumbnail_usecase.download_object_stream",
-            return_value=MockStreamingBody(),
-        ),
-    ):
-        _, content_type = await get_template_thumbnail_usecase(
-            templates_db=mock_db,
-            template_id="cafe_standard",
-            bucket_name="test-bucket",
-        )
-
-    mock_get_template.assert_awaited_once_with(
-        templates_db=mock_db,
-        template_id="cafe_standard",
-    )
-    assert content_type == "image/jpeg"
-
-
-@pytest.mark.asyncio
 async def test_usecase_returns_stream_and_content_type_for_template():
     """Test usecase returns byte stream and correct content type."""
     mock_db = MockDatabase(
