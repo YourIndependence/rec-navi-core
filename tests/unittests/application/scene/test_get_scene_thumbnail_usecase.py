@@ -24,8 +24,8 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_get_scene_master_by_principal():
-    """Test usecase delegates to core get_scene_master_by_principal collaborator."""
+async def test_usecase_calls_get_scene_master_by_principal():
+    """Test usecase calls core get_scene_master_by_principal to retrieve scene master."""
     mock_db = MockDatabase()
 
     expected_scene_master = SceneMaster(
