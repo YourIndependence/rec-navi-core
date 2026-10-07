@@ -26,7 +26,7 @@ from tests.mockups.mock_database import MockDatabase
 
 @pytest.mark.asyncio
 async def test_submit_project_all_approved():
-    """Test submit_project returns should_submit=True when all scenes approved."""
+    """Test submit_project updates status to SUBMITTED when all scenes approved."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -57,7 +57,7 @@ async def test_submit_project_all_approved():
         role=UserRole.STAFF,
     )
 
-    result_project, missing_scene_ids, should_submit = await submit_project(
+    result_project, missing_scene_ids = await submit_project(
         projects_db=db,
         project_id="proj-123",
         user=user,
@@ -65,12 +65,13 @@ async def test_submit_project_all_approved():
 
     assert result_project.project_id == "proj-123"
     assert missing_scene_ids == []
-    assert should_submit is True
+    assert result_project.status == ProjectStatus.SUBMITTED
+    assert result_project.updated_at != "2026-01-01T00:00:00Z"
 
 
 @pytest.mark.asyncio
 async def test_submit_project_one_not_recorded():
-    """Test submit_project returns missing scene ID when one not recorded."""
+    """Test submit_project returns missing scene ID and does not update status."""
     project = Project(
         project_id="proj-456",
         group_id="group-2",
@@ -101,7 +102,7 @@ async def test_submit_project_one_not_recorded():
         role=UserRole.STAFF,
     )
 
-    result_project, missing_scene_ids, should_submit = await submit_project(
+    result_project, missing_scene_ids = await submit_project(
         projects_db=db,
         project_id="proj-456",
         user=user,
@@ -109,12 +110,13 @@ async def test_submit_project_one_not_recorded():
 
     assert result_project.project_id == "proj-456"
     assert missing_scene_ids == ["scene-4"]
-    assert should_submit is False
+    assert result_project.status == ProjectStatus.IN_PROGRESS
+    assert result_project.updated_at == "2026-01-01T00:00:00Z"
 
 
 @pytest.mark.asyncio
 async def test_submit_project_one_rejected():
-    """Test submit_project returns missing scene ID when one rejected."""
+    """Test submit_project returns missing scene ID and does not update status."""
     project = Project(
         project_id="proj-789",
         group_id="group-3",
@@ -145,7 +147,7 @@ async def test_submit_project_one_rejected():
         role=UserRole.STAFF,
     )
 
-    result_project, missing_scene_ids, should_submit = await submit_project(
+    result_project, missing_scene_ids = await submit_project(
         projects_db=db,
         project_id="proj-789",
         user=user,
@@ -153,7 +155,8 @@ async def test_submit_project_one_rejected():
 
     assert result_project.project_id == "proj-789"
     assert missing_scene_ids == ["scene-6"]
-    assert should_submit is False
+    assert result_project.status == ProjectStatus.IN_PROGRESS
+    assert result_project.updated_at == "2026-01-01T00:00:00Z"
 
 
 @pytest.mark.asyncio
