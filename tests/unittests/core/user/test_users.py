@@ -10,10 +10,10 @@
 """Tests for user listing domain logic."""
 
 import pytest
-from mockups.mock_database import MockDatabase
 
 from recnavi.core.types.user import UserRole
 from recnavi.core.user.users import get_group_users
+from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
