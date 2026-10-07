@@ -12,9 +12,7 @@
 from collections.abc import AsyncIterator
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.scene.scene_master import get_scene_master_by_principal
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+from recnavi.core.scene.scene_master import get_scene_thumbnail
 from recnavi.infrastructure.s3.s3_client import download_object_stream
 
 
@@ -26,49 +24,13 @@ async def get_scene_thumbnail_usecase(
     bucket_name: str,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get scene thumbnail or guide image."""
-    # Validate kind parameter
-    if kind not in ("example", "guide"):
-        raise ClientUnprocessableEntityError(
-            f"Invalid kind: {kind}. Must be 'example' or 'guide'.",
-        )
-
-    # Get scene master from database
-    scene_master = await get_scene_master_by_principal(
+    return await get_scene_thumbnail(
         scenes_db=scenes_db,
         scene_principal=scene_principal,
-    )
-
-    if scene_master is None:
-        raise ClientResourcesNotFoundError(
-            f"Scene principal '{scene_principal}' not found.",
-        )
-
-    # Select URI based on kind
-    if kind == "example":
-        object_key = scene_master.thumbnail_uri
-    else:  # kind == "guide"
-        object_key = scene_master.guide_uri
-
-    # Infer content type from file extension
-    content_type = _infer_content_type(object_key)
-
-    # Download from S3
-    stream = download_object_stream(
+        kind=kind,
         bucket_name=bucket_name,
-        object_key=object_key,
+        download_stream=lambda bn, ok: download_object_stream(
+            bucket_name=bn,
+            object_key=ok,
+        ),
     )
-
-    return stream, content_type
-
-
-def _infer_content_type(object_key: str) -> str:
-    """Infer MIME type from file extension."""
-    lower_key = object_key.lower()
-
-    if lower_key.endswith((".jpg", ".jpeg")):
-        return "image/jpeg"
-    if lower_key.endswith(".png"):
-        return "image/png"
-
-    # Default to JPEG if extension unknown
-    return "image/jpeg"

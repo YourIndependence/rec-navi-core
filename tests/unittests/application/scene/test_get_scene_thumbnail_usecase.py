@@ -9,6 +9,7 @@
 
 """Tests for get_scene_thumbnail_usecase."""
 
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -21,6 +22,35 @@ from recnavi.core.types.scene_master import SceneMaster
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_get_scene_thumbnail():
+    """Test usecase delegates to core get_scene_thumbnail collaborator."""
+    mock_db = AsyncMock()
+    expected_stream = object()
+    expected_content_type = "image/jpeg"
+    expected_output = (expected_stream, expected_content_type)
+
+    with patch(
+        "recnavi.application.scene.get_scene_thumbnail_usecase.get_scene_thumbnail",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_get:
+        result = await get_scene_thumbnail_usecase(
+            scenes_db=mock_db,
+            scene_principal="cooking",
+            kind="example",
+            bucket_name="test-bucket",
+        )
+
+    mock_get.assert_awaited_once_with(
+        scenes_db=mock_db,
+        scene_principal="cooking",
+        kind="example",
+        bucket_name="test-bucket",
+        download_stream=ANY,
+    )
+    assert result is expected_output
 
 
 @pytest.mark.asyncio
