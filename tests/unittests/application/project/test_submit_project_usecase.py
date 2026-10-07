@@ -55,7 +55,7 @@ async def test_usecase_delegates_to_submit_project():
 
     with patch(
         "recnavi.application.project.submit_project_usecase.submit_project",
-        new=AsyncMock(return_value=(*expected_result, False)),
+        new=AsyncMock(return_value=expected_result),
     ) as mock_submit:
         result = await submit_project_usecase(
             projects_db=mock_db,
@@ -68,7 +68,7 @@ async def test_usecase_delegates_to_submit_project():
         project_id="proj-123",
         user=user,
     )
-    assert result == expected_result
+    assert result is expected_result
 
 
 @pytest.mark.asyncio
