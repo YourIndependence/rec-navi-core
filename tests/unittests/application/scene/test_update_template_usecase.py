@@ -23,8 +23,8 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_update_template_usecase_delegates_to_upsert_template():
-    """Test usecase delegates to core upsert_template collaborator."""
+async def test_update_template_usecase_calls_upsert_template():
+    """Test usecase calls core upsert_template to persist template."""
     templates_db = MockDatabase()
     scenes_db = MockDatabase()
     await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
