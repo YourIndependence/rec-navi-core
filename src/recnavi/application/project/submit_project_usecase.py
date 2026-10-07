@@ -44,10 +44,7 @@ async def submit_project_usecase(
             },
         )
 
-        updated_item = await projects_db.get_item(
-            key={"projectId": project_id},
-        )
-        updated_project = Project.model_validate(updated_item)
-        return (updated_project, missing_scene_ids)
+        project.status = ProjectStatus.SUBMITTED
+        project.updated_at = timestamp
 
     return (project, missing_scene_ids)
