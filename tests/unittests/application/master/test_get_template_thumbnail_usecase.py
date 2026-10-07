@@ -9,6 +9,7 @@
 
 """Tests for get_template_thumbnail_usecase."""
 
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -20,6 +21,33 @@ from recnavi.application.master.get_template_thumbnail_usecase import (
 from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_get_template_thumbnail():
+    """Test usecase delegates to core get_template_thumbnail collaborator."""
+    mock_db = AsyncMock()
+    expected_stream = object()
+    expected_content_type = "image/jpeg"
+    expected_output = (expected_stream, expected_content_type)
+
+    with patch(
+        "recnavi.application.master.get_template_thumbnail_usecase.get_template_thumbnail",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_get:
+        result = await get_template_thumbnail_usecase(
+            templates_db=mock_db,
+            template_id="cafe_standard",
+            bucket_name="test-bucket",
+        )
+
+    mock_get.assert_awaited_once_with(
+        templates_db=mock_db,
+        template_id="cafe_standard",
+        bucket_name="test-bucket",
+        download_stream=ANY,
+    )
+    assert result is expected_output
 
 
 @pytest.mark.asyncio

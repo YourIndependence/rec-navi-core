@@ -12,8 +12,7 @@
 from collections.abc import AsyncIterator
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.scene.scenes_template import get_template_by_id
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+from recnavi.core.scene.scenes_template import get_template_thumbnail
 from recnavi.infrastructure.s3.s3_client import download_object_stream
 
 
@@ -24,37 +23,12 @@ async def get_template_thumbnail_usecase(
     bucket_name: str,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get template thumbnail image."""
-    # Get template from database
-    template = await get_template_by_id(
+    return await get_template_thumbnail(
         templates_db=templates_db,
         template_id=template_id,
-    )
-
-    if template is None:
-        raise ClientResourcesNotFoundError(
-            f"Template '{template_id}' not found.",
-        )
-
-    # Infer content type from file extension
-    content_type = _infer_content_type(template.thumbnail_uri)
-
-    # Download from S3
-    stream = download_object_stream(
         bucket_name=bucket_name,
-        object_key=template.thumbnail_uri,
+        download_stream=lambda bn, ok: download_object_stream(
+            bucket_name=bn,
+            object_key=ok,
+        ),
     )
-
-    return stream, content_type
-
-
-def _infer_content_type(object_key: str) -> str:
-    """Infer MIME type from file extension."""
-    lower_key = object_key.lower()
-
-    if lower_key.endswith((".jpg", ".jpeg")):
-        return "image/jpeg"
-    if lower_key.endswith(".png"):
-        return "image/png"
-
-    # Default to JPEG if extension unknown
-    return "image/jpeg"

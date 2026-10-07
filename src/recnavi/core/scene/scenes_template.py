@@ -9,8 +9,12 @@
 
 """Scenes template domain logic."""
 
+from collections.abc import AsyncIterator
+from collections.abc import Callable
+
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.scenes_template import ScenesTemplate
+from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 
 
 async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
@@ -32,3 +36,40 @@ async def get_template_by_id(
             return ScenesTemplate.model_validate(item)
 
     return None
+
+
+async def get_template_thumbnail(
+    *,
+    templates_db: BaseDatabase,
+    template_id: str,
+    bucket_name: str,
+    download_stream: Callable[[str, str], AsyncIterator[bytes]],
+) -> tuple[AsyncIterator[bytes], str]:
+    """Get template thumbnail image stream."""
+    template = await get_template_by_id(
+        templates_db=templates_db,
+        template_id=template_id,
+    )
+
+    if template is None:
+        raise ClientResourcesNotFoundError(
+            f"Template '{template_id}' not found.",
+        )
+
+    content_type = _infer_content_type(template.thumbnail_uri)
+
+    stream = download_stream(bucket_name, template.thumbnail_uri)
+
+    return stream, content_type
+
+
+def _infer_content_type(object_key: str) -> str:
+    """Infer MIME type from file extension."""
+    lower_key = object_key.lower()
+
+    if lower_key.endswith((".jpg", ".jpeg")):
+        return "image/jpeg"
+    if lower_key.endswith(".png"):
+        return "image/png"
+
+    return "image/jpeg"
