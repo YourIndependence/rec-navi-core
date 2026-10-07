@@ -55,11 +55,12 @@ async def test_usecase_delegates_to_submit_project():
     mock_db.update_item = AsyncMock(return_value=mock_project_dict)
     mock_db.get_item = AsyncMock(return_value=mock_project_dict)
 
+    expected_missing = ["scene-1", "scene-2"]
     with patch(
         "recnavi.application.project.submit_project_usecase.submit_project",
-        new=AsyncMock(return_value=(mock_project, [], True)),
+        new=AsyncMock(return_value=(mock_project, expected_missing, False)),
     ) as mock_submit:
-        await submit_project_usecase(
+        result_project, result_missing = await submit_project_usecase(
             projects_db=mock_db,
             project_id="proj-123",
             user=user,
@@ -70,6 +71,8 @@ async def test_usecase_delegates_to_submit_project():
         project_id="proj-123",
         user=user,
     )
+    assert result_project == mock_project
+    assert result_missing == expected_missing
 
 
 @pytest.mark.asyncio
