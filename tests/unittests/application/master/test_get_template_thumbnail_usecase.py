@@ -23,8 +23,8 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_get_template_by_id():
-    """Test usecase delegates to core get_template_by_id collaborator."""
+async def test_usecase_calls_get_template_by_id():
+    """Test usecase calls core get_template_by_id to retrieve template."""
     mock_db = MockDatabase()
 
     expected_template = ScenesTemplate(
