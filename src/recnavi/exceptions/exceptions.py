@@ -112,7 +112,19 @@ class ClientAuthorizationError(BaseClientExceptionError):
     pass
 
 
+class ClientNotFoundError(BaseClientExceptionError):
+    """Resource not found error (404 Not Found)."""
+
+    pass
+
+
+class ClientConflictError(BaseClientExceptionError):
+    """Conflict error (409 Conflict)."""
+
+    pass
+
+
 class ClientUnprocessableEntityError(BaseClientExceptionError):
-    """Request validation error (422 Unprocessable Entity)."""
+    """Unprocessable entity error (422 Unprocessable Entity)."""
 
     pass
