@@ -71,8 +71,8 @@ async def test_usecase_delegates_to_submit_project():
         project_id="proj-123",
         user=user,
     )
-    assert result_project == mock_project
-    assert result_missing == expected_missing
+    assert result_project is mock_project
+    assert result_missing is expected_missing
 
 
 @pytest.mark.asyncio
