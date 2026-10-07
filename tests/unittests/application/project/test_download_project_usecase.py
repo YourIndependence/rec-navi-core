@@ -29,8 +29,8 @@ from recnavi.core.types.user import UserRole
 
 
 @pytest.mark.asyncio
-async def test_download_project_usecase_delegates_validation_to_core():
-    """Test usecase delegates validation to core collaborator."""
+async def test_download_project_usecase_calls_validation():
+    """Test usecase calls core validation collaborator."""
     owner = User(
         user_id="owner-1",
         user_name="Owner",
