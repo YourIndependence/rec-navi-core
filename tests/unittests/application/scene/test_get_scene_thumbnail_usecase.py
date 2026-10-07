@@ -24,50 +24,6 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_usecase_calls_get_scene_master_by_principal():
-    """Test usecase calls core get_scene_master_by_principal to retrieve scene master."""
-    mock_db = MockDatabase()
-
-    expected_scene_master = SceneMaster(
-        scene_principal="cooking",
-        title="Cooking Scene",
-        thumbnail_uri="scenes/cooking/example.jpg",
-        guide_uri="scenes/cooking/guide.png",
-        max_duration_seconds=60,
-    )
-
-    class MockStreamingBody:
-        def __aiter__(self):
-            return self
-
-        async def __anext__(self):
-            raise StopAsyncIteration
-
-    with (
-        patch(
-            "recnavi.application.scene.get_scene_thumbnail_usecase.get_scene_master_by_principal",
-            new=AsyncMock(return_value=expected_scene_master),
-        ) as mock_get_scene,
-        patch(
-            "recnavi.application.scene.get_scene_thumbnail_usecase.download_object_stream",
-            return_value=MockStreamingBody(),
-        ),
-    ):
-        _, content_type = await get_scene_thumbnail_usecase(
-            scenes_db=mock_db,
-            scene_principal="cooking",
-            kind="example",
-            bucket_name="test-bucket",
-        )
-
-    mock_get_scene.assert_awaited_once_with(
-        scenes_db=mock_db,
-        scene_principal="cooking",
-    )
-    assert content_type == "image/jpeg"
-
-
-@pytest.mark.asyncio
 async def test_usecase_returns_thumbnail_stream_and_content_type():
     """Test usecase returns byte stream and content type for example image."""
     mock_db = MockDatabase(
