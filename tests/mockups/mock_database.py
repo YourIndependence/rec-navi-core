@@ -18,14 +18,21 @@ from recnavi.core.database.base_database import DatabaseQueryResult
 class MockDatabase(BaseDatabase):
     """In-memory mock database for unit testing."""
 
-    def __init__(self, initial_items: list[dict[str, Any]] | None = None):
+    def __init__(
+        self,
+        initial_items: list[dict[str, Any]] | None = None,
+        key_names: tuple[str, ...] | None = None,
+    ):
         """Initialize mock database with optional initial items.
 
         Args:
             initial_items: List of items to pre-populate the database.
+            key_names: Primary key attribute names. When given, put_item
+                replaces an existing item with the same key like a real table.
 
         """
         self.items: list[dict[str, Any]] = initial_items or []
+        self.key_names = key_names
 
     async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
         """Get an item by primary key.
@@ -49,6 +56,12 @@ class MockDatabase(BaseDatabase):
             item: Item to store.
 
         """
+        if self.key_names:
+            self.items = [
+                existing
+                for existing in self.items
+                if any(existing.get(k) != item.get(k) for k in self.key_names)
+            ]
         self.items.append(item)
 
     async def query(

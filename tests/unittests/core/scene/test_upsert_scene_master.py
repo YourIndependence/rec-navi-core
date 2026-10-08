@@ -20,7 +20,7 @@ from tests.mockups.mock_database import MockDatabase
 @pytest.mark.asyncio
 async def test_upsert_scene_master_creates_new_scene():
     """Test upsert creates new scene master when it doesn't exist."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     result = await upsert_scene_master(
         scenes_db=scenes_db,
@@ -46,7 +46,7 @@ async def test_upsert_scene_master_creates_new_scene():
 @pytest.mark.asyncio
 async def test_upsert_scene_master_updates_existing_scene():
     """Test upsert updates existing scene master."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
     await scenes_db.put_item(
         {
             "scenePrincipal": "existing_scene",
@@ -83,7 +83,7 @@ async def test_upsert_scene_master_updates_existing_scene():
 @pytest.mark.asyncio
 async def test_upsert_scene_master_validates_max_duration_min():
     """Test upsert raises 422 when maxDurationSeconds < 1."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     with pytest.raises(
         ClientUnprocessableEntityError,
@@ -102,7 +102,7 @@ async def test_upsert_scene_master_validates_max_duration_min():
 @pytest.mark.asyncio
 async def test_upsert_scene_master_validates_max_duration_max():
     """Test upsert raises 422 when maxDurationSeconds > 10."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     with pytest.raises(
         ClientUnprocessableEntityError,
@@ -121,7 +121,7 @@ async def test_upsert_scene_master_validates_max_duration_max():
 @pytest.mark.asyncio
 async def test_upsert_scene_master_allows_valid_range():
     """Test upsert accepts maxDurationSeconds from 1 to 10."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     for duration in [1, 5, 10]:
         result = await upsert_scene_master(

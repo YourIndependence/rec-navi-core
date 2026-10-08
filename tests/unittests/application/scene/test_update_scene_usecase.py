@@ -9,12 +9,14 @@
 
 """Tests for update_scene_usecase."""
 
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
 
 from recnavi.application.scene.update_scene_usecase import update_scene_usecase
+from recnavi.core.types.scene_master import SceneMaster
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
 
@@ -22,7 +24,7 @@ from tests.mockups.mock_database import MockDatabase
 @pytest.mark.asyncio
 async def test_update_scene_usecase_creates_scene_with_images():
     """Test usecase creates new scene with uploaded images."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     mock_upload_base64 = AsyncMock()
 
@@ -63,7 +65,7 @@ async def test_update_scene_usecase_creates_scene_with_images():
 @pytest.mark.asyncio
 async def test_update_scene_usecase_updates_scene_without_images():
     """Test usecase updates existing scene without changing images."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
     await scenes_db.put_item(
         {
             "scenePrincipal": "existing_scene",
@@ -109,7 +111,7 @@ async def test_update_scene_usecase_updates_scene_without_images():
 @pytest.mark.asyncio
 async def test_update_scene_usecase_raises_422_when_images_missing_on_create():
     """Test usecase raises 422 when creating without images."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     with pytest.raises(
         ClientUnprocessableEntityError,
@@ -129,7 +131,7 @@ async def test_update_scene_usecase_raises_422_when_images_missing_on_create():
 @pytest.mark.asyncio
 async def test_update_scene_usecase_updates_only_example_image():
     """Test usecase updates only example image when provided."""
-    scenes_db = MockDatabase()
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
     await scenes_db.put_item(
         {
             "scenePrincipal": "existing_scene",
@@ -164,3 +166,44 @@ async def test_update_scene_usecase_updates_only_example_image():
         base64_data="new_base64_example",
         content_type="image/jpeg",
     )
+
+
+@pytest.mark.asyncio
+async def test_usecase_delegates_to_update_scene():
+    """Test usecase delegates to core update_scene collaborator."""
+    mock_db = AsyncMock()
+    expected_scenes = [
+        SceneMaster(
+            scene_principal="test_scene",
+            title="Test Scene",
+            max_duration_seconds=5,
+            thumbnail_uri="s3://test-bucket/scenes/test_scene/example.jpg",
+            guide_uri="s3://test-bucket/scenes/test_scene/guide.jpg",
+        ),
+    ]
+
+    with patch(
+        "recnavi.application.scene.update_scene_usecase.update_scene",
+        new=AsyncMock(return_value=expected_scenes),
+    ) as mock_update:
+        result = await update_scene_usecase(
+            scenes_db=mock_db,
+            scene_principal="test_scene",
+            title="Test Scene",
+            max_duration_seconds=5,
+            example_image="base64_example_data",
+            guide_image="base64_guide_data",
+            bucket_name="test-bucket",
+        )
+
+    mock_update.assert_awaited_once_with(
+        scenes_db=mock_db,
+        scene_principal="test_scene",
+        title="Test Scene",
+        max_duration_seconds=5,
+        example_image="base64_example_data",
+        guide_image="base64_guide_data",
+        bucket_name="test-bucket",
+        upload_image=ANY,
+    )
+    assert result is expected_scenes
