@@ -57,7 +57,9 @@ async def update_scene(
     upload_image: Callable[[str, str, str], Awaitable[None]],
 ) -> list[SceneMaster]:
     """Create or update scene master with image upload."""
-    existing_scene = await scenes_db.get_item({"scenePrincipal": scene_principal})
+    existing_scene = await scenes_db.get_item(
+        {"scenePrincipal": scene_principal}
+    )
 
     if not existing_scene:
         if not example_image or not guide_image:
@@ -65,7 +67,9 @@ async def update_scene(
                 "exampleImage and guideImage are required when creating a new scene",
             )
 
-        thumbnail_uri = f"s3://{bucket_name}/scenes/{scene_principal}/example.jpg"
+        thumbnail_uri = (
+            f"s3://{bucket_name}/scenes/{scene_principal}/example.jpg"
+        )
         guide_uri = f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
 
         await upload_image(
@@ -99,7 +103,9 @@ async def update_scene(
                 f"scenes/{scene_principal}/guide.jpg",
                 guide_image,
             )
-            guide_uri = f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
+            guide_uri = (
+                f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
+            )
 
     await upsert_scene_master(
         scenes_db=scenes_db,
