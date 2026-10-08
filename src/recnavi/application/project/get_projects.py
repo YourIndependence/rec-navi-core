@@ -12,6 +12,9 @@
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.projects import get_projects
 from recnavi.core.types.project import Project
+from recnavi.infrastructure.cloudwatch.cloudwatch_metrics import (
+    put_filter_metrics,
+)
 
 
 async def get_projects_usecase(
@@ -34,4 +37,5 @@ async def get_projects_usecase(
         group_id=group_id,
         limit=limit,
         cursor=cursor,
+        record_metrics=put_filter_metrics,
     )

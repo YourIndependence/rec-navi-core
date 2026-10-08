@@ -9,6 +9,7 @@
 
 """Tests for get_projects use case."""
 
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -42,5 +43,6 @@ async def test_get_projects_usecase_delegates_to_core():
         group_id="group-123",
         limit=20,
         cursor="cursor-1",
+        record_metrics=ANY,
     )
     assert result is expected_output
