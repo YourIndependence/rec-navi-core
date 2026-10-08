@@ -18,7 +18,6 @@ import pytest
 from recnavi.application.master.get_template_thumbnail_usecase import (
     get_template_thumbnail_usecase,
 )
-from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
 
