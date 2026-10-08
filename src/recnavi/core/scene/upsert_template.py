@@ -58,7 +58,7 @@ async def update_template(
         raise ClientValueError(f"Unknown scenePrincipals: {missing}")
 
     existing_template = await templates_db.get_item(
-        {"templateId": template_id}
+        {"templateId": template_id},
     )
     object_key = f"templates/{template_id}/thumbnail.jpg"
     uploaded_uri = f"s3://{bucket_name}/{object_key}"
