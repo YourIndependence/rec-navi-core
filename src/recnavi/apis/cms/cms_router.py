@@ -87,7 +87,7 @@ async def get_group_users_endpoint(
     request: Request,
     user: User = Depends(verify_user),
 ) -> GetGroupUsersResponse:
-    """List all users in the authenticated user's group."""
+    """List the active users in the authenticated user's group."""
     users_db = request.app.state.database[USERS_TABLE_NAME]
     users = await get_group_users_usecase(
         users_db=users_db,

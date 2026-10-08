@@ -29,5 +29,5 @@ class GetGroupUsersResponse(BaseApiResponseModel):
 
     users: list[User] = Field(
         ...,
-        description="All users in the authenticated user's group",
+        description="Active users in the authenticated user's group",
     )
