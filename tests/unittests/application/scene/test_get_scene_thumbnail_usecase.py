@@ -18,7 +18,6 @@ import pytest
 from recnavi.application.scene.get_scene_thumbnail_usecase import (
     get_scene_thumbnail_usecase,
 )
-from recnavi.core.types.scene_master import SceneMaster
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
