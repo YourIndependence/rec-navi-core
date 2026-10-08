@@ -30,6 +30,9 @@ from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.utils.discord_handler import post_notify_discord
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
+from recnavi.infrastructure.cognito.cognito_identity_provider import (
+    CognitoIdentityProvider,
+)
 from recnavi.infrastructure.database.dynamodb import DynamoDb
 
 
@@ -51,6 +54,9 @@ async def lifespan(_app: FastAPI):
             TEMPLATES_TABLE_NAME: DynamoDb(table_name=TEMPLATES_TABLE_NAME),
         }
         logger.info("database instances initialized.")
+
+        _app.state.identity_provider = CognitoIdentityProvider()
+        logger.info("identity provider initialized.")
 
         if ENV not in ["LOCAL", "CI"]:
             post_notify_discord(

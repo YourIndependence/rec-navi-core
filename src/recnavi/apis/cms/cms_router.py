@@ -23,6 +23,8 @@ from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.user_schemas import CreateUserRequest
+from recnavi.apis.schemas.user_schemas import CreateUserResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
@@ -30,9 +32,11 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.user.create_user import create_user_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -137,3 +141,24 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/createUser")
+async def create_user_endpoint(
+    request: Request,
+    item: CreateUserRequest,
+    user: User = Depends(verify_user),
+) -> CreateUserResponse:
+    """Invite a user to the caller's group (owner only)."""
+    users_db = request.app.state.database[USERS_TABLE_NAME]
+
+    users = await create_user_usecase(
+        users_db=users_db,
+        identity_provider=request.app.state.identity_provider,
+        caller=user,
+        email=item.email,
+        user_name=item.user_name,
+        role=item.role,
+    )
+
+    return CreateUserResponse(users=users)
