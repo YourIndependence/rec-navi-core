@@ -19,7 +19,7 @@ from tests.mockups.mock_database import MockDatabase
 @pytest.mark.asyncio
 async def test_upsert_template_creates_new_template():
     """Test upsert creates new template when it doesn't exist."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
 
     result = await upsert_template(
         templates_db=templates_db,
@@ -46,7 +46,7 @@ async def test_upsert_template_creates_new_template():
 @pytest.mark.asyncio
 async def test_upsert_template_updates_existing_template():
     """Test upsert updates existing template."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     await templates_db.put_item(
         {
             "templateId": "existing_template",
@@ -80,7 +80,7 @@ async def test_upsert_template_updates_existing_template():
 @pytest.mark.asyncio
 async def test_upsert_template_preserves_scene_principals_order_and_duplicates():
     """Test upsert preserves scenePrincipals order and duplicates."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
 
     result = await upsert_template(
         templates_db=templates_db,

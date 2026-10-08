@@ -9,6 +9,7 @@
 
 """Tests for update_template_usecase."""
 
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -25,7 +26,7 @@ from tests.mockups.mock_database import MockDatabase
 @pytest.mark.asyncio
 async def test_update_template_usecase_creates_template_with_thumbnail():
     """Test usecase creates new template with uploaded thumbnail."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
     await scenes_db.put_item(
         {"scenePrincipal": "cooking", "title": "Cooking"},
@@ -66,7 +67,7 @@ async def test_update_template_usecase_creates_template_with_thumbnail():
 @pytest.mark.asyncio
 async def test_update_template_usecase_updates_template_without_thumbnail():
     """Test usecase updates existing template without changing thumbnail."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
     await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
     await templates_db.put_item(
@@ -108,7 +109,7 @@ async def test_update_template_usecase_updates_template_without_thumbnail():
 @pytest.mark.asyncio
 async def test_update_template_usecase_raises_422_when_thumbnail_missing_on_create():
     """Test usecase raises 422 when creating without thumbnail."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
     await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
 
@@ -130,7 +131,7 @@ async def test_update_template_usecase_raises_422_when_thumbnail_missing_on_crea
 @pytest.mark.asyncio
 async def test_update_template_usecase_raises_400_when_scene_principal_not_found():
     """Test usecase raises 400 when scenePrincipal doesn't exist."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
     await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
 
@@ -152,7 +153,7 @@ async def test_update_template_usecase_raises_400_when_scene_principal_not_found
 @pytest.mark.asyncio
 async def test_update_template_usecase_allows_empty_scene_principals():
     """Test usecase allows empty scenePrincipals array."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
 
     mock_upload_base64 = AsyncMock()
@@ -179,7 +180,7 @@ async def test_update_template_usecase_allows_empty_scene_principals():
 @pytest.mark.asyncio
 async def test_update_template_usecase_preserves_duplicates_and_order():
     """Test usecase preserves scenePrincipals duplicates and order."""
-    templates_db = MockDatabase()
+    templates_db = MockDatabase(key_names=("templateId",))
     scenes_db = MockDatabase()
     await scenes_db.put_item({"scenePrincipal": "cooking", "title": "Cooking"})
     await scenes_db.put_item({"scenePrincipal": "plating", "title": "Plating"})
@@ -207,3 +208,37 @@ async def test_update_template_usecase_preserves_duplicates_and_order():
         "plating",
         "cooking",
     ]
+
+
+@pytest.mark.asyncio
+async def test_update_template_usecase_delegates_to_update_template():
+    """Test usecase delegates to core update_template collaborator."""
+    templates_db = AsyncMock()
+    scenes_db = AsyncMock()
+    expected_output = [object()]
+
+    with patch(
+        "recnavi.application.scene.update_template_usecase.update_template",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_update:
+        result = await update_template_usecase(
+            templates_db=templates_db,
+            scenes_db=scenes_db,
+            template_id="tpl",
+            title="Title",
+            scene_principals=["cooking"],
+            thumbnail=None,
+            bucket_name="test-bucket",
+        )
+
+    mock_update.assert_awaited_once_with(
+        templates_db=templates_db,
+        scenes_db=scenes_db,
+        template_id="tpl",
+        title="Title",
+        scene_principals=["cooking"],
+        thumbnail=None,
+        bucket_name="test-bucket",
+        upload_image=ANY,
+    )
+    assert result is expected_output
