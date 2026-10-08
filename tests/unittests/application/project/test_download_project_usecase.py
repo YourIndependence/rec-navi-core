@@ -12,6 +12,7 @@
 import io
 import json
 import zipfile
+from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -261,3 +262,36 @@ async def test_download_project_usecase_handles_duplicate_scene_principals():
         assert metadata["scenes"][0]["fileName"] == "cooking.mp4"
         assert metadata["scenes"][1]["fileName"] == "cooking_2.mp4"
         assert metadata["scenes"][2]["fileName"] == "cooking_3.mp4"
+
+
+@pytest.mark.asyncio
+async def test_download_project_usecase_delegates_to_create_project_archive():
+    """Test usecase delegates to core create_project_archive collaborator."""
+    user = User(
+        user_id="owner-1",
+        user_name="Owner",
+        role=UserRole.OWNER,
+        group_id="group-1",
+    )
+    project = object()
+    expected_output = "https://example.com/archive.zip"
+
+    with patch(
+        "recnavi.application.project.download_project_usecase.create_project_archive",
+        new=AsyncMock(return_value=expected_output),
+    ) as mock_create:
+        result = await download_project_usecase(
+            user=user,
+            project=project,
+            bucket_name="test-bucket",
+        )
+
+    mock_create.assert_awaited_once_with(
+        user=user,
+        project=project,
+        bucket_name="test-bucket",
+        download_video=ANY,
+        upload_archive=ANY,
+        generate_url=ANY,
+    )
+    assert result is expected_output

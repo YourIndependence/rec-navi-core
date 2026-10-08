@@ -9,6 +9,13 @@
 
 """Project download validation logic."""
 
+import base64
+import io
+import json
+import zipfile
+from collections.abc import Awaitable
+from collections.abc import Callable
+
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
@@ -44,3 +51,56 @@ def validate_project_for_download(
         raise ClientUnprocessableEntityError(
             f"Not all scenes are approved. Unapproved scenes: {unapproved_ids}",
         )
+
+
+async def create_project_archive(
+    *,
+    user: User,
+    project: Project,
+    bucket_name: str,
+    download_video: Callable[[str, str], Awaitable[bytes]],
+    upload_archive: Callable[[str, str, str], Awaitable[None]],
+    generate_url: Callable[[str, str], Awaitable[str]],
+) -> str:
+    """Build a zip archive of approved scene videos and return its download URL."""
+    validate_project_for_download(user=user, project=project)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        principal_counts: dict[str, int] = {}
+
+        metadata = {
+            "projectId": project.project_id,
+            "projectName": project.project_name,
+            "description": project.description,
+            "scenes": [],
+        }
+
+        for scene in project.scenes:
+            base_name = scene.scene_principal
+            if base_name not in principal_counts:
+                principal_counts[base_name] = 1
+                filename = f"{base_name}.mp4"
+            else:
+                principal_counts[base_name] += 1
+                filename = f"{base_name}_{principal_counts[base_name]}.mp4"
+
+            video_data = await download_video(bucket_name, scene.video_key)
+            zf.writestr(filename, video_data)
+
+            metadata["scenes"].append(
+                {
+                    "sceneId": scene.scene_id,
+                    "scenePrincipal": scene.scene_principal,
+                    "fileName": filename,
+                },
+            )
+
+        metadata_json = json.dumps(metadata, indent=2, ensure_ascii=False)
+        zf.writestr("metadata.json", metadata_json.encode("utf-8"))
+
+    archive_key = f"archives/{project.project_id}.zip"
+    base64_data = base64.b64encode(zip_buffer.getvalue()).decode("utf-8")
+    await upload_archive(bucket_name, archive_key, base64_data)
+
+    return await generate_url(bucket_name, archive_key)
