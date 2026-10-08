@@ -58,7 +58,7 @@ async def update_scene(
 ) -> list[SceneMaster]:
     """Create or update scene master with image upload."""
     existing_scene = await scenes_db.get_item(
-        {"scenePrincipal": scene_principal}
+        {"scenePrincipal": scene_principal},
     )
 
     if not existing_scene:
