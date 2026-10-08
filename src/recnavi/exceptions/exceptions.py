@@ -128,3 +128,9 @@ class ClientUnprocessableEntityError(BaseClientExceptionError):
     """Unprocessable entity error (422 Unprocessable Entity)."""
 
     pass
+
+
+class NotificationSendError(RuntimeError):
+    """A notification could not be delivered (best-effort, never a 4xx)."""
+
+    pass

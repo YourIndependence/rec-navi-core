@@ -10,6 +10,7 @@
 """Public router for staff-facing endpoints."""
 
 from fastapi import APIRouter
+from fastapi import BackgroundTasks
 from fastapi import Depends
 from fastapi import Query
 from fastapi import Request
@@ -19,10 +20,15 @@ from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import SubmitProjectRequest
 from recnavi.apis.schemas.project_schemas import SubmitProjectResponse
 from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.project.notify_project_submitted_usecase import (
+    notify_project_submitted_usecase,
+)
 from recnavi.application.project.submit_project_usecase import (
     submit_project_usecase,
 )
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -56,6 +62,7 @@ async def get_projects_endpoint(
 async def submit_project_endpoint(
     request: Request,
     payload: SubmitProjectRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(verify_user),
 ) -> SubmitProjectResponse:
     """Submit project for owner review (staff only)."""
@@ -66,6 +73,16 @@ async def submit_project_endpoint(
         project_id=payload.project_id,
         user=user,
     )
+
+    if not missing_scene_ids:
+        background_tasks.add_task(
+            notify_project_submitted_usecase,
+            users_db=request.app.state.database[USERS_TABLE_NAME],
+            notifier=request.app.state.notifier,
+            project=updated_project,
+            submitter=user,
+            base_url=FRONTEND_BASE_URL,
+        )
 
     return SubmitProjectResponse(
         project=updated_project,
