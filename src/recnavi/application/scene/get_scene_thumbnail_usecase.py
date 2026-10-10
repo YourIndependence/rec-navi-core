@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.scene_master import get_scene_thumbnail
-from recnavi.infrastructure.s3.s3_client import download_object_stream
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
 
 async def get_scene_thumbnail_usecase(
@@ -22,6 +22,7 @@ async def get_scene_thumbnail_usecase(
     scene_principal: str,
     kind: str,
     bucket_name: str,
+    storage: BaseObjectStorage,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get scene thumbnail or guide image."""
     return await get_scene_thumbnail(
@@ -29,8 +30,5 @@ async def get_scene_thumbnail_usecase(
         scene_principal=scene_principal,
         kind=kind,
         bucket_name=bucket_name,
-        download_stream=lambda bn, ok: download_object_stream(
-            bucket_name=bn,
-            object_key=ok,
-        ),
+        storage=storage,
     )

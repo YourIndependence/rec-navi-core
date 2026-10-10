@@ -10,9 +10,9 @@
 """Scene master domain logic."""
 
 from collections.abc import AsyncIterator
-from collections.abc import Callable
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
@@ -45,7 +45,7 @@ async def get_scene_thumbnail(
     scene_principal: str,
     kind: str,
     bucket_name: str,
-    download_stream: Callable[[str, str], AsyncIterator[bytes]],
+    storage: BaseObjectStorage,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get scene thumbnail or guide image stream."""
     if kind not in ("example", "guide"):
@@ -70,7 +70,10 @@ async def get_scene_thumbnail(
 
     content_type = _infer_content_type(object_key)
 
-    stream = download_stream(bucket_name, object_key)
+    stream = storage.download_object_stream(
+        bucket_name=bucket_name,
+        object_key=object_key,
+    )
 
     return stream, content_type
 

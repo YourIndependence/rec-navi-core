@@ -39,6 +39,7 @@ async def get_scene_thumbnail_endpoint(
         scene_principal=scene_principal,
         kind=kind,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
+        storage=request.app.state.object_storage,
     )
 
     return StreamingResponse(
