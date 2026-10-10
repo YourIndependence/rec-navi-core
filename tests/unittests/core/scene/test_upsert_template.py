@@ -10,6 +10,7 @@
 """Tests for upsert_template."""
 
 import base64
+import re
 
 import pytest
 
@@ -295,3 +296,54 @@ async def test_update_template_preserves_duplicates_and_order():
     )
 
     assert templates[0].scene_principals == principals
+
+
+@pytest.mark.asyncio
+async def test_update_template_issues_new_id_when_template_id_is_null():
+    """Test a null templateId creates a template with an issued id."""
+    templates_db = MockDatabase(key_names=("templateId",))
+    storage = MockObjectStorage()
+
+    templates = await update_template(
+        templates_db=templates_db,
+        scenes_db=await _scenes_db(),
+        template_id=None,
+        title="New Template",
+        scene_principals=["cooking"],
+        thumbnail=THUMB,
+        bucket_name="test-bucket",
+        storage=storage,
+    )
+
+    assert len(templates) == 1
+    issued_id = templates[0].template_id
+    assert re.fullmatch(r"[0-9a-f]{32}", issued_id)
+    assert templates[0].thumbnail_uri == THUMB_URI.format(issued_id)
+    assert (
+        "test-bucket",
+        f"templates/{issued_id}/thumbnail.jpg",
+    ) in storage.objects
+    stored = await templates_db.get_item({"templateId": issued_id})
+    assert stored["title"] == "New Template"
+
+
+@pytest.mark.asyncio
+async def test_update_template_raises_422_when_null_id_without_thumbnail():
+    """Test creating via a null id still requires the thumbnail."""
+    templates_db = MockDatabase(key_names=("templateId",))
+    storage = MockObjectStorage()
+
+    with pytest.raises(ClientUnprocessableEntityError):
+        await update_template(
+            templates_db=templates_db,
+            scenes_db=await _scenes_db(),
+            template_id=None,
+            title="New Template",
+            scene_principals=["cooking"],
+            thumbnail=None,
+            bucket_name="test-bucket",
+            storage=storage,
+        )
+
+    assert storage.objects == {}
+    assert (await templates_db.scan()).items == []

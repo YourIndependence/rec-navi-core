@@ -19,7 +19,7 @@ async def update_template_usecase(
     *,
     templates_db: BaseDatabase,
     scenes_db: BaseDatabase,
-    template_id: str,
+    template_id: str | None,
     title: str,
     scene_principals: list[str],
     thumbnail: str | None,

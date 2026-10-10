@@ -9,6 +9,8 @@
 
 """Upsert template domain logic."""
 
+import uuid
+
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scenes_template import ScenesTemplate
@@ -56,23 +58,30 @@ async def update_template(
     *,
     templates_db: BaseDatabase,
     scenes_db: BaseDatabase,
-    template_id: str,
+    template_id: str | None,
     title: str,
     scene_principals: list[str],
     thumbnail: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
-    """Create or update template with thumbnail upload."""
+    """Create or update template with thumbnail upload.
+
+    A null template_id means create: a new id is issued.
+    """
     result = await scenes_db.scan()
     existing_principals = {item["scenePrincipal"] for item in result.items}
     missing = [p for p in scene_principals if p not in existing_principals]
     if missing:
         raise ClientValueError(f"Unknown scenePrincipals: {missing}")
 
-    existing_template = await templates_db.get_item(
-        {"templateId": template_id},
-    )
+    existing_template = None
+    if template_id is None:
+        template_id = uuid.uuid4().hex
+    else:
+        existing_template = await templates_db.get_item(
+            {"templateId": template_id},
+        )
     object_key = f"templates/{template_id}/thumbnail.jpg"
     uploaded_uri = f"s3://{bucket_name}/{object_key}"
 

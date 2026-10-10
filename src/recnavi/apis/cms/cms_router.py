@@ -162,10 +162,10 @@ async def update_template_endpoint(
     templates = await update_template_usecase(
         templates_db=templates_db,
         scenes_db=scenes_db,
-        template_id=item.template_id,
-        title=item.title,
-        scene_principals=item.scene_principals,
-        thumbnail=item.thumbnail,
+        template_id=item.template.template_id,
+        title=item.template.title,
+        scene_principals=item.template.scene_principals,
+        thumbnail=item.thumbnail_image,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
         storage=request.app.state.object_storage,
     )

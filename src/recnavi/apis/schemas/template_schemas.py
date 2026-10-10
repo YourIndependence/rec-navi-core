@@ -25,16 +25,28 @@ class GetTemplatesResponse(BaseApiResponseModel):
     )
 
 
-class UpdateTemplateRequest(BaseItemModel):
-    """Request for POST /updateTemplate (admin-only)."""
+class TemplateInput(BaseItemModel):
+    """Template fields sent by the client (mirrors ScenesTemplate).
 
-    template_id: str = Field(..., description="Identifier of the template")
+    thumbnailUri is excluded; the image is sent separately on the request.
+    """
+
+    template_id: str | None = Field(
+        None,
+        description="Identifier of the template (null creates a new one)",
+    )
     title: str = Field(..., description="Name shown to the owner")
     scene_principals: list[str] = Field(
         ...,
         description="Scene masters to lay out, in shooting order",
     )
-    thumbnail: str | None = Field(
+
+
+class UpdateTemplateRequest(BaseItemModel):
+    """Request for POST /updateTemplate (admin-only)."""
+
+    template: TemplateInput = Field(..., description="Template to save")
+    thumbnail_image: str | None = Field(
         None,
         description="Base64-encoded JPEG (required on create, optional on update)",
     )
