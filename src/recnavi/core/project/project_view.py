@@ -38,9 +38,8 @@ async def attach_scene_urls(
         )
         for scene in project.scenes
     ]
-    return ProjectView(
-        **project.model_dump(exclude={"scenes"}),
-        scenes=scenes,
+    return ProjectView.model_validate(
+        {**project.model_dump(exclude={"scenes"}), "scenes": scenes},
     )
 
 
@@ -108,10 +107,12 @@ async def _to_scene_view(
         bucket_name=bucket_name,
         object_key=scene.thumbnail_key,
     )
-    return SceneView(
-        **scene.model_dump(exclude={"video_key", "thumbnail_key"}),
-        video_url=video_url,
-        thumbnail_url=thumbnail_url,
+    return SceneView.model_validate(
+        {
+            **scene.model_dump(exclude={"video_key", "thumbnail_key"}),
+            "video_url": video_url,
+            "thumbnail_url": thumbnail_url,
+        },
     )
 
 
