@@ -84,12 +84,11 @@ async def get_projects_endpoint(
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
 ) -> GetProjectsResponse:
-    """List projects for the authenticated user's group."""
+    """List all projects of the authenticated owner's group."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
-        user_id=user.user_id,
-        group_id=user.group_id,
+        user=user,
         limit=limit,
         cursor=cursor,
     )

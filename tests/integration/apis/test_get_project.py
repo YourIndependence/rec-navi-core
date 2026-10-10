@@ -91,4 +91,15 @@ async def test_get_projects_returns_injected_project(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert project_data in data["projects"]
+    summary = {
+        key: project_data[key]
+        for key in (
+            "projectId",
+            "projectName",
+            "description",
+            "ownerUserId",
+            "createdAt",
+            "status",
+        )
+    }
+    assert summary in data["projects"]
