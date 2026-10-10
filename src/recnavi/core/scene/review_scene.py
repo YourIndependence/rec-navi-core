@@ -52,11 +52,10 @@ async def review_scene(
             "Access to other group's project is forbidden",
         )
 
-    scene_index = None
-    for i, s in enumerate(project.scenes):
-        if s.scene_id == scene_id:
-            scene_index = i
-            break
+    scene_index = next(
+        (i for i, s in enumerate(project.scenes) if s.scene_id == scene_id),
+        None,
+    )
 
     if scene_index is None:
         raise ClientNotFoundError("Scene not found")

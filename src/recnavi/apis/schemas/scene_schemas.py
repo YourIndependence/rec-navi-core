@@ -57,23 +57,6 @@ class GetSceneMastersResponse(BaseModel):
     )
 
 
-class UpdateSceneRecordRequest(BaseItemModel):
-    """Request for POST /updateSceneRecord."""
-
-    project_id: str = Field(..., description="Project ID")
-    scene_id: str = Field(..., description="Scene ID")
-    video: str = Field(..., description="Base64-encoded video data")
-    thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
-
-
-class UpdateSceneRecordResponse(BaseApiResponseModel):
-    """Response for POST /updateSceneRecord."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    project: Project = Field(..., description="Updated project")
-
-
 class ReviewSceneRequest(BaseItemModel):
     """Request for POST /reviewScene."""
 

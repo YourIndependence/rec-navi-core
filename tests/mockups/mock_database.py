@@ -9,10 +9,13 @@
 
 """Mock database for unit testing."""
 
+import re
 from typing import Any
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.database.base_database import DatabaseQueryResult
+from recnavi.exceptions.exceptions import ClientConflictError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 class MockDatabase(BaseDatabase):
@@ -36,7 +39,6 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> None:
         """Put an item into the database with optional condition."""
-        from recnavi.exceptions.exceptions import ClientConflictError
 
         if (
             condition_expression is not None
@@ -162,8 +164,6 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Update item with UpdateExpression (simplified for testing)."""
-        from recnavi.exceptions.exceptions import ClientConflictError
-        from recnavi.exceptions.exceptions import ClientNotFoundError
 
         item = await self.get_item(key)
         if not item:
@@ -197,8 +197,6 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any],
     ) -> bool:
         """Check if update condition expression is satisfied."""
-        import re
-
         match = re.search(
             r"scenes\[(\d+)\]\.sceneId = :sceneId",
             condition_expression,
@@ -221,8 +219,6 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any],
     ) -> None:
         """Apply SET operations from UpdateExpression (simplified parser)."""
-        import re
-
         scene_pattern = r"scenes\[(\d+)\]\.(\#?\w+) = :(\w+)"
         for match in re.finditer(scene_pattern, update_expression):
             index = int(match.group(1))

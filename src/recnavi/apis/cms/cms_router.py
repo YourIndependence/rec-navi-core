@@ -32,6 +32,7 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.scene.review_scene_usecase import review_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -148,10 +149,6 @@ async def review_scene_endpoint(
     user: User = Depends(verify_user),
 ) -> ReviewSceneResponse:
     """Review a scene recording (approve or reject)."""
-    from recnavi.application.scene.review_scene_usecase import (
-        review_scene_usecase,
-    )
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     updated_project = await review_scene_usecase(
