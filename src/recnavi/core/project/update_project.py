@@ -94,7 +94,7 @@ async def update_project(
     if not existing_item:
         raise ClientResourcesNotFoundError(f"Project {project_id} not found")
 
-    existing_project = Project(**existing_item)
+    existing_project = Project.model_validate(existing_item)
 
     if user.role != UserRole.OWNER:
         raise ClientAuthorizationError("Only owners can update projects")
