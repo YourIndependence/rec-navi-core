@@ -12,7 +12,9 @@
 from decimal import Decimal
 
 import pytest
+from botocore.exceptions import ClientError
 
+from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.infrastructure.database.dynamodb import DynamoDb
 from recnavi.infrastructure.database.dynamodb import (
     _convert_from_dynamodb_format,
@@ -330,3 +332,124 @@ def test_convert_roundtrip_preserves_data():
     assert converted_back["isActive"] == original["isActive"]
     assert converted_back["profile"]["level"] == original["profile"]["level"]
     assert converted_back["profile"]["score"] == original["profile"]["score"]
+
+
+class MockWriteTable:
+    """Async DynamoDB table fake for put_item/update_item tests."""
+
+    def __init__(self, error_code: str | None = None) -> None:
+        self.error_code = error_code
+        self.put_kwargs: dict[str, object] | None = None
+        self.update_kwargs: dict[str, object] | None = None
+
+    def _raise_if_configured(self) -> None:
+        if self.error_code is not None:
+            raise ClientError(
+                {"Error": {"Code": self.error_code, "Message": "rejected"}},
+                "Write",
+            )
+
+    async def put_item(self, **kwargs: object) -> dict[str, object]:
+        self.put_kwargs = kwargs
+        self._raise_if_configured()
+        return {}
+
+    async def update_item(self, **kwargs: object) -> dict[str, object]:
+        self.update_kwargs = kwargs
+        self._raise_if_configured()
+        return {"Attributes": {"projectId": "p1", "version": 2}}
+
+
+def _build_database(table: MockWriteTable) -> DynamoDb:
+    database = DynamoDb(table_name="projects")
+    database.session = MockDynamoSession(MockDynamoResource(table))
+    return database
+
+
+@pytest.mark.asyncio
+async def test_put_item_without_condition_sends_only_item():
+    """Test put_item omits condition arguments when none are given."""
+    table = MockWriteTable()
+
+    await _build_database(table).put_item({"projectId": "p1"})
+
+    assert table.put_kwargs == {"Item": {"projectId": "p1"}}
+
+
+@pytest.mark.asyncio
+async def test_put_item_passes_condition_to_dynamodb():
+    """Test put_item forwards the condition and converted values."""
+    table = MockWriteTable()
+
+    await _build_database(table).put_item(
+        {"projectId": "p1", "version": 2},
+        condition_expression="version = :expected_version",
+        expression_attribute_values={":expected_version": 1},
+    )
+
+    assert table.put_kwargs is not None
+    assert table.put_kwargs["ConditionExpression"] == (
+        "version = :expected_version"
+    )
+    assert table.put_kwargs["ExpressionAttributeValues"] == {
+        ":expected_version": Decimal(1),
+    }
+
+
+@pytest.mark.asyncio
+async def test_put_item_conditional_failure_raises_conflict():
+    """Test ConditionalCheckFailedException becomes ClientConflictError."""
+    table = MockWriteTable(error_code="ConditionalCheckFailedException")
+
+    with pytest.raises(ClientConflictError, match="rejected"):
+        await _build_database(table).put_item(
+            {"projectId": "p1"},
+            condition_expression="version = :expected_version",
+            expression_attribute_values={":expected_version": 1},
+        )
+
+
+@pytest.mark.asyncio
+async def test_put_item_reraises_other_client_errors():
+    """Test other DynamoDB errors are not converted."""
+    table = MockWriteTable(error_code="ProvisionedThroughputExceeded")
+
+    with pytest.raises(ClientError):
+        await _build_database(table).put_item({"projectId": "p1"})
+
+
+@pytest.mark.asyncio
+async def test_update_item_returns_converted_attributes():
+    """Test update_item sends expressions and returns the new item."""
+    table = MockWriteTable()
+
+    result = await _build_database(table).update_item(
+        key={"projectId": "p1"},
+        update_expression="SET #s = :s",
+        condition_expression="attribute_exists(projectId)",
+        expression_attribute_names={"#s": "status"},
+        expression_attribute_values={":s": "SUBMITTED"},
+    )
+
+    assert result == {"projectId": "p1", "version": 2}
+    assert table.update_kwargs == {
+        "Key": {"projectId": "p1"},
+        "UpdateExpression": "SET #s = :s",
+        "ReturnValues": "ALL_NEW",
+        "ConditionExpression": "attribute_exists(projectId)",
+        "ExpressionAttributeNames": {"#s": "status"},
+        "ExpressionAttributeValues": {":s": "SUBMITTED"},
+    }
+
+
+@pytest.mark.asyncio
+async def test_update_item_conditional_failure_raises_conflict():
+    """Test a failed update condition becomes ClientConflictError."""
+    table = MockWriteTable(error_code="ConditionalCheckFailedException")
+
+    with pytest.raises(ClientConflictError):
+        await _build_database(table).update_item(
+            key={"projectId": "p1"},
+            update_expression="SET #s = :s",
+            condition_expression="scenes[0].sceneId = :sceneId",
+        )

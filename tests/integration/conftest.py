@@ -19,6 +19,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
@@ -60,6 +61,7 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
 
     app.state.database = {
         USERS_TABLE_NAME: MockDatabase(),
+        PROJECTS_TABLE_NAME: MockDatabase(),
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
