@@ -172,3 +172,22 @@ async def test_update_scene_record_raises_403_when_not_assigned():
         await _update(database, storage, user=_staff(user_id="staff-other"))
 
     assert storage.objects == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
+async def test_update_scene_record_raises_403_when_not_staff(role):
+    """Test only staff may shoot; owner and admin are forbidden."""
+    storage = MockObjectStorage()
+    database = MockDatabase(initial_items=[_project_item()])
+    user = User(
+        user_id="staff-789",
+        user_name="Not Staff",
+        group_id="group-456",
+        role=role,
+    )
+
+    with pytest.raises(ClientAuthorizationError, match="Only staff"):
+        await _update(database, storage, user=user)
+
+    assert storage.objects == {}
