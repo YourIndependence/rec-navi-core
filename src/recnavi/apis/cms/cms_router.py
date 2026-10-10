@@ -163,4 +163,4 @@ async def delete_project_endpoint(
         media_bucket_name=MEDIA_BUCKET_NAME,
     )
 
-    return DeleteProjectResponse(success=True)
+    return DeleteProjectResponse(project_id=item.project_id)
