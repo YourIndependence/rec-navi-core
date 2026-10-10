@@ -312,3 +312,45 @@ async def test_submit_project_not_assigned_raises_403():
             project_id="proj-999",
             user=unassigned_user,
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
+async def test_submit_project_non_staff_raises_403(role):
+    """Test submit_project raises 403 and leaves the DB unchanged for non-staff."""
+    project = Project(
+        project_id="proj-role",
+        group_id="group-9",
+        owner_user_id="user-9",
+        project_name="Test Project 9",
+        assigned_user_ids=["user-9"],
+        scenes=[
+            Scene(
+                scene_id="scene-9",
+                scene_principal="cooking",
+                status=SceneStatus.PENDING,
+                video_key="videos/scene-9.mp4",
+            ),
+        ],
+        status=ProjectStatus.IN_PROGRESS,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    user = User(
+        user_id="user-9",
+        user_name="Non Staff",
+        group_id="group-9",
+        role=role,
+    )
+
+    with pytest.raises(ClientAuthorizationError, match="Only staff"):
+        await submit_project(
+            projects_db=db,
+            project_id="proj-role",
+            user=user,
+        )
+
+    stored = await db.get_item(key={"projectId": "proj-role"})
+    assert stored["status"] == ProjectStatus.IN_PROGRESS.value
+    assert stored["updatedAt"] == "2026-01-01T00:00:00Z"

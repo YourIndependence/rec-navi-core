@@ -17,6 +17,7 @@ from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
@@ -46,6 +47,11 @@ async def submit_project(
     if user.group_id != project.group_id:
         raise ClientAuthorizationError(
             "Access to other group's project is forbidden",
+        )
+
+    if user.role != UserRole.STAFF:
+        raise ClientAuthorizationError(
+            "Only staff can submit a project",
         )
 
     if user.user_id not in project.assigned_user_ids:
