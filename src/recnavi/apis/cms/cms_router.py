@@ -30,6 +30,7 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -111,6 +112,8 @@ async def get_project_endpoint(
 
     project = await get_project_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
+        bucket_name=MEDIA_BUCKET_NAME,
         project_id=item.project_id,
         user=user,
     )
@@ -129,6 +132,8 @@ async def create_project_endpoint(
 
     project = await create_project_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
+        bucket_name=MEDIA_BUCKET_NAME,
         project_name=item.project_name,
         description=item.description,
         scene_principals=item.scene_principals,

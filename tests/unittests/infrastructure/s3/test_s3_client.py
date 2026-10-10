@@ -19,6 +19,7 @@ from unittest.mock import patch
 
 import pytest
 
+from recnavi.infrastructure.s3.s3_client import S3Client
 from recnavi.infrastructure.s3.s3_client import generate_presigned_url
 
 
@@ -97,3 +98,24 @@ async def test_generate_presigned_url_respects_custom_expiration():
             Params={"Bucket": "test-bucket", "Key": "videos/scene-456.mp4"},
             ExpiresIn=7200,  # Custom expiration
         )
+
+
+@pytest.mark.asyncio
+async def test_s3_client_delegates_to_module_function():
+    """Test S3Client.generate_presigned_url delegates to the module function."""
+    with patch(
+        "recnavi.infrastructure.s3.s3_client.generate_presigned_url",
+        new=AsyncMock(return_value="mock://url"),
+    ) as mock_generate:
+        url = await S3Client().generate_presigned_url(
+            bucket_name="test-bucket",
+            object_key="videos/scene-789.mp4",
+            expiration=60,
+        )
+
+    assert url == "mock://url"
+    mock_generate.assert_awaited_once_with(
+        bucket_name="test-bucket",
+        object_key="videos/scene-789.mp4",
+        expiration=60,
+    )

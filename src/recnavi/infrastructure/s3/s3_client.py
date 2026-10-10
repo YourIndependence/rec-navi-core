@@ -12,6 +12,7 @@
 import aioboto3
 
 from recnavi.config.variables import REGION
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
 
 async def generate_presigned_url(
@@ -38,3 +39,21 @@ async def generate_presigned_url(
             ExpiresIn=expiration,
         )
         return url
+
+
+class S3Client(BaseObjectStorage):
+    """S3-backed object storage."""
+
+    async def generate_presigned_url(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+        expiration: int = 3600,
+    ) -> str:
+        """Generate a presigned GET URL for an S3 object."""
+        return await generate_presigned_url(
+            bucket_name=bucket_name,
+            object_key=object_key,
+            expiration=expiration,
+        )
