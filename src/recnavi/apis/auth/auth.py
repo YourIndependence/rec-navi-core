@@ -21,6 +21,7 @@ from recnavi.config.variables import COGNITO_USER_POOL_ID
 from recnavi.config.variables import REGION
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
+from recnavi.core.user.user import ensure_user_is_active
 from recnavi.core.user.user import get_user_by_id
 from recnavi.exceptions.exceptions import ClientPermissionError
 
@@ -39,6 +40,7 @@ async def verify_user(request: Request) -> User:
         user_id=sub,
         user_database=user_database,
     )
+    ensure_user_is_active(user=user)
 
     return user
 
