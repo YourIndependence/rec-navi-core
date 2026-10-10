@@ -10,6 +10,7 @@
 """S3 client for presigned URL generation."""
 
 import base64
+import binascii
 
 import aioboto3
 
@@ -87,7 +88,7 @@ async def upload_base64(
     """Upload base64-encoded data to S3."""
     try:
         binary_data = base64.b64decode(base64_data)
-    except Exception as e:
+    except binascii.Error as e:
         raise ValueError("Invalid base64 data") from e
 
     session = aioboto3.Session()

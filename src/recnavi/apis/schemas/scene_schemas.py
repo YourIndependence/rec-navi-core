@@ -72,20 +72,3 @@ class UpdateSceneRecordResponse(BaseApiResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     project: Project = Field(..., description="Updated project")
-
-
-class ReviewSceneRequest(BaseItemModel):
-    """Request for POST /reviewScene."""
-
-    project_id: str = Field(..., description="Project ID")
-    scene_id: str = Field(..., description="Scene ID")
-    result: str = Field(..., description="Review result (approve or reject)")
-    comment: str | None = Field(default=None, description="Review comment")
-
-
-class ReviewSceneResponse(BaseApiResponseModel):
-    """Response for POST /reviewScene."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    project: Project = Field(..., description="Updated project")
