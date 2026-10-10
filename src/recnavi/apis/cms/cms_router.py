@@ -26,12 +26,16 @@ from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
+from recnavi.application.project.delete_project_usecase import (
+    delete_project_usecase,
+)
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -148,11 +152,6 @@ async def delete_project_endpoint(
     user: User = Depends(verify_user),
 ) -> DeleteProjectResponse:
     """Delete project and associated S3 files."""
-    from recnavi.application.project.delete_project_usecase import (
-        delete_project_usecase,
-    )
-    from recnavi.config.variables import MEDIA_BUCKET_NAME
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     await delete_project_usecase(
