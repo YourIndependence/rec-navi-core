@@ -43,7 +43,7 @@ async def test_delete_project_endpoint_returns_status_message_project_id():
     )
 
     with patch(
-        "recnavi.application.project.delete_project_usecase.delete_project_usecase",
+        "recnavi.apis.cms.cms_router.delete_project_usecase",
         new=AsyncMock(return_value="proj-123"),
     ):
         response = await delete_project_endpoint(
