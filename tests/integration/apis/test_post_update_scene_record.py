@@ -48,7 +48,8 @@ def test_update_scene_record_response_accepts_a_project():
     )
 
     data = UpdateSceneRecordResponse(project=project).model_dump(
-        by_alias=True, mode="json"
+        by_alias=True,
+        mode="json",
     )
 
     assert data["status"] == "ok"
