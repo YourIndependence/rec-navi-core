@@ -119,6 +119,12 @@ class ClientNotFoundError(BaseClientExceptionError):
 
 
 class ClientConflictError(BaseClientExceptionError):
-    """Conflict error for optimistic locking failure (409 Conflict)."""
+    """Conflict error (409 Conflict)."""
+
+    pass
+
+
+class ClientUnprocessableEntityError(BaseClientExceptionError):
+    """Unprocessable entity error (422 Unprocessable Entity)."""
 
     pass
