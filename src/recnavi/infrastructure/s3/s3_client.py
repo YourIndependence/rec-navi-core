@@ -14,6 +14,7 @@ import base64
 import aioboto3
 
 from recnavi.config.variables import REGION
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
 
 async def generate_presigned_url(
@@ -95,4 +96,20 @@ async def upload_base64(
             Key=object_key,
             Body=binary_data,
             ContentType=content_type,
+        )
+
+
+class S3Client(BaseObjectStorage):
+    """S3 implementation of the object storage."""
+
+    async def delete_objects_by_prefix(
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+    ) -> int:
+        """Delete all S3 objects under a prefix."""
+        return await delete_objects_by_prefix(
+            bucket_name=bucket_name,
+            prefix=prefix,
         )

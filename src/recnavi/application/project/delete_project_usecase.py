@@ -11,8 +11,8 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.delete_project import delete_project
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.user import User
-from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
 
 
 async def delete_project_usecase(
@@ -20,18 +20,14 @@ async def delete_project_usecase(
     projects_db: BaseDatabase,
     project_id: str,
     user: User,
-    video_bucket_name: str,
+    storage: BaseObjectStorage,
+    media_bucket_name: str,
 ) -> str:
-    """Delete project from database and S3."""
-    deleted_project_id = await delete_project(
+    """Delete project from database and object storage."""
+    return await delete_project(
         projects_db=projects_db,
         project_id=project_id,
         user=user,
+        storage=storage,
+        bucket_name=media_bucket_name,
     )
-
-    await delete_objects_by_prefix(
-        bucket_name=video_bucket_name,
-        prefix=f"projects/{project_id}/",
-    )
-
-    return deleted_project_id

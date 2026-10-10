@@ -1,0 +1,36 @@
+# Copyright (c) 2026 YourIndependence. All rights reserved.
+#
+# This software is the confidential and proprietary information of
+# YourIndependence. Unauthorized copying, distribution,
+# modification, or use outside the organization is strictly prohibited.
+#
+# For internal use only.
+# developer team.
+
+"""Object storage abstraction."""
+
+from abc import ABC
+from abc import abstractmethod
+
+
+class BaseObjectStorage(ABC):
+    """Abstract object storage for recorded media."""
+
+    @abstractmethod
+    async def delete_objects_by_prefix(
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+    ) -> int:
+        """Delete every object whose key starts with the prefix.
+
+        Args:
+            bucket_name: Bucket to delete from.
+            prefix: Key prefix to match.
+
+        Returns:
+            Number of deleted objects.
+
+        """
+        pass

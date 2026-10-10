@@ -159,6 +159,7 @@ async def delete_project_endpoint(
         projects_db=projects_db,
         project_id=item.project_id,
         user=user,
+        storage=request.app.state.object_storage,
         media_bucket_name=MEDIA_BUCKET_NAME,
     )
 
