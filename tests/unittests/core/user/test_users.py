@@ -11,6 +11,7 @@
 
 import pytest
 
+from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.core.user.users import get_group_users
 from tests.mockups.mock_database import MockDatabase
@@ -196,8 +197,6 @@ async def test_get_group_users_excludes_inactive_users():
 
 def test_user_is_active_defaults_to_true_and_serializes_camel_case():
     """Test the flag defaults to active and uses the isActive alias."""
-    from recnavi.core.types.user import User
-
     user = User.model_validate(
         {
             "userId": "user-1",
