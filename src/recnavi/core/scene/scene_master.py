@@ -21,6 +21,7 @@ from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
     """Retrieve all scene masters from the database."""
     result = await scenes_db.scan()
+
     return [SceneMaster.model_validate(item) for item in result.items]
 
 
@@ -31,12 +32,17 @@ async def get_scene_master_by_principal(
 ) -> SceneMaster | None:
     """Get a single scene master by principal."""
     result = await scenes_db.scan()
-
-    for item in result.items:
-        if item.get("scenePrincipal") == scene_principal:
-            return SceneMaster.model_validate(item)
-
-    return None
+    item = next(
+        (
+            item
+            for item in result.items
+            if item.get("scenePrincipal") == scene_principal
+        ),
+        None,
+    )
+    if item is None:
+        return None
+    return SceneMaster.model_validate(item)
 
 
 async def get_scene_thumbnail(
