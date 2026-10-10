@@ -9,8 +9,6 @@
 
 """Scene-related API schemas."""
 
-from typing import TYPE_CHECKING
-
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -18,10 +16,7 @@ from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
-
-
-if TYPE_CHECKING:
-    from recnavi.core.types.project import Project
+from recnavi.core.types.project import Project
 
 
 class SceneMasterView(BaseModel):
@@ -76,7 +71,7 @@ class UpdateSceneRecordResponse(BaseApiResponseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    project: "Project" = Field(..., description="Updated project")
+    project: Project = Field(..., description="Updated project")
 
 
 class ReviewSceneRequest(BaseItemModel):
@@ -93,4 +88,4 @@ class ReviewSceneResponse(BaseApiResponseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    project: "Project" = Field(..., description="Updated project")
+    project: Project = Field(..., description="Updated project")
