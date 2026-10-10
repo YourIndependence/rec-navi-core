@@ -128,6 +128,4 @@ async def update_scene(
     )
 
     result = await scenes_db.scan()
-    all_scenes = [SceneMaster.model_validate(item) for item in result.items]
-
-    return all_scenes
+    return [SceneMaster.model_validate(item) for item in result.items]
