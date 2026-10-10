@@ -25,8 +25,8 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
-async def test_submit_project_all_approved():
-    """Test submit_project updates status to SUBMITTED when all scenes approved."""
+async def test_submit_project_all_recorded():
+    """Test submit_project updates status to SUBMITTED when every scene is recorded."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -37,12 +37,20 @@ async def test_submit_project_all_approved():
             Scene(
                 scene_id="scene-1",
                 scene_principal="cooking",
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.PENDING,
+                video_key="videos/scene-1.mp4",
             ),
             Scene(
                 scene_id="scene-2",
                 scene_principal="interview",
+                status=SceneStatus.REJECT,
+                video_key="videos/scene-2.mp4",
+            ),
+            Scene(
+                scene_id="scene-2b",
+                scene_principal="outro",
                 status=SceneStatus.APPROVE,
+                video_key="videos/scene-2b.mp4",
             ),
         ],
         status=ProjectStatus.IN_PROGRESS,
@@ -67,6 +75,8 @@ async def test_submit_project_all_approved():
     assert missing_scene_ids == []
     assert result_project.status == ProjectStatus.SUBMITTED
     assert result_project.updated_at != "2026-01-01T00:00:00Z"
+    stored = await db.get_item(key={"projectId": "proj-123"})
+    assert stored["status"] == ProjectStatus.SUBMITTED.value
 
 
 @pytest.mark.asyncio
@@ -82,7 +92,8 @@ async def test_submit_project_one_not_recorded():
             Scene(
                 scene_id="scene-3",
                 scene_principal="cooking",
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.PENDING,
+                video_key="videos/scene-3.mp4",
             ),
             Scene(
                 scene_id="scene-4",
@@ -115,8 +126,8 @@ async def test_submit_project_one_not_recorded():
 
 
 @pytest.mark.asyncio
-async def test_submit_project_one_rejected():
-    """Test submit_project returns missing scene ID and does not update status."""
+async def test_submit_project_rejected_counts_as_recorded():
+    """Test rejected scene is recorded, so project is submitted."""
     project = Project(
         project_id="proj-789",
         group_id="group-3",
@@ -128,11 +139,13 @@ async def test_submit_project_one_rejected():
                 scene_id="scene-5",
                 scene_principal="cooking",
                 status=SceneStatus.APPROVE,
+                video_key="videos/scene-5.mp4",
             ),
             Scene(
                 scene_id="scene-6",
                 scene_principal="interview",
                 status=SceneStatus.REJECT,
+                video_key="videos/scene-6.mp4",
             ),
         ],
         status=ProjectStatus.IN_PROGRESS,
@@ -154,9 +167,47 @@ async def test_submit_project_one_rejected():
     )
 
     assert result_project.project_id == "proj-789"
-    assert missing_scene_ids == ["scene-6"]
+    assert missing_scene_ids == []
+    assert result_project.status == ProjectStatus.SUBMITTED
+    assert result_project.updated_at != "2026-01-01T00:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_submit_project_missing_video_key_is_unrecorded():
+    """Test scene without a video is reported missing despite its status."""
+    project = Project(
+        project_id="proj-novideo",
+        group_id="group-7",
+        owner_user_id="owner-7",
+        project_name="No Video Project",
+        assigned_user_ids=["staff-9"],
+        scenes=[
+            Scene(
+                scene_id="scene-9",
+                scene_principal="cooking",
+                status=SceneStatus.PENDING,
+            ),
+        ],
+        status=ProjectStatus.IN_PROGRESS,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    user = User(
+        user_id="staff-9",
+        user_name="Staff Nine",
+        group_id="group-7",
+        role=UserRole.STAFF,
+    )
+
+    result_project, missing_scene_ids = await submit_project(
+        projects_db=db,
+        project_id="proj-novideo",
+        user=user,
+    )
+
+    assert missing_scene_ids == ["scene-9"]
     assert result_project.status == ProjectStatus.IN_PROGRESS
-    assert result_project.updated_at == "2026-01-01T00:00:00Z"
 
 
 @pytest.mark.asyncio
@@ -203,6 +254,7 @@ async def test_submit_project_already_submitted_raises_409():
                 scene_id="scene-7",
                 scene_principal="cooking",
                 status=SceneStatus.APPROVE,
+                video_key="videos/scene-7.mp4",
             ),
         ],
         status=ProjectStatus.SUBMITTED,
@@ -239,6 +291,7 @@ async def test_submit_project_not_assigned_raises_403():
                 scene_id="scene-8",
                 scene_principal="cooking",
                 status=SceneStatus.APPROVE,
+                video_key="videos/scene-8.mp4",
             ),
         ],
         status=ProjectStatus.IN_PROGRESS,

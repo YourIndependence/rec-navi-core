@@ -29,7 +29,13 @@ async def submit_project(
     project_id: str,
     user: User,
 ) -> tuple[Project, list[str]]:
-    """Submit project for owner review."""
+    """Submit project for owner review.
+
+    Staff report that shooting is done. A scene counts as unrecorded when
+    its status is NOT_RECORDED or it has no video. Pending, rejected and
+    approved scenes all count as recorded. The project becomes SUBMITTED
+    only when no scene is unrecorded.
+    """
     item = await projects_db.get_item(key={"projectId": project_id})
 
     if not item:
@@ -60,7 +66,7 @@ async def submit_project(
     missing_scene_ids = [
         scene.scene_id
         for scene in project.scenes
-        if scene.status != SceneStatus.APPROVE
+        if scene.status == SceneStatus.NOT_RECORDED or scene.video_key is None
     ]
 
     should_submit = len(missing_scene_ids) == 0

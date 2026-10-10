@@ -144,9 +144,9 @@ class SubmitProjectResponse(BaseApiResponseModel):
 
     project: Project = Field(
         ...,
-        description="Project (SUBMITTED if all approved)",
+        description="Project (SUBMITTED if every scene has a video)",
     )
     missing_scene_ids: list[str] = Field(
         default_factory=list,
-        description="Scene IDs not approved (empty if all approved)",
+        description="Scene IDs still unrecorded, i.e. without a video (empty if every scene is recorded)",
     )
