@@ -32,6 +32,7 @@ from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
 from recnavi.infrastructure.database.dynamodb import DynamoDb
 from recnavi.infrastructure.ses.ses_notifier import SesNotifier
+from recnavi.infrastructure.s3.s3_client import S3Client
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -55,6 +56,8 @@ async def lifespan(_app: FastAPI):
 
         _app.state.notifier = SesNotifier()
         logger.info("notifier initialized.")
+        _app.state.object_storage = S3Client()
+        logger.info("object storage initialized.")
 
         if ENV not in ["LOCAL", "CI"]:
             post_notify_discord(

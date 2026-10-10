@@ -17,6 +17,7 @@ from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
@@ -29,7 +30,13 @@ async def submit_project(
     project_id: str,
     user: User,
 ) -> tuple[Project, list[str]]:
-    """Submit project for owner review."""
+    """Submit project for owner review.
+
+    Staff report that shooting is done. A scene counts as unrecorded when
+    its status is NOT_RECORDED or it has no video. Pending, rejected and
+    approved scenes all count as recorded. The project becomes SUBMITTED
+    only when no scene is unrecorded.
+    """
     item = await projects_db.get_item(key={"projectId": project_id})
 
     if not item:
@@ -40,6 +47,11 @@ async def submit_project(
     if user.group_id != project.group_id:
         raise ClientAuthorizationError(
             "Access to other group's project is forbidden",
+        )
+
+    if user.role != UserRole.STAFF:
+        raise ClientAuthorizationError(
+            "Only staff can submit a project",
         )
 
     if user.user_id not in project.assigned_user_ids:
@@ -60,7 +72,7 @@ async def submit_project(
     missing_scene_ids = [
         scene.scene_id
         for scene in project.scenes
-        if scene.status != SceneStatus.APPROVE
+        if scene.status == SceneStatus.NOT_RECORDED or scene.video_key is None
     ]
 
     should_submit = len(missing_scene_ids) == 0

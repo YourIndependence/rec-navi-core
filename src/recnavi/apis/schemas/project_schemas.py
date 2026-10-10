@@ -9,10 +9,7 @@
 
 """Project-related API schemas."""
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
@@ -65,74 +62,6 @@ class CreateProjectResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Created project")
 
 
-class SceneInput(BaseModel):
-    """Scene input for update request (read-only fields excluded)."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    scene_id: str | None = Field(
-        None,
-        description="Scene ID (null for new scene)",
-    )
-    scene_principal: str = Field(..., description="Scene master principal")
-    assigned_user_ids: list[str] = Field(
-        default_factory=list,
-        description="Staff assigned to scene",
-    )
-
-
-class ProjectInput(BaseModel):
-    """Project input for update."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    project_id: str = Field(..., description="Project ID to update")
-    project_name: str = Field(..., description="Project name")
-    description: str = Field(..., description="Project description")
-    assigned_user_ids: list[str] = Field(
-        default_factory=list,
-        description="Staff assigned to project",
-    )
-    scenes: list[SceneInput] = Field(
-        default_factory=list,
-        description="Scenes array",
-    )
-    version: int = Field(
-        ...,
-        description="Expected version for optimistic locking",
-    )
-
-
-class UpdateProjectRequest(BaseItemModel):
-    """Request payload for POST /updateProject."""
-
-    project: ProjectInput = Field(..., description="Project data to update")
-
-
-class UpdateProjectResponse(BaseApiResponseModel):
-    """Response for POST /updateProject."""
-
-    project: Project = Field(..., description="Updated project")
-
-
-class DeleteProjectRequest(BaseItemModel):
-    """Request payload for POST /deleteProject."""
-
-    project_id: str = Field(..., description="Project ID to delete")
-
-
-class DeleteProjectResponse(BaseApiResponseModel):
-    """Response for POST /deleteProject."""
-
-    project_id: str = Field(..., description="Deleted project ID")
-
-
 class SubmitProjectRequest(BaseItemModel):
     """Request payload for POST /submitProject."""
 
@@ -144,9 +73,9 @@ class SubmitProjectResponse(BaseApiResponseModel):
 
     project: Project = Field(
         ...,
-        description="Project (SUBMITTED if all approved)",
+        description="Project (SUBMITTED if every scene has a video)",
     )
     missing_scene_ids: list[str] = Field(
         default_factory=list,
-        description="Scene IDs not approved (empty if all approved)",
+        description="Scene IDs still unrecorded, i.e. without a video (empty if every scene is recorded)",
     )
