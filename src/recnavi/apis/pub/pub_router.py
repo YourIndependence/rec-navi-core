@@ -56,6 +56,7 @@ async def get_template_thumbnail_endpoint(
     request: Request,
     template_id: str = Query(
         ...,
+        alias="templateId",
         description="Template identifier",
     ),
 ) -> StreamingResponse:
