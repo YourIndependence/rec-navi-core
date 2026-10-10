@@ -9,7 +9,6 @@
 
 """Tests for get_template_thumbnail_usecase."""
 
-from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -20,12 +19,14 @@ from recnavi.application.master.get_template_thumbnail_usecase import (
 )
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
 async def test_usecase_delegates_to_get_template_thumbnail():
     """Test usecase delegates to core get_template_thumbnail collaborator."""
     mock_db = AsyncMock()
+    mock_storage = MockObjectStorage()
     expected_stream = object()
     expected_content_type = "image/jpeg"
     expected_output = (expected_stream, expected_content_type)
@@ -38,13 +39,14 @@ async def test_usecase_delegates_to_get_template_thumbnail():
             templates_db=mock_db,
             template_id="cafe_standard",
             bucket_name="test-bucket",
+            storage=mock_storage,
         )
 
     mock_get.assert_awaited_once_with(
         templates_db=mock_db,
         template_id="cafe_standard",
         bucket_name="test-bucket",
-        download_stream=ANY,
+        storage=mock_storage,
     )
     assert result is expected_output
 
@@ -67,6 +69,7 @@ async def test_usecase_returns_stream_and_content_type_for_template():
         templates_db=mock_db,
         template_id="cafe_standard",
         bucket_name="test-bucket",
+        storage=MockObjectStorage(),
     )
 
     # Stream will be AsyncIterator - just verify it's not None
@@ -87,6 +90,7 @@ async def test_usecase_raises_404_when_template_not_found():
             templates_db=mock_db,
             template_id="nonexistent",
             bucket_name="test-bucket",
+            storage=MockObjectStorage(),
         )
 
 
@@ -108,6 +112,7 @@ async def test_usecase_infers_jpeg_from_jpg_extension():
         templates_db=mock_db,
         template_id="test_template",
         bucket_name="test-bucket",
+        storage=MockObjectStorage(),
     )
 
     assert content_type == "image/jpeg"
@@ -131,6 +136,7 @@ async def test_usecase_infers_jpeg_from_jpeg_extension():
         templates_db=mock_db,
         template_id="test_template",
         bucket_name="test-bucket",
+        storage=MockObjectStorage(),
     )
 
     assert content_type == "image/jpeg"
@@ -154,6 +160,7 @@ async def test_usecase_infers_png_from_png_extension():
         templates_db=mock_db,
         template_id="test_template",
         bucket_name="test-bucket",
+        storage=MockObjectStorage(),
     )
 
     assert content_type == "image/png"
@@ -177,6 +184,7 @@ async def test_usecase_defaults_to_jpeg_for_unknown_extension():
         templates_db=mock_db,
         template_id="test_template",
         bucket_name="test-bucket",
+        storage=MockObjectStorage(),
     )
 
     assert content_type == "image/jpeg"

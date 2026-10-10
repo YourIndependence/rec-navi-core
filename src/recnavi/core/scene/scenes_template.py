@@ -10,9 +10,9 @@
 """Scenes template domain logic."""
 
 from collections.abc import AsyncIterator
-from collections.abc import Callable
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 
@@ -43,7 +43,7 @@ async def get_template_thumbnail(
     templates_db: BaseDatabase,
     template_id: str,
     bucket_name: str,
-    download_stream: Callable[[str, str], AsyncIterator[bytes]],
+    storage: BaseObjectStorage,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get template thumbnail image stream."""
     template = await get_template_by_id(
@@ -58,7 +58,10 @@ async def get_template_thumbnail(
 
     content_type = _infer_content_type(template.thumbnail_uri)
 
-    stream = download_stream(bucket_name, template.thumbnail_uri)
+    stream = storage.download_object_stream(
+        bucket_name=bucket_name,
+        object_key=template.thumbnail_uri,
+    )
 
     return stream, content_type
 

@@ -66,6 +66,7 @@ async def get_template_thumbnail_endpoint(
         templates_db=templates_db,
         template_id=template_id,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
+        storage=request.app.state.object_storage,
     )
 
     return StreamingResponse(

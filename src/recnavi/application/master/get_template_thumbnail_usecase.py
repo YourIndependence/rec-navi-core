@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.scenes_template import get_template_thumbnail
-from recnavi.infrastructure.s3.s3_client import download_object_stream
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
 
 async def get_template_thumbnail_usecase(
@@ -21,14 +21,12 @@ async def get_template_thumbnail_usecase(
     templates_db: BaseDatabase,
     template_id: str,
     bucket_name: str,
+    storage: BaseObjectStorage,
 ) -> tuple[AsyncIterator[bytes], str]:
     """Get template thumbnail image."""
     return await get_template_thumbnail(
         templates_db=templates_db,
         template_id=template_id,
         bucket_name=bucket_name,
-        download_stream=lambda bn, ok: download_object_stream(
-            bucket_name=bn,
-            object_key=ok,
-        ),
+        storage=storage,
     )
