@@ -12,6 +12,7 @@
 from recnavi.core.project.project_download import create_project_archive
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.project_archive import ProjectArchive
 from recnavi.core.types.user import User
 
 
@@ -21,7 +22,7 @@ async def download_project_usecase(
     project: Project,
     bucket_name: str,
     storage: BaseObjectStorage,
-) -> str:
+) -> ProjectArchive:
     """Download project as zip archive."""
     return await create_project_archive(
         user=user,

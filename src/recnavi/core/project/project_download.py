@@ -16,11 +16,15 @@ import zipfile
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.project_archive import ProjectArchive
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+
+
+DOWNLOAD_URL_EXPIRATION_SECONDS = 3600
 
 
 def validate_project_for_download(
@@ -58,8 +62,8 @@ async def create_project_archive(
     project: Project,
     bucket_name: str,
     storage: BaseObjectStorage,
-) -> str:
-    """Build a zip archive of approved scene videos and return its download URL."""
+) -> ProjectArchive:
+    """Build a zip archive of approved scene videos and return its download info."""
     validate_project_for_download(user=user, project=project)
 
     zip_buffer = io.BytesIO()
@@ -108,8 +112,12 @@ async def create_project_archive(
         content_type="application/zip",
     )
 
-    return await storage.generate_presigned_url(
+    download_url = await storage.generate_presigned_url(
         bucket_name=bucket_name,
         object_key=archive_key,
-        expiration=3600,
+        expiration=DOWNLOAD_URL_EXPIRATION_SECONDS,
+    )
+    return ProjectArchive(
+        download_url=download_url,
+        expires_in_seconds=DOWNLOAD_URL_EXPIRATION_SECONDS,
     )

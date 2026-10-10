@@ -17,6 +17,7 @@ import pytest
 from recnavi.application.project.download_project_usecase import (
     download_project_usecase,
 )
+from recnavi.core.types.project_archive import ProjectArchive
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_object_storage import MockObjectStorage
@@ -33,7 +34,10 @@ async def test_download_project_usecase_delegates_to_create_project_archive():
     )
     project = object()
     storage = MockObjectStorage()
-    expected_output = "mock://test-bucket/archives/proj.zip?expires=3600"
+    expected_output = ProjectArchive(
+        download_url="mock://test-bucket/archives/proj.zip?expires=3600",
+        expires_in_seconds=3600,
+    )
 
     with patch(
         "recnavi.application.project.download_project_usecase.create_project_archive",

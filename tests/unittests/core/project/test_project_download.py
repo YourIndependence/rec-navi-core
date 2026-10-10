@@ -263,14 +263,18 @@ async def test_create_project_archive_creates_zip_with_videos_and_metadata():
         ],
     )
 
-    url = await create_project_archive(
+    archive = await create_project_archive(
         user=_owner(),
         project=project,
         bucket_name="test-bucket",
         storage=storage,
     )
 
-    assert url == "mock://test-bucket/archives/proj-123.zip?expires=3600"
+    assert (
+        archive.download_url
+        == "mock://test-bucket/archives/proj-123.zip?expires=3600"
+    )
+    assert archive.expires_in_seconds == 3600
     zip_bytes, content_type = storage.objects[
         ("test-bucket", "archives/proj-123.zip")
     ]

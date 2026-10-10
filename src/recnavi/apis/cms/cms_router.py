@@ -166,11 +166,14 @@ async def download_project_endpoint(
 
     project = Project.model_validate(project_item)
 
-    presigned_url = await download_project_usecase(
+    archive = await download_project_usecase(
         user=user,
         project=project,
         bucket_name=MEDIA_BUCKET_NAME,
         storage=request.app.state.object_storage,
     )
 
-    return DownloadProjectResponse(download_url=presigned_url)
+    return DownloadProjectResponse(
+        download_url=archive.download_url,
+        expires_in_seconds=archive.expires_in_seconds,
+    )

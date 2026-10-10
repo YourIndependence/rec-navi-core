@@ -78,7 +78,10 @@ class DownloadProjectResponse(BaseApiResponseModel):
     download_url: str = Field(
         ...,
         alias="downloadUrl",
-        description=(
-            "Presigned S3 URL for zip archive download (1-hour expiration)"
-        ),
+        description=("Presigned S3 URL for zip archive download"),
+    )
+    expires_in_seconds: int = Field(
+        ...,
+        alias="expiresInSeconds",
+        description="Seconds until the download URL expires",
     )
