@@ -48,7 +48,8 @@ def test_review_scene_response_accepts_a_project():
     )
 
     data = ReviewSceneResponse(project=project).model_dump(
-        by_alias=True, mode="json"
+        by_alias=True,
+        mode="json",
     )
 
     assert data["status"] == "ok"
