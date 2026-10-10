@@ -30,12 +30,17 @@ async def get_template_by_id(
 ) -> ScenesTemplate | None:
     """Get a single template by ID."""
     result = await templates_db.scan()
-
-    for item in result.items:
-        if item.get("templateId") == template_id:
-            return ScenesTemplate.model_validate(item)
-
-    return None
+    item = next(
+        (
+            item
+            for item in result.items
+            if item.get("templateId") == template_id
+        ),
+        None,
+    )
+    if item is None:
+        return None
+    return ScenesTemplate.model_validate(item)
 
 
 async def get_template_thumbnail(
