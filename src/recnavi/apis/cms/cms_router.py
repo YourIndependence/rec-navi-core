@@ -167,6 +167,7 @@ async def update_template_endpoint(
         scene_principals=item.scene_principals,
         thumbnail=item.thumbnail,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
+        storage=request.app.state.object_storage,
     )
 
     return UpdateTemplateResponse(templates=templates)

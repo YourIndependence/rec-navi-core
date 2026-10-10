@@ -9,10 +9,8 @@
 
 """Upsert template domain logic."""
 
-from collections.abc import Awaitable
-from collections.abc import Callable
-
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from recnavi.exceptions.exceptions import ClientValueError
@@ -39,6 +37,21 @@ async def upsert_template(
     return template
 
 
+async def _upload_thumbnail(
+    storage: BaseObjectStorage,
+    bucket_name: str,
+    object_key: str,
+    thumbnail: str,
+) -> None:
+    """Upload base64 thumbnail as JPEG."""
+    await storage.upload_base64(
+        bucket_name=bucket_name,
+        object_key=object_key,
+        base64_data=thumbnail,
+        content_type="image/jpeg",
+    )
+
+
 async def update_template(
     *,
     templates_db: BaseDatabase,
@@ -48,7 +61,7 @@ async def update_template(
     scene_principals: list[str],
     thumbnail: str | None,
     bucket_name: str,
-    upload_image: Callable[[str, str, str], Awaitable[None]],
+    storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
     """Create or update template with thumbnail upload."""
     result = await scenes_db.scan()
@@ -68,14 +81,19 @@ async def update_template(
             raise ClientUnprocessableEntityError(
                 "thumbnail is required when creating a new template",
             )
-        await upload_image(bucket_name, object_key, thumbnail)
+        await _upload_thumbnail(storage, bucket_name, object_key, thumbnail)
         thumbnail_uri = uploaded_uri
     else:
         thumbnail_uri = ScenesTemplate.model_validate(
             existing_template,
         ).thumbnail_uri
         if thumbnail:
-            await upload_image(bucket_name, object_key, thumbnail)
+            await _upload_thumbnail(
+                storage,
+                bucket_name,
+                object_key,
+                thumbnail,
+            )
             thumbnail_uri = uploaded_uri
 
     await upsert_template(

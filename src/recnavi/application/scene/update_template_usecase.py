@@ -11,8 +11,8 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.upsert_template import update_template
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scenes_template import ScenesTemplate
-from recnavi.infrastructure.s3.s3_client import upload_base64
 
 
 async def update_template_usecase(
@@ -24,6 +24,7 @@ async def update_template_usecase(
     scene_principals: list[str],
     thumbnail: str | None,
     bucket_name: str,
+    storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
     """Create or update template with thumbnail upload."""
     return await update_template(
@@ -34,10 +35,5 @@ async def update_template_usecase(
         scene_principals=scene_principals,
         thumbnail=thumbnail,
         bucket_name=bucket_name,
-        upload_image=lambda bn, ok, data: upload_base64(
-            bucket_name=bn,
-            object_key=ok,
-            base64_data=data,
-            content_type="image/jpeg",
-        ),
+        storage=storage,
     )
