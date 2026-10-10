@@ -37,7 +37,7 @@ async def test_update_template_usecase_delegates_to_update_template():
             template_id="tpl",
             title="Title",
             scene_principals=["cooking"],
-            thumbnail=None,
+            thumbnail_image=None,
             bucket_name="test-bucket",
             storage=storage,
         )
@@ -48,7 +48,7 @@ async def test_update_template_usecase_delegates_to_update_template():
         template_id="tpl",
         title="Title",
         scene_principals=["cooking"],
-        thumbnail=None,
+        thumbnail_image=None,
         bucket_name="test-bucket",
         storage=storage,
     )

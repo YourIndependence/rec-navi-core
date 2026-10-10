@@ -22,7 +22,7 @@ async def update_template_usecase(
     template_id: str | None,
     title: str,
     scene_principals: list[str],
-    thumbnail: str | None,
+    thumbnail_image: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
@@ -33,7 +33,7 @@ async def update_template_usecase(
         template_id=template_id,
         title=title,
         scene_principals=scene_principals,
-        thumbnail=thumbnail,
+        thumbnail_image=thumbnail_image,
         bucket_name=bucket_name,
         storage=storage,
     )

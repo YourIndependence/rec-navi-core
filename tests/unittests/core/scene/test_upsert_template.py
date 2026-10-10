@@ -138,7 +138,7 @@ async def test_update_template_creates_template_and_uploads_thumbnail():
         template_id="new_template",
         title="New Template",
         scene_principals=["cooking", "plating"],
-        thumbnail=THUMB,
+        thumbnail_image=THUMB,
         bucket_name="test-bucket",
         storage=storage,
     )
@@ -176,7 +176,7 @@ async def test_update_template_keeps_thumbnail_when_not_provided():
         template_id="existing_template",
         title="Updated Title",
         scene_principals=["cooking"],
-        thumbnail=None,
+        thumbnail_image=None,
         bucket_name="test-bucket",
         storage=storage,
     )
@@ -206,7 +206,7 @@ async def test_update_template_replaces_thumbnail_of_existing_template():
         template_id="tpl",
         title="Old",
         scene_principals=["cooking"],
-        thumbnail=THUMB,
+        thumbnail_image=THUMB,
         bucket_name="test-bucket",
         storage=storage,
     )
@@ -233,7 +233,7 @@ async def test_update_template_raises_422_when_thumbnail_missing_on_create():
             template_id="new_template",
             title="New Template",
             scene_principals=["cooking"],
-            thumbnail=None,
+            thumbnail_image=None,
             bucket_name="test-bucket",
             storage=storage,
         )
@@ -253,7 +253,7 @@ async def test_update_template_raises_400_when_scene_principal_not_found():
             template_id="new_template",
             title="New Template",
             scene_principals=["cooking", "nonexistent_scene"],
-            thumbnail=THUMB,
+            thumbnail_image=THUMB,
             bucket_name="test-bucket",
             storage=storage,
         )
@@ -270,7 +270,7 @@ async def test_update_template_allows_empty_scene_principals():
         template_id="empty_template",
         title="Empty Template",
         scene_principals=[],
-        thumbnail=THUMB,
+        thumbnail_image=THUMB,
         bucket_name="test-bucket",
         storage=MockObjectStorage(),
     )
@@ -290,7 +290,7 @@ async def test_update_template_preserves_duplicates_and_order():
         template_id="duplicate_template",
         title="Duplicate Template",
         scene_principals=principals,
-        thumbnail=THUMB,
+        thumbnail_image=THUMB,
         bucket_name="test-bucket",
         storage=MockObjectStorage(),
     )
@@ -310,7 +310,7 @@ async def test_update_template_issues_new_id_when_template_id_is_null():
         template_id=None,
         title="New Template",
         scene_principals=["cooking"],
-        thumbnail=THUMB,
+        thumbnail_image=THUMB,
         bucket_name="test-bucket",
         storage=storage,
     )
@@ -340,7 +340,7 @@ async def test_update_template_raises_422_when_null_id_without_thumbnail():
             template_id=None,
             title="New Template",
             scene_principals=["cooking"],
-            thumbnail=None,
+            thumbnail_image=None,
             bucket_name="test-bucket",
             storage=storage,
         )

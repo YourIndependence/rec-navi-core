@@ -39,21 +39,6 @@ async def upsert_template(
     return template
 
 
-async def _upload_thumbnail(
-    storage: BaseObjectStorage,
-    bucket_name: str,
-    object_key: str,
-    thumbnail: str,
-) -> None:
-    """Upload base64 thumbnail as JPEG."""
-    await storage.upload_base64(
-        bucket_name=bucket_name,
-        object_key=object_key,
-        base64_data=thumbnail,
-        content_type="image/jpeg",
-    )
-
-
 async def update_template(
     *,
     templates_db: BaseDatabase,
@@ -61,7 +46,7 @@ async def update_template(
     template_id: str | None,
     title: str,
     scene_principals: list[str],
-    thumbnail: str | None,
+    thumbnail_image: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
@@ -86,22 +71,27 @@ async def update_template(
     uploaded_uri = f"s3://{bucket_name}/{object_key}"
 
     if not existing_template:
-        if not thumbnail:
+        if not thumbnail_image:
             raise ClientUnprocessableEntityError(
                 "thumbnail is required when creating a new template",
             )
-        await _upload_thumbnail(storage, bucket_name, object_key, thumbnail)
+        await storage.upload_base64(
+            bucket_name=bucket_name,
+            object_key=object_key,
+            base64_data=thumbnail_image,
+            content_type="image/jpeg",
+        )
         thumbnail_uri = uploaded_uri
     else:
         thumbnail_uri = ScenesTemplate.model_validate(
             existing_template,
         ).thumbnail_uri
-        if thumbnail:
-            await _upload_thumbnail(
-                storage,
-                bucket_name,
-                object_key,
-                thumbnail,
+        if thumbnail_image:
+            await storage.upload_base64(
+                bucket_name=bucket_name,
+                object_key=object_key,
+                base64_data=thumbnail_image,
+                content_type="image/jpeg",
             )
             thumbnail_uri = uploaded_uri
 

@@ -165,7 +165,7 @@ async def update_template_endpoint(
         template_id=item.template.template_id,
         title=item.template.title,
         scene_principals=item.template.scene_principals,
-        thumbnail=item.thumbnail_image,
+        thumbnail_image=item.thumbnail_image,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
         storage=request.app.state.object_storage,
     )
