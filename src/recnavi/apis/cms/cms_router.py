@@ -164,6 +164,7 @@ async def update_scene_endpoint(
         example_image=item.example_image,
         guide_image=item.guide_image,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,
+        storage=request.app.state.object_storage,
     )
 
     scene_views = [

@@ -9,10 +9,8 @@
 
 """Upsert scene master domain logic."""
 
-from collections.abc import Awaitable
-from collections.abc import Callable
-
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
@@ -54,7 +52,7 @@ async def update_scene(
     example_image: str | None,
     guide_image: str | None,
     bucket_name: str,
-    upload_image: Callable[[str, str, str], Awaitable[None]],
+    storage: BaseObjectStorage,
 ) -> list[SceneMaster]:
     """Create or update scene master with image upload."""
     existing_scene = await scenes_db.get_item(
@@ -72,15 +70,17 @@ async def update_scene(
         )
         guide_uri = f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
 
-        await upload_image(
-            bucket_name,
-            f"scenes/{scene_principal}/example.jpg",
-            example_image,
+        await storage.upload_base64(
+            bucket_name=bucket_name,
+            object_key=f"scenes/{scene_principal}/example.jpg",
+            base64_data=example_image,
+            content_type="image/jpeg",
         )
-        await upload_image(
-            bucket_name,
-            f"scenes/{scene_principal}/guide.jpg",
-            guide_image,
+        await storage.upload_base64(
+            bucket_name=bucket_name,
+            object_key=f"scenes/{scene_principal}/guide.jpg",
+            base64_data=guide_image,
+            content_type="image/jpeg",
         )
     else:
         existing_master = SceneMaster.model_validate(existing_scene)
@@ -88,20 +88,22 @@ async def update_scene(
         guide_uri = existing_master.guide_uri
 
         if example_image:
-            await upload_image(
-                bucket_name,
-                f"scenes/{scene_principal}/example.jpg",
-                example_image,
+            await storage.upload_base64(
+                bucket_name=bucket_name,
+                object_key=f"scenes/{scene_principal}/example.jpg",
+                base64_data=example_image,
+                content_type="image/jpeg",
             )
             thumbnail_uri = (
                 f"s3://{bucket_name}/scenes/{scene_principal}/example.jpg"
             )
 
         if guide_image:
-            await upload_image(
-                bucket_name,
-                f"scenes/{scene_principal}/guide.jpg",
-                guide_image,
+            await storage.upload_base64(
+                bucket_name=bucket_name,
+                object_key=f"scenes/{scene_principal}/guide.jpg",
+                base64_data=guide_image,
+                content_type="image/jpeg",
             )
             guide_uri = (
                 f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"

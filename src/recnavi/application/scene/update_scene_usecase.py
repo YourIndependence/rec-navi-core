@@ -11,8 +11,8 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.upsert_scene_master import update_scene
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.infrastructure.s3.s3_client import upload_base64
 
 
 async def update_scene_usecase(
@@ -24,6 +24,7 @@ async def update_scene_usecase(
     example_image: str | None,
     guide_image: str | None,
     bucket_name: str,
+    storage: BaseObjectStorage,
 ) -> list[SceneMaster]:
     """Create or update scene master with image upload."""
     return await update_scene(
@@ -34,10 +35,5 @@ async def update_scene_usecase(
         example_image=example_image,
         guide_image=guide_image,
         bucket_name=bucket_name,
-        upload_image=lambda bn, ok, data: upload_base64(
-            bucket_name=bn,
-            object_key=ok,
-            base64_data=data,
-            content_type="image/jpeg",
-        ),
+        storage=storage,
     )
