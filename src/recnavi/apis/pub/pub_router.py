@@ -9,6 +9,8 @@
 
 """Public router for staff-facing endpoints."""
 
+from typing import Literal
+
 from fastapi import APIRouter
 from fastapi import Query
 from fastapi import Request
@@ -27,9 +29,13 @@ async def get_scene_thumbnail_endpoint(
     request: Request,
     scene_principal: str = Query(
         ...,
+        alias="scenePrincipal",
         description="Scene principal identifier",
     ),
-    kind: str = Query(..., description="Image kind: 'example' or 'guide'"),
+    kind: Literal["example", "guide"] = Query(
+        ...,
+        description="Image kind: 'example' or 'guide'",
+    ),
 ) -> StreamingResponse:
     """Serve scene thumbnail or guide image without authentication (GET endpoint for <img src>)."""
     scenes_db = request.app.state.database[SCENES_TABLE_NAME]
