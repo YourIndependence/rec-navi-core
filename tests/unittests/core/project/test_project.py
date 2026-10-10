@@ -14,7 +14,7 @@ import pytest
 from recnavi.core.project.project import get_project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from tests.mockups.mock_database import MockDatabase
 
@@ -146,7 +146,7 @@ async def test_get_project_raises_403_for_other_group():
     )
 
     with pytest.raises(
-        ClientPermissionError,
+        ClientAuthorizationError,
         match="User does not have access",
     ):
         await get_project(
@@ -184,7 +184,7 @@ async def test_get_project_raises_403_for_non_assigned_user():
     )
 
     with pytest.raises(
-        ClientPermissionError,
+        ClientAuthorizationError,
         match="User does not have access",
     ):
         await get_project(

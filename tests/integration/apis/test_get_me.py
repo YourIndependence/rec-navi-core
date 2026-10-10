@@ -40,8 +40,9 @@ def test_get_me_with_real_aws(client, auth_headers):
 
     data = response.json()
     assert data["status"] == "ok"
+    assert data["groupId"] == "it-group"
     user = data["user"]
     assert user["userId"] == "test-user-123"
     assert user["userName"] == "Test User"
     assert user["groupId"] == "it-group"
-    assert user["role"] == "admin"
+    assert user["role"] == "owner"
