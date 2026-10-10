@@ -11,6 +11,7 @@
 
 from abc import ABC
 from abc import abstractmethod
+from collections.abc import AsyncIterator
 
 
 class BaseObjectStorage(ABC):
@@ -40,6 +41,25 @@ class BaseObjectStorage(ABC):
         pass
 
     @abstractmethod
+    async def delete_objects_by_prefix(
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+    ) -> int:
+        """Delete every object whose key starts with the prefix.
+
+        Args:
+            bucket_name: Bucket to delete from.
+            prefix: Key prefix to match.
+
+        Returns:
+            Number of deleted objects.
+
+        """
+        pass
+
+    @abstractmethod
     async def download_object(
         self,
         *,
@@ -54,6 +74,25 @@ class BaseObjectStorage(ABC):
 
         Returns:
             Object content as bytes.
+
+        """
+        pass
+
+    @abstractmethod
+    def download_object_stream(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> AsyncIterator[bytes]:
+        """Stream an object's content as byte chunks.
+
+        Args:
+            bucket_name: Bucket to read from.
+            object_key: Key of the object.
+
+        Returns:
+            Async iterator yielding the object content in chunks.
 
         """
         pass

@@ -7,10 +7,11 @@
 # For internal use only.
 # developer team.
 
-"""S3 client for presigned URL generation and object transfer."""
+"""S3 client for presigned URLs and object transfer."""
 
 import base64
 import binascii
+from collections.abc import AsyncIterator
 
 import aioboto3
 
@@ -42,6 +43,59 @@ async def generate_presigned_url(
             ExpiresIn=expiration,
         )
         return url
+
+
+async def delete_objects_by_prefix(
+    *,
+    bucket_name: str,
+    prefix: str,
+) -> int:
+    """Delete all S3 objects under a prefix.
+
+    Args:
+        bucket_name: S3 bucket name.
+        prefix: Key prefix to match (e.g., "projects/proj-123/").
+
+    Returns:
+        Number of deleted objects.
+
+    """
+    session = aioboto3.Session()
+    deleted_count = 0
+
+    async with session.client("s3", region_name=REGION) as s3:
+        continuation_token = None
+
+        while True:
+            list_kwargs = {
+                "Bucket": bucket_name,
+                "Prefix": prefix,
+            }
+            if continuation_token:
+                list_kwargs["ContinuationToken"] = continuation_token
+
+            response = await s3.list_objects_v2(**list_kwargs)
+
+            if "Contents" not in response:
+                break
+
+            objects_to_delete = [
+                {"Key": obj["Key"]} for obj in response["Contents"]
+            ]
+
+            if objects_to_delete:
+                await s3.delete_objects(
+                    Bucket=bucket_name,
+                    Delete={"Objects": objects_to_delete},
+                )
+                deleted_count += len(objects_to_delete)
+
+            if not response.get("IsTruncated"):
+                break
+
+            continuation_token = response.get("NextContinuationToken")
+
+    return deleted_count
 
 
 async def upload_base64(
@@ -102,6 +156,31 @@ async def download_object(
         return await response["Body"].read()
 
 
+async def download_object_stream(
+    *,
+    bucket_name: str,
+    object_key: str,
+) -> AsyncIterator[bytes]:
+    """Download S3 object as async byte stream.
+
+    Args:
+        bucket_name: S3 bucket name.
+        object_key: S3 object key (e.g., "scenes/cooking/thumbnail.jpg").
+
+    Yields:
+        Byte chunks from S3 object.
+
+    Raises:
+        ClientError: If S3 object not found or access denied.
+
+    """
+    session = aioboto3.Session()
+    async with session.client("s3", region_name=REGION) as s3:
+        response = await s3.get_object(Bucket=bucket_name, Key=object_key)
+        async for chunk in response["Body"]:
+            yield chunk
+
+
 class S3Client(BaseObjectStorage):
     """S3 implementation of the object storage."""
 
@@ -121,6 +200,18 @@ class S3Client(BaseObjectStorage):
             content_type=content_type,
         )
 
+    async def delete_objects_by_prefix(
+        self,
+        *,
+        bucket_name: str,
+        prefix: str,
+    ) -> int:
+        """Delete all S3 objects under a prefix."""
+        return await delete_objects_by_prefix(
+            bucket_name=bucket_name,
+            prefix=prefix,
+        )
+
     async def download_object(
         self,
         *,
@@ -129,6 +220,18 @@ class S3Client(BaseObjectStorage):
     ) -> bytes:
         """Download an S3 object as bytes."""
         return await download_object(
+            bucket_name=bucket_name,
+            object_key=object_key,
+        )
+
+    def download_object_stream(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> AsyncIterator[bytes]:
+        """Stream an S3 object's content as byte chunks."""
+        return download_object_stream(
             bucket_name=bucket_name,
             object_key=object_key,
         )
