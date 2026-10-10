@@ -10,9 +10,9 @@
 """Integration tests for Public (staff-facing) endpoints."""
 
 
-def test_get_my_projects_returns_400_when_no_token(client):
-    """Test GET /getMyProjects returns 400 when no authorization header."""
+def test_get_my_projects_returns_401_when_no_token(client):
+    """Test GET /getMyProjects returns 401 when no authorization header."""
     response = client.get("/getProjects")
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"

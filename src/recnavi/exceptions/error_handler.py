@@ -21,13 +21,40 @@ from recnavi.config.variables import ENV
 from recnavi.core.utils.discord_handler import post_error_discord
 
 from .exceptions import BaseClientExceptionError
+from .exceptions import ClientAuthenticationError
 from .exceptions import ClientAuthorizationError
+from .exceptions import ClientConflictError
+from .exceptions import ClientNotFoundError
+from .exceptions import ClientPayloadTooLargeError
+from .exceptions import ClientResourcesNotFoundError
+from .exceptions import ClientUnprocessableEntityError
 
 
 ERROR_LOG_BUCKET_NAME = "trust-api-error-log"
 ses_client = boto3.client("ses", region_name="ap-northeast-1")
 
 logger = logging.getLogger(__name__)
+
+CLIENT_ERROR_STATUS_CODES: dict[type[Exception], int] = {
+    ClientAuthenticationError: 401,
+    ClientAuthorizationError: 403,
+    ClientNotFoundError: 404,
+    ClientResourcesNotFoundError: 404,
+    ClientConflictError: 409,
+    ClientPayloadTooLargeError: 413,
+    ClientUnprocessableEntityError: 422,
+}
+DEFAULT_CLIENT_ERROR_STATUS_CODE = 400
+
+
+def resolve_client_error_status_code(exc: Exception) -> int | None:
+    """Return the HTTP status code for a client error, or None if not one."""
+    for exc_type, status_code in CLIENT_ERROR_STATUS_CODES.items():
+        if isinstance(exc, exc_type):
+            return status_code
+    if isinstance(exc, BaseClientExceptionError):
+        return DEFAULT_CLIENT_ERROR_STATUS_CODE
+    return None
 
 
 async def custom_exception_handler(request: Request, exc: Exception):
@@ -43,12 +70,10 @@ async def custom_exception_handler(request: Request, exc: Exception):
 
     kwargs["x_user"] = x_user
 
-    if isinstance(exc, ClientAuthorizationError):
+    client_status_code = resolve_client_error_status_code(exc)
+    if client_status_code is not None:
         message = str(exc)
-        status_code = 403
-    elif isinstance(exc, BaseClientExceptionError):
-        message = str(exc)
-        status_code = 400
+        status_code = client_status_code
     elif isinstance(exc, TypeError):
         message = "Invalid request parameter"
         status_code = 400

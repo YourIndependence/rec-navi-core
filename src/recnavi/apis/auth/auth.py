@@ -22,7 +22,7 @@ from recnavi.config.variables import REGION
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 from recnavi.core.user.user import get_user_by_id
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthenticationError
 
 
 client = boto3.client("cognito-idp", region_name="ap-northeast-1")
@@ -48,9 +48,9 @@ async def decode_token(request: Request) -> dict[str, object]:
     authorization = request.headers.get("authorization")
     client_id = request.headers.get("client-Id", COGNITO_CLIENT_ID)
     if not authorization:
-        raise ClientPermissionError("Authorization header is required.")
+        raise ClientAuthenticationError("Authorization header is required.")
     if not authorization.startswith("Bearer "):
-        raise ClientPermissionError(
+        raise ClientAuthenticationError(
             "Authorization header must start with 'Bearer '",
         )
     token = authorization.split(" ")[1]
@@ -68,7 +68,7 @@ async def decode_token(request: Request) -> dict[str, object]:
         )
 
         if key is None:
-            raise ClientPermissionError("Invalid token")
+            raise ClientAuthenticationError("Invalid token")
 
         payload = jwt.decode(
             token,
@@ -83,8 +83,8 @@ async def decode_token(request: Request) -> dict[str, object]:
     except httpx.HTTPError as e:
         raise JWTError(f"Failed to fetch JWKs: {e!s}") from e
     except ExpiredSignatureError as e:
-        raise ClientPermissionError("Token signature has expired.") from e
+        raise ClientAuthenticationError("Token signature has expired.") from e
     except JWTError as e:
-        raise ClientPermissionError("Token verification failed.") from e
+        raise ClientAuthenticationError("Token verification failed.") from e
     except Exception as e:
         raise e

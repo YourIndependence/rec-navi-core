@@ -16,11 +16,11 @@ Mark with @pytest.mark.real_aws to skip in CI without AWS access.
 import pytest
 
 
-def test_get_me_returns_400_when_no_token(client):
-    """Test GET /getMe returns 400 when no authorization header."""
+def test_get_me_returns_401_when_no_token(client):
+    """Test GET /getMe returns 401 when no authorization header."""
     response = client.get("/getMe")
 
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 
