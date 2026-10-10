@@ -22,7 +22,6 @@ import json
 import warnings
 from collections.abc import AsyncIterator
 from collections.abc import Callable
-from contextlib import suppress
 from uuid import uuid4
 
 import pytest
@@ -106,8 +105,7 @@ async def seed_project(
         yield _seed
     finally:
         for item in created:
-            with suppress(Exception):
-                await db.delete_item({"projectId": item["projectId"]})
+            await db.delete_item({"projectId": item["projectId"]})
 
 
 def test_health_returns_ok(client):
