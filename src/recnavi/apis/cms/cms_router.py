@@ -28,6 +28,9 @@ from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.project.update_project_usecase import (
+    update_project_usecase,
+)
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
@@ -148,21 +151,7 @@ async def update_project_endpoint(
     user: User = Depends(verify_user),
 ) -> UpdateProjectResponse:
     """Update project with optimistic locking."""
-    from recnavi.application.project.update_project_usecase import (
-        update_project_usecase,
-    )
-    from recnavi.core.types.scene_input import SceneInput as CoreSceneInput
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    core_scene_inputs = [
-        CoreSceneInput(
-            scene_id=scene.scene_id,
-            scene_principal=scene.scene_principal,
-            assigned_user_ids=scene.assigned_user_ids,
-        )
-        for scene in item.project.scenes
-    ]
 
     updated_project = await update_project_usecase(
         projects_db=projects_db,
@@ -170,7 +159,7 @@ async def update_project_endpoint(
         project_name=item.project.project_name,
         description=item.project.description,
         assigned_user_ids=item.project.assigned_user_ids,
-        scenes=core_scene_inputs,
+        scenes=item.project.scenes,
         expected_version=item.project.version,
         user=user,
     )

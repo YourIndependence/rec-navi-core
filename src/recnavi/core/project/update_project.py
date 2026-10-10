@@ -11,7 +11,6 @@
 
 from datetime import UTC
 from datetime import datetime
-from uuid import uuid4
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import Project
@@ -35,32 +34,25 @@ def merge_scenes(
     merged = []
 
     for scene_input in scene_inputs:
-        if scene_input.scene_id is None:
-            new_scene = Scene(
-                scene_id=str(uuid4()),
-                scene_principal=scene_input.scene_principal,
-                assigned_user_ids=scene_input.assigned_user_ids,
-                status=SceneStatus.NOT_RECORDED,
-            )
-            merged.append(new_scene)
-        else:
-            existing_scene = existing_by_id.get(scene_input.scene_id)
-            if existing_scene:
-                updated_scene = existing_scene.model_copy(
+        existing_scene = existing_by_id.get(scene_input.scene_id)
+        if existing_scene:
+            merged.append(
+                existing_scene.model_copy(
                     update={
                         "scene_principal": scene_input.scene_principal,
                         "assigned_user_ids": scene_input.assigned_user_ids,
                     },
-                )
-                merged.append(updated_scene)
-            else:
-                new_scene = Scene(
+                ),
+            )
+        else:
+            merged.append(
+                Scene(
                     scene_id=scene_input.scene_id,
                     scene_principal=scene_input.scene_principal,
                     assigned_user_ids=scene_input.assigned_user_ids,
                     status=SceneStatus.NOT_RECORDED,
-                )
-                merged.append(new_scene)
+                ),
+            )
 
     return merged
 

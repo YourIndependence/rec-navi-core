@@ -17,10 +17,12 @@ import aioboto3
 from boto3.dynamodb.conditions import Attr
 from boto3.dynamodb.conditions import ConditionBase
 from boto3.dynamodb.conditions import Key
+from botocore.exceptions import ClientError
 
 from recnavi.config.variables import REGION
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.database.base_database import DatabaseQueryResult
+from recnavi.exceptions.exceptions import ClientConflictError
 
 
 class DynamoDb(BaseDatabase):
@@ -46,10 +48,6 @@ class DynamoDb(BaseDatabase):
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> None:
         """Put an item into the table with optional condition."""
-        from botocore.exceptions import ClientError
-
-        from recnavi.exceptions.exceptions import ClientConflictError
-
         converted_item = _convert_to_dynamodb_format(item)
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
@@ -112,10 +110,6 @@ class DynamoDb(BaseDatabase):
         expression_attribute_values: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Update item with UpdateExpression."""
-        from botocore.exceptions import ClientError
-
-        from recnavi.exceptions.exceptions import ClientConflictError
-
         converted_values = (
             _convert_to_dynamodb_format(expression_attribute_values)
             if expression_attribute_values

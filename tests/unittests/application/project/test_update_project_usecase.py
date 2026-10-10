@@ -50,6 +50,13 @@ async def test_update_project_usecase_delegates_to_update_project():
         updated_at="2026-01-01T00:00:00Z",
     )
 
+    scenes = [
+        SceneInput(
+            scene_principal="cooking",
+            assigned_user_ids=["staff-1"],
+        ),
+    ]
+
     with patch(
         "recnavi.application.project.update_project_usecase.update_project",
         new=AsyncMock(return_value=expected_project),
@@ -60,13 +67,7 @@ async def test_update_project_usecase_delegates_to_update_project():
             project_name="New Name",
             description="New Description",
             assigned_user_ids=["user-1"],
-            scenes=[
-                SceneInput(
-                    scene_id=None,
-                    scene_principal="cooking",
-                    assigned_user_ids=["staff-1"],
-                ),
-            ],
+            scenes=scenes,
             expected_version=1,
             user=owner,
         )
@@ -77,13 +78,7 @@ async def test_update_project_usecase_delegates_to_update_project():
         project_name="New Name",
         description="New Description",
         assigned_user_ids=["user-1"],
-        scenes=[
-            SceneInput(
-                scene_id=None,
-                scene_principal="cooking",
-                assigned_user_ids=["staff-1"],
-            ),
-        ],
+        scenes=scenes,
         expected_version=1,
         user=owner,
     )
@@ -123,7 +118,6 @@ async def test_update_project_usecase_returns_updated_project():
         assigned_user_ids=["user-1"],
         scenes=[
             SceneInput(
-                scene_id=None,
                 scene_principal="cooking",
                 assigned_user_ids=["staff-1"],
             ),

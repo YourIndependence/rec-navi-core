@@ -12,15 +12,15 @@
 from recnavi.core.types.scene_input import SceneInput
 
 
-def test_scene_input_with_null_scene_id():
-    """Test SceneInput can have None scene_id for new scenes."""
+def test_scene_input_issues_scene_id_when_omitted():
+    """Test SceneInput issues a unique scene_id for new scenes."""
     scene_input = SceneInput(
-        scene_id=None,
         scene_principal="cooking",
         assigned_user_ids=["user-1", "user-2"],
     )
 
-    assert scene_input.scene_id is None
+    assert scene_input.scene_id
+    assert scene_input.scene_id != SceneInput(scene_principal="x").scene_id
     assert scene_input.scene_principal == "cooking"
     assert scene_input.assigned_user_ids == ["user-1", "user-2"]
 

@@ -42,7 +42,6 @@ def test_merge_scenes_adds_new_scene_when_scene_id_is_null():
             assigned_user_ids=[],
         ),
         SceneInput(
-            scene_id=None,
             scene_principal="eating",
             assigned_user_ids=["user-1"],
         ),

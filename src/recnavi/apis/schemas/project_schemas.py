@@ -17,6 +17,7 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene_input import SceneInput
 
 
 class GetProjectsResponse(BaseApiResponseModel):
@@ -63,25 +64,6 @@ class CreateProjectResponse(BaseApiResponseModel):
     """Response for POST /createProject."""
 
     project: Project = Field(..., description="Created project")
-
-
-class SceneInput(BaseModel):
-    """Scene input for update request (read-only fields excluded)."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    scene_id: str | None = Field(
-        None,
-        description="Scene ID (null for new scene)",
-    )
-    scene_principal: str = Field(..., description="Scene master principal")
-    assigned_user_ids: list[str] = Field(
-        default_factory=list,
-        description="Staff assigned to scene",
-    )
 
 
 class ProjectInput(BaseModel):
