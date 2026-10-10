@@ -158,9 +158,9 @@ async def update_scene_endpoint(
 
     scenes = await update_scene_usecase(
         scenes_db=scenes_db,
-        scene_principal=item.scene_principal,
-        title=item.title,
-        max_duration_seconds=item.max_duration_seconds,
+        scene_principal=item.scene.scene_principal,
+        title=item.scene.title,
+        max_duration_seconds=item.scene.max_duration_seconds,
         example_image=item.example_image,
         guide_image=item.guide_image,
         bucket_name=SCENE_IMAGES_BUCKET_NAME,

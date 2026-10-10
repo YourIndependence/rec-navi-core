@@ -50,22 +50,31 @@ class GetSceneMastersResponse(BaseApiResponseModel):
     )
 
 
-class UpdateSceneRequest(BaseItemModel):
-    """Request for POST /updateScene (admin-only).
+class SceneMasterInput(BaseItemModel):
+    """Scene master fields sent by the client (mirrors SceneMaster).
 
-    Creates a new scene master if scenePrincipal doesn't exist,
-    or updates existing scene master if it does (upsert pattern).
+    URIs are excluded; images are sent separately on the request.
     """
 
-    scene_principal: str = Field(
-        ...,
-        description="Identifier of the scene master",
+    scene_principal: str | None = Field(
+        None,
+        description="Identifier of the scene master (null creates a new one)",
     )
     title: str = Field(..., description="Name shown to the staff")
     max_duration_seconds: int = Field(
         ...,
         description="How long the staff may record (1-10 seconds)",
     )
+
+
+class UpdateSceneRequest(BaseItemModel):
+    """Request for POST /updateScene (admin-only).
+
+    Creates a new scene master when scene.scenePrincipal is null,
+    otherwise upserts the scene master with the given scenePrincipal.
+    """
+
+    scene: SceneMasterInput = Field(..., description="Scene master to save")
     example_image: str | None = Field(
         None,
         description=(

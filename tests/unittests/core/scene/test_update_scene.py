@@ -10,6 +10,7 @@
 """Tests for update_scene."""
 
 import base64
+import re
 
 import pytest
 
@@ -175,3 +176,54 @@ async def test_update_scene_updates_only_guide_image():
             "image/jpeg",
         ),
     }
+
+
+@pytest.mark.asyncio
+async def test_update_scene_issues_new_id_when_principal_is_null():
+    """Test a null scenePrincipal creates a scene with an issued id."""
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage()
+
+    scenes = await update_scene(
+        scenes_db=scenes_db,
+        scene_principal=None,
+        title="New Scene",
+        max_duration_seconds=5,
+        example_image=_b64(b"example"),
+        guide_image=_b64(b"guide"),
+        bucket_name="test-bucket",
+        storage=storage,
+    )
+
+    assert len(scenes) == 1
+    issued_id = scenes[0].scene_principal
+    assert re.fullmatch(r"[0-9a-f]{32}", issued_id)
+    assert (
+        scenes[0].thumbnail_uri
+        == f"s3://test-bucket/scenes/{issued_id}/example.jpg"
+    )
+    assert ("test-bucket", f"scenes/{issued_id}/guide.jpg") in storage.objects
+    stored = await scenes_db.get_item({"scenePrincipal": issued_id})
+    assert stored["title"] == "New Scene"
+
+
+@pytest.mark.asyncio
+async def test_update_scene_raises_422_when_null_principal_without_images():
+    """Test creating via a null id still requires both images."""
+    scenes_db = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage()
+
+    with pytest.raises(ClientUnprocessableEntityError):
+        await update_scene(
+            scenes_db=scenes_db,
+            scene_principal=None,
+            title="New Scene",
+            max_duration_seconds=5,
+            example_image=_b64(b"example"),
+            guide_image=None,
+            bucket_name="test-bucket",
+            storage=storage,
+        )
+
+    assert storage.objects == {}
+    assert (await scenes_db.scan()).items == []

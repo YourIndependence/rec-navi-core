@@ -18,7 +18,7 @@ from recnavi.core.types.scene_master import SceneMaster
 async def update_scene_usecase(
     *,
     scenes_db: BaseDatabase,
-    scene_principal: str,
+    scene_principal: str | None,
     title: str,
     max_duration_seconds: int,
     example_image: str | None,

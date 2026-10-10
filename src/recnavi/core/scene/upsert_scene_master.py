@@ -9,6 +9,8 @@
 
 """Upsert scene master domain logic."""
 
+import uuid
+
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
@@ -46,7 +48,7 @@ async def upsert_scene_master(
 async def update_scene(
     *,
     scenes_db: BaseDatabase,
-    scene_principal: str,
+    scene_principal: str | None,
     title: str,
     max_duration_seconds: int,
     example_image: str | None,
@@ -54,10 +56,17 @@ async def update_scene(
     bucket_name: str,
     storage: BaseObjectStorage,
 ) -> list[SceneMaster]:
-    """Create or update scene master with image upload."""
-    existing_scene = await scenes_db.get_item(
-        {"scenePrincipal": scene_principal},
-    )
+    """Create or update scene master with image upload.
+
+    A null scene_principal means create: a new id is issued.
+    """
+    existing_scene = None
+    if scene_principal is None:
+        scene_principal = uuid.uuid4().hex
+    else:
+        existing_scene = await scenes_db.get_item(
+            {"scenePrincipal": scene_principal},
+        )
 
     if not existing_scene:
         if not example_image or not guide_image:
