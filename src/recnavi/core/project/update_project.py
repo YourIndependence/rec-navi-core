@@ -57,9 +57,30 @@ def merge_scenes(
     return merged
 
 
+async def validate_assignees_in_group(
+    *,
+    users_db: BaseDatabase,
+    assigned_user_ids: list[str],
+    scenes: list[SceneInput],
+    group_id: str,
+) -> None:
+    """Ensure every assignee is a user of the given group."""
+    user_ids = set(assigned_user_ids)
+    for scene in scenes:
+        user_ids.update(scene.assigned_user_ids)
+
+    for user_id in user_ids:
+        user_item = await users_db.get_item(key={"userId": user_id})
+        if not user_item or user_item.get("groupId") != group_id:
+            raise ClientAuthorizationError(
+                "Assigned users must belong to your group",
+            )
+
+
 async def update_project(
     *,
     projects_db: BaseDatabase,
+    users_db: BaseDatabase,
     project_id: str,
     project_name: str,
     description: str,
@@ -78,11 +99,23 @@ async def update_project(
     if user.role != UserRole.OWNER:
         raise ClientAuthorizationError("Only owners can update projects")
 
+    if existing_project.group_id != user.group_id:
+        raise ClientAuthorizationError(
+            "You do not have access to this project",
+        )
+
     if existing_project.version != expected_version:
         raise ClientConflictError(
             f"Version mismatch: expected {expected_version}, "
             f"current {existing_project.version}",
         )
+
+    await validate_assignees_in_group(
+        users_db=users_db,
+        assigned_user_ids=assigned_user_ids,
+        scenes=scenes,
+        group_id=user.group_id,
+    )
 
     merged_scenes = merge_scenes(
         existing_scenes=existing_project.scenes,

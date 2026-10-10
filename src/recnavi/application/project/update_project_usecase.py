@@ -19,6 +19,7 @@ from recnavi.core.types.user import User
 async def update_project_usecase(
     *,
     projects_db: BaseDatabase,
+    users_db: BaseDatabase,
     project_id: str,
     project_name: str,
     description: str,
@@ -30,6 +31,7 @@ async def update_project_usecase(
     """Update project use case."""
     return await update_project(
         projects_db=projects_db,
+        users_db=users_db,
         project_id=project_id,
         project_name=project_name,
         description=description,

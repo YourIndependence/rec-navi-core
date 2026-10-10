@@ -15,6 +15,7 @@ from typing import cast
 import pytest
 
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import ProjectStatus
 from recnavi.main import app
@@ -51,6 +52,18 @@ async def test_update_project_returns_good(
         dict[str, BaseDatabase],
         app.state.database,
     )[PROJECTS_TABLE_NAME]
+    users_database = cast(
+        dict[str, BaseDatabase],
+        app.state.database,
+    )[USERS_TABLE_NAME]
+    await users_database.put_item(
+        {
+            "userId": "test-staff-456",
+            "userName": "Test Staff",
+            "role": "staff",
+            "groupId": "it-group",
+        },
+    )
     project_id = None
     try:
         create_response = client.post(
@@ -117,3 +130,5 @@ async def test_update_project_returns_good(
                 await database.delete_item(
                     {"projectId": project_id},
                 )
+        with suppress(Exception):
+            await users_database.delete_item({"userId": "test-staff-456"})

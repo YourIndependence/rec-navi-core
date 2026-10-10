@@ -25,6 +25,48 @@ from recnavi.exceptions.exceptions import ClientConflictError
 from tests.mockups.mock_database import MockDatabase
 
 
+def make_users_db(*user_ids: str, group_id: str = "group-1") -> MockDatabase:
+    """Build a users database holding staff users of the given group."""
+    return MockDatabase(
+        initial_items=[
+            {
+                "userId": user_id,
+                "userName": user_id,
+                "role": "staff",
+                "groupId": group_id,
+            }
+            for user_id in user_ids
+        ],
+    )
+
+
+def make_project(*, group_id: str = "group-1") -> Project:
+    """Build an existing project owned by the given group."""
+    return Project(
+        project_id="proj-123",
+        group_id=group_id,
+        owner_user_id="owner-1",
+        project_name="Name",
+        description="Description",
+        assigned_user_ids=[],
+        scenes=[],
+        status=ProjectStatus.IN_PROGRESS,
+        version=1,
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+
+
+def make_owner(*, group_id: str = "group-1") -> User:
+    """Build an owner user of the given group."""
+    return User(
+        user_id="owner-1",
+        user_name="Owner User",
+        group_id=group_id,
+        role=UserRole.OWNER,
+    )
+
+
 def test_merge_scenes_adds_new_scene_when_scene_id_is_null():
     """Test merge_scenes adds new scene with NOT_RECORDED status when scene_id is None."""
     existing_scenes = [
@@ -158,6 +200,7 @@ async def test_update_project_increments_version():
 
     updated_project = await update_project(
         projects_db=database,
+        users_db=MockDatabase(),
         project_id="proj-123",
         project_name="New Name",
         description="New Description",
@@ -199,6 +242,7 @@ async def test_update_project_raises_conflict_on_version_mismatch():
     with pytest.raises(ClientConflictError) as exc_info:
         await update_project(
             projects_db=database,
+            users_db=MockDatabase(),
             project_id="proj-123",
             project_name="New Name",
             description="New Description",
@@ -239,6 +283,7 @@ async def test_update_project_raises_authorization_error_for_non_owner():
     with pytest.raises(ClientAuthorizationError):
         await update_project(
             projects_db=database,
+            users_db=MockDatabase(),
             project_id="proj-123",
             project_name="New Name",
             description="New Description",
@@ -287,6 +332,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
 
     updated_project = await update_project(
         projects_db=database,
+        users_db=make_users_db("user-2", "user-3"),
         project_id="proj-123",
         project_name="Updated Name",
         description="Updated Description",
@@ -312,3 +358,125 @@ async def test_update_project_preserves_video_key_and_recording_state():
     assert scene.thumbnail_key == "s3://bucket/thumb.jpg"
     assert scene.created_by == "staff-1"
     assert scene.created_at == "2026-01-01T00:00:00Z"
+
+
+@pytest.mark.asyncio
+async def test_update_project_rejects_owner_of_another_group():
+    """Test update_project raises 403 error and keeps DB unchanged for cross-group owner."""
+    database = MockDatabase()
+    existing_project = make_project(group_id="group-1")
+    await database.put_item(existing_project.model_dump(by_alias=True))
+    before = [dict(item) for item in database.items]
+
+    with pytest.raises(ClientAuthorizationError):
+        await update_project(
+            projects_db=database,
+            users_db=MockDatabase(),
+            project_id="proj-123",
+            project_name="Hacked",
+            description="Hacked",
+            assigned_user_ids=[],
+            scenes=[],
+            expected_version=1,
+            user=make_owner(group_id="group-2"),
+        )
+
+    assert database.items == before
+
+
+@pytest.mark.asyncio
+async def test_update_project_checks_group_before_version():
+    """Test cross-group owner gets authorization error even with wrong version."""
+    database = MockDatabase()
+    await database.put_item(make_project().model_dump(by_alias=True))
+
+    with pytest.raises(ClientAuthorizationError):
+        await update_project(
+            projects_db=database,
+            users_db=MockDatabase(),
+            project_id="proj-123",
+            project_name="New Name",
+            description="Description",
+            assigned_user_ids=[],
+            scenes=[],
+            expected_version=99,
+            user=make_owner(group_id="group-2"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_update_project_rejects_unknown_project_assignee():
+    """Test update_project rejects project assignee missing from users table."""
+    database = MockDatabase()
+    await database.put_item(make_project().model_dump(by_alias=True))
+    before = [dict(item) for item in database.items]
+
+    with pytest.raises(ClientAuthorizationError):
+        await update_project(
+            projects_db=database,
+            users_db=make_users_db("user-1"),
+            project_id="proj-123",
+            project_name="New Name",
+            description="Description",
+            assigned_user_ids=["ghost"],
+            scenes=[],
+            expected_version=1,
+            user=make_owner(),
+        )
+
+    assert database.items == before
+
+
+@pytest.mark.asyncio
+async def test_update_project_rejects_other_group_scene_assignee():
+    """Test update_project rejects scene assignee belonging to another group."""
+    database = MockDatabase()
+    await database.put_item(make_project().model_dump(by_alias=True))
+    before = [dict(item) for item in database.items]
+
+    with pytest.raises(ClientAuthorizationError):
+        await update_project(
+            projects_db=database,
+            users_db=make_users_db("outsider", group_id="group-2"),
+            project_id="proj-123",
+            project_name="New Name",
+            description="Description",
+            assigned_user_ids=[],
+            scenes=[
+                SceneInput(
+                    scene_principal="cooking",
+                    assigned_user_ids=["outsider"],
+                ),
+            ],
+            expected_version=1,
+            user=make_owner(),
+        )
+
+    assert database.items == before
+
+
+@pytest.mark.asyncio
+async def test_update_project_accepts_same_group_assignees():
+    """Test update_project accepts project and scene assignees of the same group."""
+    database = MockDatabase()
+    await database.put_item(make_project().model_dump(by_alias=True))
+
+    updated_project = await update_project(
+        projects_db=database,
+        users_db=make_users_db("user-1", "user-2"),
+        project_id="proj-123",
+        project_name="New Name",
+        description="Description",
+        assigned_user_ids=["user-1"],
+        scenes=[
+            SceneInput(
+                scene_principal="cooking",
+                assigned_user_ids=["user-2"],
+            ),
+        ],
+        expected_version=1,
+        user=make_owner(),
+    )
+
+    assert updated_project.assigned_user_ids == ["user-1"]
+    assert updated_project.scenes[0].assigned_user_ids == ["user-2"]

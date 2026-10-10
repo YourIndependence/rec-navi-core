@@ -38,6 +38,7 @@ from recnavi.application.scene.get_templates import get_templates_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -152,9 +153,11 @@ async def update_project_endpoint(
 ) -> UpdateProjectResponse:
     """Update project with optimistic locking."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+    users_db = request.app.state.database[USERS_TABLE_NAME]
 
     updated_project = await update_project_usecase(
         projects_db=projects_db,
+        users_db=users_db,
         project_id=item.project.project_id,
         project_name=item.project.project_name,
         description=item.project.description,
