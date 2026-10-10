@@ -16,6 +16,7 @@ from botocore.exceptions import ClientError
 
 from recnavi.config.variables import ENV
 from recnavi.config.variables import REGION
+from recnavi.core.metrics.base_metrics_publisher import BaseMetricsPublisher
 from recnavi.core.types.project_filter_stats import ProjectFilterStats
 
 
@@ -50,21 +51,30 @@ def build_metric_data(stats: ProjectFilterStats) -> list[dict[str, object]]:
     ]
 
 
-async def put_filter_metrics(stats: ProjectFilterStats) -> None:
-    """Record filter statistics as CloudWatch custom metrics.
+class CloudWatchMetricsPublisher(BaseMetricsPublisher):
+    """Publish metrics as CloudWatch custom metrics."""
 
-    Does nothing outside deployed environments. A failure to publish is
-    logged and never fails the request.
-    """
-    if ENV in LOCAL_ENVIRONMENTS:
-        return
+    async def publish_project_filter_stats(
+        self,
+        stats: ProjectFilterStats,
+    ) -> None:
+        """Record filter statistics as CloudWatch custom metrics.
 
-    session = aioboto3.Session()
-    try:
-        async with session.client("cloudwatch", region_name=REGION) as cw:
-            await cw.put_metric_data(
-                Namespace=METRIC_NAMESPACE,
-                MetricData=build_metric_data(stats),
+        Does nothing outside deployed environments. A failure to publish is
+        logged and never fails the request.
+        """
+        if ENV in LOCAL_ENVIRONMENTS:
+            return
+
+        session = aioboto3.Session()
+        try:
+            async with session.client("cloudwatch", region_name=REGION) as cw:
+                await cw.put_metric_data(
+                    Namespace=METRIC_NAMESPACE,
+                    MetricData=build_metric_data(stats),
+                )
+        except ClientError:
+            logger.warning(
+                "failed to put getMyProjects metrics",
+                exc_info=True,
             )
-    except ClientError:
-        logger.warning("failed to put getMyProjects metrics", exc_info=True)

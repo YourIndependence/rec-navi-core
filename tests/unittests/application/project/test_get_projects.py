@@ -9,7 +9,6 @@
 
 """Tests for get_projects use case."""
 
-from unittest.mock import ANY
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
@@ -17,12 +16,14 @@ import pytest
 
 from recnavi.application.project.get_projects import get_projects_usecase
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_metrics_publisher import MockMetricsPublisher
 
 
 @pytest.mark.asyncio
 async def test_get_projects_usecase_delegates_to_core():
     """Test get_projects_usecase delegates and returns the core output."""
     projects_db = MockDatabase()
+    metrics = MockMetricsPublisher()
     expected_output = object()
 
     with patch(
@@ -35,6 +36,7 @@ async def test_get_projects_usecase_delegates_to_core():
             group_id="group-123",
             limit=20,
             cursor="cursor-1",
+            metrics=metrics,
         )
 
     mock_get_projects.assert_awaited_with(
@@ -43,6 +45,6 @@ async def test_get_projects_usecase_delegates_to_core():
         group_id="group-123",
         limit=20,
         cursor="cursor-1",
-        record_metrics=ANY,
+        metrics=metrics,
     )
     assert result is expected_output

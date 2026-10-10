@@ -12,10 +12,9 @@
 import base64
 import json
 import logging
-from collections.abc import Awaitable
-from collections.abc import Callable
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.metrics.base_metrics_publisher import BaseMetricsPublisher
 from recnavi.core.types.project import Project
 from recnavi.core.types.project_filter_stats import ProjectFilterStats
 
@@ -32,8 +31,7 @@ async def get_projects(
     group_id: str,
     limit: int = 20,
     cursor: str | None = None,
-    record_metrics: Callable[[ProjectFilterStats], Awaitable[None]]
-    | None = None,
+    metrics: BaseMetricsPublisher | None = None,
 ) -> tuple[list[Project], str | None]:
     """Get projects assigned to user_id with pagination.
 
@@ -43,7 +41,7 @@ async def get_projects(
         group_id: User group identifier.
         limit: Maximum items per page.
         cursor: Opaque pagination cursor from the previous response.
-        record_metrics: Optional sink for the page's filter statistics.
+        metrics: Optional publisher for the page's filter statistics.
 
     Note: limit is the query size, not result count after filtering.
 
@@ -79,8 +77,8 @@ async def get_projects(
             stats.filtered_count,
             stats.filter_ratio,
         )
-    if record_metrics is not None:
-        await record_metrics(stats)
+    if metrics is not None:
+        await metrics.publish_project_filter_stats(stats)
 
     next_cursor = _encode_cursor(result.last_evaluated_key)
 

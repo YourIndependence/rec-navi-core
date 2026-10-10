@@ -10,13 +10,13 @@
 """Tests for getMyProjects filter monitoring in get_projects."""
 
 import logging
-from unittest.mock import AsyncMock
 
 import pytest
 
 from recnavi.core.project.projects import build_filter_stats
 from recnavi.core.project.projects import get_projects
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_metrics_publisher import MockMetricsPublisher
 
 
 def _db(total: int, assigned: int) -> MockDatabase:
@@ -95,17 +95,17 @@ async def test_get_projects_does_not_warn_below_threshold(
 
 @pytest.mark.asyncio
 async def test_get_projects_records_metrics():
-    """Test the page's filter statistics are passed to the metrics sink."""
-    record_metrics = AsyncMock()
+    """Test the page's filter statistics are published to the metrics publisher."""
+    metrics = MockMetricsPublisher()
 
     await get_projects(
         projects_db=_db(5, 2),
         user_id="staff-1",
         group_id="group-1",
-        record_metrics=record_metrics,
+        metrics=metrics,
     )
 
-    record_metrics.assert_awaited_once()
-    stats = record_metrics.await_args.args[0]
+    assert len(metrics.published) == 1
+    stats = metrics.published[0]
     assert (stats.queried_count, stats.filtered_count) == (5, 2)
     assert stats.filter_ratio == 60.0

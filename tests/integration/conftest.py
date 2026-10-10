@@ -27,6 +27,7 @@ from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.main import app
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_metrics_publisher import MockMetricsPublisher
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -62,6 +63,7 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
+    app.state.metrics_publisher = MockMetricsPublisher()
 
 
 @pytest.fixture(scope="session")

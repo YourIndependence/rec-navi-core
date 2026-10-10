@@ -92,6 +92,7 @@ async def get_projects_endpoint(
         group_id=user.group_id,
         limit=limit,
         cursor=cursor,
+        metrics=request.app.state.metrics_publisher,
     )
 
     return GetProjectsResponse(

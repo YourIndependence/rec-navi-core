@@ -17,6 +17,9 @@ import pytest
 
 from recnavi.core.project.projects import build_filter_stats
 from recnavi.infrastructure.cloudwatch import cloudwatch_metrics
+from recnavi.infrastructure.cloudwatch.cloudwatch_metrics import (
+    CloudWatchMetricsPublisher,
+)
 
 
 MODULE = "recnavi.infrastructure.cloudwatch.cloudwatch_metrics"
@@ -45,7 +48,7 @@ def test_build_metric_data_has_the_three_metrics():
 
 
 @pytest.mark.asyncio
-async def test_put_filter_metrics_is_noop_in_local_environments():
+async def test_publish_project_filter_stats_is_noop_in_local_environments():
     """Test nothing is published from LOCAL or CI."""
     stats = build_filter_stats(queried_count=10, filtered_count=1)
 
@@ -53,13 +56,13 @@ async def test_put_filter_metrics_is_noop_in_local_environments():
         patch(f"{MODULE}.ENV", "CI"),
         patch(f"{MODULE}.aioboto3.Session") as session_cls,
     ):
-        await cloudwatch_metrics.put_filter_metrics(stats)
+        await CloudWatchMetricsPublisher().publish_project_filter_stats(stats)
 
     session_cls.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_put_filter_metrics_publishes_in_deployed_environments():
+async def test_publish_project_filter_stats_publishes_in_deployed_environments():
     """Test metrics are published to CloudWatch outside LOCAL and CI."""
     cloudwatch = AsyncMock()
     stats = build_filter_stats(queried_count=10, filtered_count=1)
@@ -71,7 +74,7 @@ async def test_put_filter_metrics_publishes_in_deployed_environments():
             return_value=_session_with(cloudwatch),
         ),
     ):
-        await cloudwatch_metrics.put_filter_metrics(stats)
+        await CloudWatchMetricsPublisher().publish_project_filter_stats(stats)
 
     cloudwatch.put_metric_data.assert_awaited_once()
     kwargs = cloudwatch.put_metric_data.await_args.kwargs
