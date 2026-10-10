@@ -64,6 +64,7 @@ async def update_scene_record_endpoint(
 
     updated_project = await update_scene_record_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
         project_id=payload.project_id,
         scene_id=payload.scene_id,
         video_base64=payload.video,

@@ -9,19 +9,17 @@
 
 """Update scene record use case."""
 
-import uuid
-
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.update_scene_record import update_scene_record
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
-from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
-from recnavi.infrastructure.s3.s3_client import upload_base64
 
 
 async def update_scene_record_usecase(
     *,
     projects_db: BaseDatabase,
+    storage: BaseObjectStorage,
     project_id: str,
     scene_id: str,
     video_base64: str,
@@ -29,39 +27,14 @@ async def update_scene_record_usecase(
     user: User,
     video_bucket_name: str,
 ) -> Project:
-    """Upload scene recording to S3 and update DynamoDB."""
-    shot_id = str(uuid.uuid4())
-    video_key = f"projects/{project_id}/scenes/{scene_id}/{shot_id}.mp4"
-    thumbnail_key = (
-        f"projects/{project_id}/scenes/{scene_id}/{shot_id}_thumb.jpg"
-    )
-
-    await upload_base64(
-        bucket_name=video_bucket_name,
-        object_key=video_key,
-        base64_data=video_base64,
-        content_type="video/mp4",
-    )
-
-    await upload_base64(
-        bucket_name=video_bucket_name,
-        object_key=thumbnail_key,
-        base64_data=thumbnail_base64,
-        content_type="image/jpeg",
-    )
-
-    async def delete_old_shot(prefix: str) -> None:
-        await delete_objects_by_prefix(
-            bucket_name=video_bucket_name,
-            prefix=prefix,
-        )
-
+    """Store a scene recording and update the project."""
     return await update_scene_record(
         projects_db=projects_db,
+        storage=storage,
         project_id=project_id,
         scene_id=scene_id,
-        video_key=video_key,
-        thumbnail_key=thumbnail_key,
+        video_base64=video_base64,
+        thumbnail_base64=thumbnail_base64,
         user=user,
-        s3_delete_callback=delete_old_shot,
+        bucket_name=video_bucket_name,
     )

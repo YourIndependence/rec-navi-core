@@ -11,8 +11,10 @@
 
 from datetime import UTC
 from datetime import datetime
+from uuid import uuid4
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
@@ -23,14 +25,19 @@ from recnavi.exceptions.exceptions import ClientNotFoundError
 async def update_scene_record(
     *,
     projects_db: BaseDatabase,
+    storage: BaseObjectStorage,
     project_id: str,
     scene_id: str,
-    video_key: str,
-    thumbnail_key: str,
+    video_base64: str,
+    thumbnail_base64: str,
     user: User,
-    s3_delete_callback=None,
+    bucket_name: str,
 ) -> Project:
-    """Update scene recording in DynamoDB after S3 upload."""
+    """Store a scene recording, then replace the previous shot.
+
+    The recording is uploaded under a new shot id, the scene is updated in
+    DynamoDB, and only then is the previous shot deleted.
+    """
     item = await projects_db.get_item(key={"projectId": project_id})
     if not item:
         raise ClientNotFoundError("Project not found")
@@ -42,22 +49,38 @@ async def update_scene_record(
             "Access to other group's project is forbidden",
         )
 
-    scene_index = None
-    scene = None
-    for i, s in enumerate(project.scenes):
-        if s.scene_id == scene_id:
-            scene_index = i
-            scene = s
-            break
-
-    if scene is None:
+    found = next(
+        (
+            (index, scene)
+            for index, scene in enumerate(project.scenes)
+            if scene.scene_id == scene_id
+        ),
+        None,
+    )
+    if found is None:
         raise ClientNotFoundError("Scene not found")
+    scene_index, scene = found
 
     if user.user_id not in scene.assigned_user_ids:
         raise ClientAuthorizationError("Not assigned to this scene")
 
-    old_video_key = scene.video_key
-    timestamp = datetime.now(UTC).isoformat()
+    shot_prefix = f"projects/{project_id}/scenes/{scene_id}"
+    shot_id = str(uuid4())
+    video_key = f"{shot_prefix}/{shot_id}.mp4"
+    thumbnail_key = f"{shot_prefix}/{shot_id}_thumb.jpg"
+
+    await storage.upload_base64(
+        bucket_name=bucket_name,
+        object_key=video_key,
+        base64_data=video_base64,
+        content_type="video/mp4",
+    )
+    await storage.upload_base64(
+        bucket_name=bucket_name,
+        object_key=thumbnail_key,
+        base64_data=thumbnail_base64,
+        content_type="image/jpeg",
+    )
 
     await projects_db.update_item(
         key={"projectId": project_id},
@@ -75,17 +98,17 @@ async def update_scene_record(
             ":videoKey": video_key,
             ":thumbnailKey": thumbnail_key,
             ":createdBy": user.user_id,
-            ":createdAt": timestamp,
+            ":createdAt": datetime.now(UTC).isoformat(),
             ":sceneId": scene_id,
         },
     )
 
-    if old_video_key and s3_delete_callback:
-        old_shot_id = old_video_key.split("/")[-1].replace(".mp4", "")
-        old_key_prefix = (
-            f"projects/{project_id}/scenes/{scene_id}/{old_shot_id}"
+    if scene.video_key:
+        old_shot_id = scene.video_key.rsplit("/", 1)[-1].removesuffix(".mp4")
+        await storage.delete_objects_by_prefix(
+            bucket_name=bucket_name,
+            prefix=f"{shot_prefix}/{old_shot_id}",
         )
-        await s3_delete_callback(old_key_prefix)
 
     updated_item = await projects_db.get_item(key={"projectId": project_id})
     return Project.model_validate(updated_item)
