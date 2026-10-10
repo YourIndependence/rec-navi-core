@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator
 import aioboto3
 
 from recnavi.config.variables import REGION
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
 
 async def generate_presigned_url(
@@ -176,3 +177,49 @@ async def download_object_stream(
         response = await s3.get_object(Bucket=bucket_name, Key=object_key)
         async for chunk in response["Body"]:
             yield chunk
+
+
+class S3Client(BaseObjectStorage):
+    """S3 implementation of the object storage."""
+
+    async def upload_base64(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+        base64_data: str,
+        content_type: str,
+    ) -> None:
+        """Upload base64-encoded data to S3."""
+        await upload_base64(
+            bucket_name=bucket_name,
+            object_key=object_key,
+            base64_data=base64_data,
+            content_type=content_type,
+        )
+
+    async def download_object(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> bytes:
+        """Download an S3 object as bytes."""
+        return await download_object(
+            bucket_name=bucket_name,
+            object_key=object_key,
+        )
+
+    async def generate_presigned_url(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+        expiration: int = 3600,
+    ) -> str:
+        """Generate a presigned URL for an S3 object."""
+        return await generate_presigned_url(
+            bucket_name=bucket_name,
+            object_key=object_key,
+            expiration=expiration,
+        )

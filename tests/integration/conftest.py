@@ -19,6 +19,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
@@ -27,6 +28,7 @@ from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.main import app
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -59,9 +61,11 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
 
     app.state.database = {
         USERS_TABLE_NAME: MockDatabase(),
+        PROJECTS_TABLE_NAME: MockDatabase(),
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
+    app.state.object_storage = MockObjectStorage()
 
 
 @pytest.fixture(scope="session")

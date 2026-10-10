@@ -13,9 +13,8 @@ import base64
 import io
 import json
 import zipfile
-from collections.abc import Awaitable
-from collections.abc import Callable
 
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
@@ -58,9 +57,7 @@ async def create_project_archive(
     user: User,
     project: Project,
     bucket_name: str,
-    download_video: Callable[[str, str], Awaitable[bytes]],
-    upload_archive: Callable[[str, str, str], Awaitable[None]],
-    generate_url: Callable[[str, str], Awaitable[str]],
+    storage: BaseObjectStorage,
 ) -> str:
     """Build a zip archive of approved scene videos and return its download URL."""
     validate_project_for_download(user=user, project=project)
@@ -85,7 +82,10 @@ async def create_project_archive(
                 principal_counts[base_name] += 1
                 filename = f"{base_name}_{principal_counts[base_name]}.mp4"
 
-            video_data = await download_video(bucket_name, scene.video_key)
+            video_data = await storage.download_object(
+                bucket_name=bucket_name,
+                object_key=scene.video_key,
+            )
             zf.writestr(filename, video_data)
 
             metadata["scenes"].append(
@@ -101,6 +101,15 @@ async def create_project_archive(
 
     archive_key = f"archives/{project.project_id}.zip"
     base64_data = base64.b64encode(zip_buffer.getvalue()).decode("utf-8")
-    await upload_archive(bucket_name, archive_key, base64_data)
+    await storage.upload_base64(
+        bucket_name=bucket_name,
+        object_key=archive_key,
+        base64_data=base64_data,
+        content_type="application/zip",
+    )
 
-    return await generate_url(bucket_name, archive_key)
+    return await storage.generate_presigned_url(
+        bucket_name=bucket_name,
+        object_key=archive_key,
+        expiration=3600,
+    )

@@ -170,6 +170,7 @@ async def download_project_endpoint(
         user=user,
         project=project,
         bucket_name=MEDIA_BUCKET_NAME,
+        storage=request.app.state.object_storage,
     )
 
     return DownloadProjectResponse(download_url=presigned_url)
