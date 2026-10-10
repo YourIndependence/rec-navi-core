@@ -12,6 +12,9 @@ Detected automatically by pytest, so no need to import it in the test code.
 """
 
 import os
+from collections.abc import Callable
+from collections.abc import Iterator
+from typing import cast
 
 import pytest
 from fastapi import FastAPI
@@ -19,9 +22,11 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
+from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientPermissionError
@@ -59,6 +64,7 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
 
     app.state.database = {
         USERS_TABLE_NAME: MockDatabase(),
+        PROJECTS_TABLE_NAME: MockDatabase(),
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
@@ -97,3 +103,44 @@ def mock_verify_user(request: Request) -> User:
             "Authorization header must start with 'Bearer '",
         )
     return get_mock_x_user()
+
+
+@pytest.fixture
+def databases() -> dict[str, BaseDatabase]:
+    """In-memory tables injected in CI (skipped when real AWS is used)."""
+    if os.environ.get("ENV") != "CI":
+        pytest.skip("success-path tests need the in-memory tables (ENV=CI)")
+    return cast(dict[str, BaseDatabase], app.state.database)
+
+
+@pytest.fixture
+def as_user() -> Iterator[Callable[..., User]]:
+    """Return a factory that makes requests run as the given user.
+
+    The dependency override is restored after each test, so no real
+    Cognito is touched and tests cannot leak a role into one another.
+    """
+
+    def _as_user(
+        role: UserRole,
+        group_id: str = "it-group",
+        user_id: str = "test-user-123",
+    ) -> User:
+        user = User(
+            user_id=user_id,
+            user_name=f"{role.value} {user_id}",
+            role=role,
+            group_id=group_id,
+        )
+
+        def _verify_user(request: Request) -> User:
+            mock_verify_user(request)  # keeps the header checks
+            return user
+
+        app.dependency_overrides[verify_user] = _verify_user
+        return user
+
+    try:
+        yield _as_user
+    finally:
+        app.dependency_overrides[verify_user] = mock_verify_user
