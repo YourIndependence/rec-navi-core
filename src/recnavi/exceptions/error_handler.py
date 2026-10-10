@@ -49,12 +49,17 @@ DEFAULT_CLIENT_ERROR_STATUS_CODE = 400
 
 def resolve_client_error_status_code(exc: Exception) -> int | None:
     """Return the HTTP status code for a client error, or None if not one."""
-    for exc_type, status_code in CLIENT_ERROR_STATUS_CODES.items():
-        if isinstance(exc, exc_type):
-            return status_code
-    if isinstance(exc, BaseClientExceptionError):
+    status_code = next(
+        (
+            code
+            for exc_type, code in CLIENT_ERROR_STATUS_CODES.items()
+            if isinstance(exc, exc_type)
+        ),
+        None,
+    )
+    if status_code is None and isinstance(exc, BaseClientExceptionError):
         return DEFAULT_CLIENT_ERROR_STATUS_CODE
-    return None
+    return status_code
 
 
 async def custom_exception_handler(request: Request, exc: Exception):
