@@ -10,6 +10,7 @@
 """Mock object storage for unit testing."""
 
 import base64
+import binascii
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 
@@ -32,7 +33,7 @@ class MockObjectStorage(BaseObjectStorage):
         """Store the decoded content in memory."""
         try:
             data = base64.b64decode(base64_data, validate=True)
-        except ValueError as e:
+        except binascii.Error as e:
             raise ValueError("Invalid base64 data") from e
         self.objects[(bucket_name, object_key)] = (data, content_type)
 

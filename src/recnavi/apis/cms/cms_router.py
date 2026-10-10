@@ -37,7 +37,9 @@ from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
+from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -153,9 +155,6 @@ async def download_project_endpoint(
     user: User = Depends(verify_user),
 ) -> DownloadProjectResponse:
     """Download approved project as zip archive."""
-    from recnavi.core.types.project import Project
-    from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
-
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     project_item = await projects_db.get_item({"projectId": item.project_id})
