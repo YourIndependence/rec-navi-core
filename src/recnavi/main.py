@@ -31,8 +31,8 @@ from recnavi.core.utils.discord_handler import post_notify_discord
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import post_error_discord
 from recnavi.infrastructure.database.dynamodb import DynamoDb
-from recnavi.infrastructure.ses.ses_notifier import SesNotifier
 from recnavi.infrastructure.s3.s3_client import S3Client
+from recnavi.infrastructure.ses.ses_notifier import SesNotifier
 
 
 BASE_DIR = Path(__file__).resolve().parent
