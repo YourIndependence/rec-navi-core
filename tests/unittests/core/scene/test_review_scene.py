@@ -403,3 +403,45 @@ async def test_review_scene_reject_moves_submitted_project_to_in_progress():
     )
 
     assert view.status == ProjectStatus.IN_PROGRESS
+
+
+@pytest.mark.asyncio
+async def test_review_scene_approve_keeps_submitted_project_submitted():
+    """Test approving a scene does not change the project status."""
+    project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        status=ProjectStatus.SUBMITTED,
+        scenes=[
+            Scene(
+                scene_id="scene-456",
+                scene_principal="cooking",
+                status=SceneStatus.PENDING,
+            ),
+        ],
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    user = User(
+        user_id="owner-1",
+        user_name="Test Owner",
+        group_id="group-1",
+        role=UserRole.OWNER,
+    )
+
+    view = await review_scene(
+        projects_db=db,
+        project_id="proj-123",
+        scene_id="scene-456",
+        result="approve",
+        review_comment=None,
+        user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
+    )
+
+    assert view.status == ProjectStatus.SUBMITTED
+    assert view.scenes[0].status == SceneStatus.APPROVE
