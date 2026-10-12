@@ -14,8 +14,10 @@ from datetime import datetime
 from uuid import uuid4
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -33,8 +35,10 @@ async def update_scene_record(
     thumbnail_base64: str,
     user: User,
     bucket_name: str,
-) -> Project:
+) -> ProjectView:
     """Store a scene recording, then replace the previous shot.
+
+    Returns the updated project with presigned playback URLs.
 
     The recording is uploaded under a new shot id, the scene is updated in
     DynamoDB, and only then is the previous shot deleted.
@@ -115,4 +119,8 @@ async def update_scene_record(
         )
 
     updated_item = await projects_db.get_item(key={"projectId": project_id})
-    return Project.model_validate(updated_item)
+    return await attach_scene_urls(
+        storage=storage,
+        bucket_name=bucket_name,
+        project=Project.model_validate(updated_item),
+    )

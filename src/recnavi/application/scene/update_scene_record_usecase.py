@@ -12,7 +12,7 @@
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.update_scene_record import update_scene_record
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
-from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.user import User
 
 
@@ -26,7 +26,7 @@ async def update_scene_record_usecase(
     thumbnail_base64: str,
     user: User,
     video_bucket_name: str,
-) -> Project:
+) -> ProjectView:
     """Store a scene recording and update the project."""
     return await update_scene_record(
         projects_db=projects_db,

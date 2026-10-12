@@ -13,6 +13,7 @@ import base64
 
 import pytest
 
+from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.scene.update_scene_record import update_scene_record
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -81,15 +82,26 @@ async def test_update_scene_record_uploads_and_marks_scene_pending():
     scene = project.scenes[0]
     assert scene.status.value == "pending"
     assert scene.created_by == "staff-789"
-    assert storage.objects[(BUCKET, scene.video_key)] == (
+    keys = [key for _, key in storage.objects]
+    video_key = next(key for key in keys if key.endswith(".mp4"))
+    thumbnail_key = next(key for key in keys if key.endswith(".jpg"))
+    assert storage.objects[(BUCKET, video_key)] == (
         b"video-bytes",
         "video/mp4",
     )
-    assert storage.objects[(BUCKET, scene.thumbnail_key)] == (
+    assert storage.objects[(BUCKET, thumbnail_key)] == (
         b"thumb-bytes",
         "image/jpeg",
     )
-    assert scene.video_key.startswith("projects/proj-123/scenes/scene-1/")
+    assert video_key.startswith("projects/proj-123/scenes/scene-1/")
+    expires = SCENE_URL_EXPIRATION_SECONDS
+    assert scene.video_url == f"mock://{BUCKET}/{video_key}?expires={expires}"
+    assert scene.thumbnail_url == (
+        f"mock://{BUCKET}/{thumbnail_key}?expires={expires}"
+    )
+    dumped = project.model_dump(by_alias=True, mode="json")
+    assert "videoKey" not in dumped["scenes"][0]
+    assert "thumbnailKey" not in dumped["scenes"][0]
 
 
 @pytest.mark.asyncio
@@ -104,11 +116,17 @@ async def test_update_scene_record_deletes_the_previous_shot():
 
     project = await _update(database, storage)
 
-    new_key = project.scenes[0].video_key
+    new_key = (
+        project.scenes[0]
+        .video_url.split("?")[0]
+        .removeprefix(
+            f"mock://{BUCKET}/",
+        )
+    )
     assert new_key != old_key
-    assert set(storage.objects) == {
-        (BUCKET, new_key),
-        (BUCKET, project.scenes[0].thumbnail_key),
+    assert {key for _, key in storage.objects} == {
+        new_key,
+        new_key.replace(".mp4", "_thumb.jpg"),
     }
 
 
