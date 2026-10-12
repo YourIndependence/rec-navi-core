@@ -14,6 +14,7 @@ from pydantic import Field
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 
 
 class GetProjectsResponse(BaseApiResponseModel):
@@ -71,7 +72,7 @@ class SubmitProjectRequest(BaseItemModel):
 class SubmitProjectResponse(BaseApiResponseModel):
     """Response for POST /submitProject."""
 
-    project: Project = Field(
+    project: ProjectView = Field(
         ...,
         description="Project (SUBMITTED if every scene has a video)",
     )

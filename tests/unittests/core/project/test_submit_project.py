@@ -11,6 +11,7 @@
 
 import pytest
 
+from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.project.submit_project import submit_project
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
@@ -22,6 +23,7 @@ from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
@@ -67,6 +69,8 @@ async def test_submit_project_all_recorded():
 
     result_project, missing_scene_ids = await submit_project(
         projects_db=db,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         project_id="proj-123",
         user=user,
     )
@@ -75,6 +79,15 @@ async def test_submit_project_all_recorded():
     assert missing_scene_ids == []
     assert result_project.status == ProjectStatus.SUBMITTED
     assert result_project.updated_at != "2026-01-01T00:00:00Z"
+    urls = [scene.video_url for scene in result_project.scenes]
+    assert urls == [
+        f"mock://bucket/videos/scene-1.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
+        f"mock://bucket/videos/scene-2.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
+        f"mock://bucket/videos/scene-2b.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
+    ]
+    dumped = str(result_project.model_dump(by_alias=True))
+    assert "videoKey" not in dumped
+    assert "thumbnailKey" not in dumped
     stored = await db.get_item(key={"projectId": "proj-123"})
     assert stored["status"] == ProjectStatus.SUBMITTED.value
 
@@ -115,6 +128,8 @@ async def test_submit_project_one_not_recorded():
 
     result_project, missing_scene_ids = await submit_project(
         projects_db=db,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         project_id="proj-456",
         user=user,
     )
@@ -123,6 +138,9 @@ async def test_submit_project_one_not_recorded():
     assert missing_scene_ids == ["scene-4"]
     assert result_project.status == ProjectStatus.IN_PROGRESS
     assert result_project.updated_at == "2026-01-01T00:00:00Z"
+    assert result_project.scenes[0].video_url is not None
+    assert result_project.scenes[1].video_url is None
+    assert result_project.scenes[1].thumbnail_url is None
 
 
 @pytest.mark.asyncio
@@ -162,6 +180,8 @@ async def test_submit_project_rejected_counts_as_recorded():
 
     result_project, missing_scene_ids = await submit_project(
         projects_db=db,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         project_id="proj-789",
         user=user,
     )
@@ -202,6 +222,8 @@ async def test_submit_project_missing_video_key_is_unrecorded():
 
     result_project, missing_scene_ids = await submit_project(
         projects_db=db,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         project_id="proj-novideo",
         user=user,
     )
@@ -235,6 +257,8 @@ async def test_submit_project_empty_scenes_raises_422():
     with pytest.raises(ClientUnprocessableEntityError):
         await submit_project(
             projects_db=db,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             project_id="proj-empty",
             user=user,
         )
@@ -272,6 +296,8 @@ async def test_submit_project_already_submitted_raises_409():
     with pytest.raises(ClientConflictError):
         await submit_project(
             projects_db=db,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             project_id="proj-submitted",
             user=user,
         )
@@ -309,6 +335,8 @@ async def test_submit_project_not_assigned_raises_403():
     with pytest.raises(ClientAuthorizationError):
         await submit_project(
             projects_db=db,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             project_id="proj-999",
             user=unassigned_user,
         )
@@ -347,6 +375,8 @@ async def test_submit_project_non_staff_raises_403(role):
     with pytest.raises(ClientAuthorizationError, match="Only staff"):
         await submit_project(
             projects_db=db,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             project_id="proj-role",
             user=user,
         )

@@ -22,6 +22,7 @@ from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.project.submit_project_usecase import (
     submit_project_usecase,
 )
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.user import User
 
@@ -63,6 +64,8 @@ async def submit_project_endpoint(
 
     updated_project, missing_scene_ids = await submit_project_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
+        bucket_name=MEDIA_BUCKET_NAME,
         project_id=payload.project_id,
         user=user,
     )
