@@ -11,7 +11,8 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.review_scene import review_scene
-from recnavi.core.types.project import Project
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.user import User
 
 
@@ -23,7 +24,9 @@ async def review_scene_usecase(
     result: str,
     review_comment: str | None,
     user: User,
-) -> Project:
+    storage: BaseObjectStorage,
+    bucket_name: str,
+) -> ProjectView:
     """Review a scene recording (approve or reject)."""
     return await review_scene(
         projects_db=projects_db,
@@ -32,4 +35,6 @@ async def review_scene_usecase(
         result=result,
         review_comment=review_comment,
         user=user,
+        storage=storage,
+        bucket_name=bucket_name,
     )

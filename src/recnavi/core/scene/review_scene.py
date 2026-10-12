@@ -13,8 +13,11 @@ from datetime import UTC
 from datetime import datetime
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.project.scene_urls import attach_scene_urls
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -31,8 +34,10 @@ async def review_scene(
     result: str,
     review_comment: str | None,
     user: User,
-) -> Project:
-    """Review a scene recording and update the project."""
+    storage: BaseObjectStorage,
+    bucket_name: str,
+) -> ProjectView:
+    """Review a scene recording and return the project with presigned URLs."""
     if result not in ("approve", "reject"):
         raise ClientUnprocessableEntityError(
             f"Invalid result value: {result}. Must be 'approve' or 'reject'.",
@@ -106,4 +111,8 @@ async def review_scene(
     )
 
     updated_item = await projects_db.get_item(key={"projectId": project_id})
-    return Project.model_validate(updated_item)
+    return await attach_scene_urls(
+        storage=storage,
+        bucket_name=bucket_name,
+        project=Project.model_validate(updated_item),
+    )

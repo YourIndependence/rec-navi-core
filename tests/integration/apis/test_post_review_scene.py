@@ -10,7 +10,8 @@
 """Integration tests for POST /reviewScene endpoint."""
 
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
-from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.project_view import ProjectView
 from recnavi.main import app
 
 
@@ -36,11 +37,12 @@ def test_openapi_schema_builds():
 
 
 def test_review_scene_response_accepts_a_project():
-    """Test the response model can hold a Project and serialises it."""
-    project = Project(
+    """Test the response model can hold a ProjectView and serialises it."""
+    project = ProjectView(
         project_id="proj-123",
         group_id="group-456",
         project_name="Test Project",
+        status=ProjectStatus.IN_PROGRESS,
         owner_user_id="owner-1",
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",

@@ -11,8 +11,10 @@
 
 import pytest
 
+from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.scene.review_scene import review_scene
 from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
@@ -21,6 +23,7 @@ from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
@@ -56,12 +59,12 @@ async def test_review_scene_approve_returns_correct_data():
         result="approve",
         review_comment=None,
         user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
     )
 
     assert result_project.project_id == "proj-123"
     assert result_project.scenes[0].status == SceneStatus.APPROVE
-    assert result_project.scenes[0].reviewed_by == "owner-1"
-    assert result_project.scenes[0].reviewed_at is not None
 
 
 @pytest.mark.asyncio
@@ -97,12 +100,12 @@ async def test_review_scene_reject_returns_correct_data():
         result="reject",
         review_comment=None,
         user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
     )
 
     assert result_project.project_id == "proj-123"
     assert result_project.scenes[0].status == SceneStatus.REJECT
-    assert result_project.scenes[0].reviewed_by == "owner-1"
-    assert result_project.scenes[0].reviewed_at is not None
 
 
 @pytest.mark.asyncio
@@ -139,6 +142,8 @@ async def test_review_scene_raises_403_for_non_owner():
             result="approve",
             review_comment=None,
             user=staff_user,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
         )
 
 
@@ -176,6 +181,8 @@ async def test_review_scene_raises_403_for_wrong_group():
             result="approve",
             review_comment=None,
             user=other_owner,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
         )
 
 
@@ -213,6 +220,8 @@ async def test_review_scene_raises_404_when_scene_not_found():
             result="approve",
             review_comment=None,
             user=user,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
         )
 
 
@@ -250,6 +259,8 @@ async def test_review_scene_raises_422_for_invalid_result():
             result="pending",
             review_comment=None,
             user=user,
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
         )
 
 
@@ -286,7 +297,109 @@ async def test_review_scene_allows_re_review():
         result="reject",
         review_comment=None,
         user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
     )
 
     assert result_project.scenes[0].status == SceneStatus.REJECT
     assert result_project.scenes[0].scene_id == "scene-456"
+
+
+@pytest.mark.asyncio
+async def test_review_scene_returns_view_with_urls_and_no_keys():
+    """Test review_scene returns presigned URLs and hides storage keys."""
+    project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        scenes=[
+            Scene(
+                scene_id="scene-456",
+                scene_principal="cooking",
+                status=SceneStatus.PENDING,
+                video_key="videos/s456.mp4",
+                thumbnail_key="thumbnails/s456.jpg",
+            ),
+            Scene(
+                scene_id="scene-789",
+                scene_principal="serving",
+                status=SceneStatus.PENDING,
+            ),
+        ],
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    user = User(
+        user_id="owner-1",
+        user_name="Test Owner",
+        group_id="group-1",
+        role=UserRole.OWNER,
+    )
+
+    view = await review_scene(
+        projects_db=db,
+        project_id="proj-123",
+        scene_id="scene-456",
+        result="approve",
+        review_comment=None,
+        user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
+    )
+
+    expires = SCENE_URL_EXPIRATION_SECONDS
+    assert view.scenes[0].status == SceneStatus.APPROVE
+    assert view.scenes[0].video_url == (
+        f"mock://bucket/videos/s456.mp4?expires={expires}"
+    )
+    assert view.scenes[0].thumbnail_url == (
+        f"mock://bucket/thumbnails/s456.jpg?expires={expires}"
+    )
+    assert view.scenes[1].video_url is None
+    assert view.scenes[1].thumbnail_url is None
+    dumped = view.model_dump(by_alias=True)["scenes"][0]
+    assert "videoKey" not in dumped
+    assert "thumbnailKey" not in dumped
+
+
+@pytest.mark.asyncio
+async def test_review_scene_reject_moves_submitted_project_to_in_progress():
+    """Test rejecting a scene reopens a SUBMITTED project."""
+    project = Project(
+        project_id="proj-123",
+        group_id="group-1",
+        owner_user_id="owner-1",
+        project_name="Test Project",
+        status=ProjectStatus.SUBMITTED,
+        scenes=[
+            Scene(
+                scene_id="scene-456",
+                scene_principal="cooking",
+                status=SceneStatus.APPROVE,
+            ),
+        ],
+        created_at="2026-01-01T00:00:00Z",
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    user = User(
+        user_id="owner-1",
+        user_name="Test Owner",
+        group_id="group-1",
+        role=UserRole.OWNER,
+    )
+
+    view = await review_scene(
+        projects_db=db,
+        project_id="proj-123",
+        scene_id="scene-456",
+        result="reject",
+        review_comment="Please re-record",
+        user=user,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
+    )
+
+    assert view.status == ProjectStatus.IN_PROGRESS
