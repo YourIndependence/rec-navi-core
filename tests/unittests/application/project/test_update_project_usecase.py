@@ -19,10 +19,12 @@ from recnavi.application.project.update_project_usecase import (
 )
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene_input import SceneInput
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
@@ -37,7 +39,7 @@ async def test_update_project_usecase_delegates_to_update_project():
         role=UserRole.OWNER,
     )
 
-    expected_project = Project(
+    expected_output = ProjectView(
         project_id="proj-123",
         group_id="group-1",
         owner_user_id="owner-1",
@@ -50,6 +52,7 @@ async def test_update_project_usecase_delegates_to_update_project():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
+    storage = MockObjectStorage()
 
     scenes = [
         SceneInput(
@@ -60,7 +63,7 @@ async def test_update_project_usecase_delegates_to_update_project():
 
     with patch(
         "recnavi.application.project.update_project_usecase.update_project",
-        new=AsyncMock(return_value=expected_project),
+        new=AsyncMock(return_value=expected_output),
     ) as mock_update:
         result = await update_project_usecase(
             projects_db=database,
@@ -72,6 +75,8 @@ async def test_update_project_usecase_delegates_to_update_project():
             scenes=scenes,
             expected_version=1,
             user=owner,
+            storage=storage,
+            bucket_name="bucket",
         )
 
     mock_update.assert_awaited_once_with(
@@ -84,8 +89,10 @@ async def test_update_project_usecase_delegates_to_update_project():
         scenes=scenes,
         expected_version=1,
         user=owner,
+        storage=storage,
+        bucket_name="bucket",
     )
-    assert result is expected_project
+    assert result is expected_output
 
 
 @pytest.mark.asyncio
@@ -139,6 +146,8 @@ async def test_update_project_usecase_returns_updated_project():
         ],
         expected_version=1,
         user=owner,
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
     )
 
     assert updated_project.project_id == "proj-123"

@@ -35,6 +35,7 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -165,6 +166,8 @@ async def update_project_endpoint(
         scenes=item.project.scenes,
         expected_version=item.project.version,
         user=user,
+        storage=request.app.state.object_storage,
+        bucket_name=MEDIA_BUCKET_NAME,
     )
 
     return UpdateProjectResponse(project=updated_project)

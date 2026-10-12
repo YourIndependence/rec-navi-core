@@ -23,6 +23,7 @@ from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 def make_users_db(*user_ids: str, group_id: str = "group-1") -> MockDatabase:
@@ -199,6 +200,8 @@ async def test_update_project_increments_version():
     await database.put_item(existing_project.model_dump(by_alias=True))
 
     updated_project = await update_project(
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         projects_db=database,
         users_db=MockDatabase(),
         project_id="proj-123",
@@ -241,6 +244,8 @@ async def test_update_project_raises_conflict_on_version_mismatch():
 
     with pytest.raises(ClientConflictError) as exc_info:
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -282,6 +287,8 @@ async def test_update_project_raises_authorization_error_for_non_owner():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -331,6 +338,8 @@ async def test_update_project_preserves_video_key_and_recording_state():
     await database.put_item(existing_project.model_dump(by_alias=True))
 
     updated_project = await update_project(
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         projects_db=database,
         users_db=make_users_db("user-2", "user-3"),
         project_id="proj-123",
@@ -354,8 +363,15 @@ async def test_update_project_preserves_video_key_and_recording_state():
     assert scene.scene_principal == "cooking-updated"
     assert scene.assigned_user_ids == ["user-3"]
     assert scene.status == SceneStatus.APPROVE
-    assert scene.video_key == "s3://bucket/video.mp4"
-    assert scene.thumbnail_key == "s3://bucket/thumb.jpg"
+    assert (
+        scene.video_url == "mock://bucket/s3://bucket/video.mp4?expires=3600"
+    )
+    assert scene.thumbnail_url == (
+        "mock://bucket/s3://bucket/thumb.jpg?expires=3600"
+    )
+    dumped = scene.model_dump(by_alias=True)
+    assert "videoKey" not in dumped
+    assert "thumbnailKey" not in dumped
     assert scene.created_by == "staff-1"
     assert scene.created_at == "2026-01-01T00:00:00Z"
 
@@ -370,6 +386,8 @@ async def test_update_project_rejects_owner_of_another_group():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -392,6 +410,8 @@ async def test_update_project_checks_group_before_version():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -413,6 +433,8 @@ async def test_update_project_rejects_unknown_project_assignee():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=make_users_db("user-1"),
             project_id="proj-123",
@@ -436,6 +458,8 @@ async def test_update_project_rejects_other_group_scene_assignee():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
+            storage=MockObjectStorage(),
+            bucket_name="bucket",
             projects_db=database,
             users_db=make_users_db("outsider", group_id="group-2"),
             project_id="proj-123",
@@ -462,6 +486,8 @@ async def test_update_project_accepts_same_group_assignees():
     await database.put_item(make_project().model_dump(by_alias=True))
 
     updated_project = await update_project(
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
         projects_db=database,
         users_db=make_users_db("user-1", "user-2"),
         project_id="proj-123",
@@ -480,3 +506,32 @@ async def test_update_project_accepts_same_group_assignees():
 
     assert updated_project.assigned_user_ids == ["user-1"]
     assert updated_project.scenes[0].assigned_user_ids == ["user-2"]
+
+
+@pytest.mark.asyncio
+async def test_update_project_returns_null_urls_for_unrecorded_scene():
+    """Test update_project returns null urls for scenes without keys."""
+    database = MockDatabase()
+    await database.put_item(make_project().model_dump(by_alias=True))
+
+    updated_project = await update_project(
+        projects_db=database,
+        users_db=make_users_db("user-2"),
+        storage=MockObjectStorage(),
+        bucket_name="bucket",
+        project_id="proj-123",
+        project_name="New Name",
+        description="Description",
+        assigned_user_ids=[],
+        scenes=[
+            SceneInput(
+                scene_principal="cooking",
+                assigned_user_ids=["user-2"],
+            ),
+        ],
+        expected_version=1,
+        user=make_owner(),
+    )
+
+    assert updated_project.scenes[0].video_url is None
+    assert updated_project.scenes[0].thumbnail_url is None

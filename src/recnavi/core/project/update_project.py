@@ -13,7 +13,10 @@ from datetime import UTC
 from datetime import datetime
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.project.scene_urls import attach_scene_urls
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.scene_input import SceneInput
@@ -88,7 +91,9 @@ async def update_project(
     scenes: list[SceneInput],
     expected_version: int,
     user: User,
-) -> Project:
+    storage: BaseObjectStorage,
+    bucket_name: str,
+) -> ProjectView:
     """Update project with optimistic locking."""
     existing_item = await projects_db.get_item({"projectId": project_id})
     if not existing_item:
@@ -139,4 +144,8 @@ async def update_project(
         expression_attribute_values={":expected_version": expected_version},
     )
 
-    return updated_project
+    return await attach_scene_urls(
+        storage=storage,
+        bucket_name=bucket_name,
+        project=updated_project,
+    )
