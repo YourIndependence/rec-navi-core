@@ -14,7 +14,7 @@ from recnavi.core.notification.base_notifier import BaseNotifier
 from recnavi.core.project.notify_project_submitted import (
     notify_project_submitted,
 )
-from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.user import User
 
 
@@ -22,7 +22,7 @@ async def notify_project_submitted_usecase(
     *,
     users_db: BaseDatabase,
     notifier: BaseNotifier,
-    project: Project,
+    project: ProjectView,
     submitter: User,
     base_url: str,
 ) -> bool:

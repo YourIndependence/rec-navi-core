@@ -13,7 +13,7 @@ import logging
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.notification.base_notifier import BaseNotifier
-from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.user import User
 from recnavi.exceptions.exceptions import NotificationSendError
 
@@ -33,7 +33,7 @@ async def notify_project_submitted(
     *,
     users_db: BaseDatabase,
     notifier: BaseNotifier,
-    project: Project,
+    project: ProjectView,
     submitter: User,
     base_url: str,
 ) -> bool:

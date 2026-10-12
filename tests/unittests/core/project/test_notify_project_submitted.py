@@ -17,15 +17,15 @@ from recnavi.core.project.notify_project_submitted import build_review_url
 from recnavi.core.project.notify_project_submitted import (
     notify_project_submitted,
 )
-from recnavi.core.types.project import Project
+from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_notifier import MockNotifier
 
 
-def _project() -> Project:
-    return Project.model_validate(
+def _project() -> ProjectView:
+    return ProjectView.model_validate(
         {
             "projectId": "proj-1",
             "groupId": "group-1",
