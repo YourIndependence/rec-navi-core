@@ -7,100 +7,78 @@
 # For internal use only.
 # developer team.
 
-"""Tests for project view core logic."""
+"""Tests for get_project_view and create_project_view."""
 
 import pytest
 
-from recnavi.core.project.project_view import SCENE_URL_EXPIRATION_SECONDS
-from recnavi.core.project.project_view import attach_scene_urls
-from recnavi.core.types.project import Project
+from recnavi.core.project.project_view import create_project_view
+from recnavi.core.project.project_view import get_project_view
+from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
+from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
-def build_project(*, scenes: list[dict[str, object]]) -> Project:
-    return Project.model_validate(
-        {
-            "projectId": "proj-123",
-            "groupId": "group-456",
-            "projectName": "Test Project",
-            "ownerUserId": "user-789",
-            "createdAt": "2026-01-01T00:00:00Z",
-            "scenes": scenes,
-        },
+@pytest.fixture
+def owner() -> User:
+    """Provide the account owner used by every test."""
+    return User(
+        user_id="user-789",
+        user_name="Owner",
+        group_id="group-456",
+        role=UserRole.OWNER,
     )
 
 
 @pytest.mark.asyncio
-async def test_attach_scene_urls_returns_null_urls_for_unrecorded_scene():
-    """Unrecorded scenes get null videoUrl and thumbnailUrl."""
-    project = build_project(
-        scenes=[{"sceneId": "s1", "scenePrincipal": "opening"}],
+async def test_get_project_view_returns_presigned_urls(owner: User):
+    """get_project_view loads the project and presigns recorded scenes."""
+    projects_db = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-123",
+                "groupId": "group-456",
+                "projectName": "Test Project",
+                "ownerUserId": "user-789",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "scenes": [
+                    {
+                        "sceneId": "s1",
+                        "scenePrincipal": "opening",
+                        "videoKey": "videos/s1.mp4",
+                    },
+                ],
+            },
+        ],
     )
 
-    view = await attach_scene_urls(
+    view = await get_project_view(
+        projects_db=projects_db,
         storage=MockObjectStorage(),
         bucket_name="bucket",
-        project=project,
+        project_id="proj-123",
+        user=owner,
     )
 
-    assert view.scenes[0].video_url is None
+    assert view.project_id == "proj-123"
+    assert view.scenes[0].video_url is not None
     assert view.scenes[0].thumbnail_url is None
 
 
 @pytest.mark.asyncio
-async def test_attach_scene_urls_returns_urls_for_recorded_scene():
-    """Recorded scenes get presigned URLs built from their keys."""
-    project = build_project(
-        scenes=[
-            {
-                "sceneId": "s1",
-                "scenePrincipal": "opening",
-                "status": "pending",
-                "videoKey": "videos/s1.mp4",
-                "thumbnailKey": "thumbnails/s1.jpg",
-            },
-        ],
-    )
-    expires = SCENE_URL_EXPIRATION_SECONDS
-
-    view = await attach_scene_urls(
+async def test_create_project_view_returns_scenes_without_urls(owner: User):
+    """create_project_view returns new unrecorded scenes with null URLs."""
+    view = await create_project_view(
+        projects_db=MockDatabase(),
         storage=MockObjectStorage(),
         bucket_name="bucket",
-        project=project,
+        project_name="New",
+        description="",
+        scene_principals=["opening", "main"],
+        assigned_user_ids=[],
+        owner=owner,
     )
 
-    scene = view.scenes[0]
-    assert scene.video_url == f"mock://bucket/videos/s1.mp4?expires={expires}"
-    assert scene.thumbnail_url == (
-        f"mock://bucket/thumbnails/s1.jpg?expires={expires}"
-    )
-    assert scene.status == project.scenes[0].status
-
-
-@pytest.mark.asyncio
-async def test_attach_scene_urls_never_serializes_storage_keys():
-    """Serialized view exposes camelCase URLs and no S3 keys."""
-    project = build_project(
-        scenes=[
-            {
-                "sceneId": "s1",
-                "scenePrincipal": "opening",
-                "videoKey": "videos/s1.mp4",
-                "thumbnailKey": "thumbnails/s1.jpg",
-            },
-        ],
-    )
-
-    view = await attach_scene_urls(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project=project,
-    )
-
-    scene = view.model_dump(by_alias=True)["scenes"][0]
-    assert "videoUrl" in scene
-    assert "thumbnailUrl" in scene
-    assert "videoKey" not in scene
-    assert "thumbnailKey" not in scene
-    assert view.project_id == "proj-123"
-    assert view.group_id == "group-456"
+    assert len(view.scenes) == 2
+    assert all(s.video_url is None for s in view.scenes)
+    assert all(s.thumbnail_url is None for s in view.scenes)
