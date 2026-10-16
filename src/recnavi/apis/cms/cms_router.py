@@ -28,9 +28,7 @@ from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
-from recnavi.application.project.update_project_usecase import (
-    update_project_usecase,
-)
+from recnavi.application.project.update_project import update_project_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
