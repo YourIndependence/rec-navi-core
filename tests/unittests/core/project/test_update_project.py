@@ -11,13 +11,11 @@
 
 import pytest
 
-from recnavi.core.project.update_project import merge_scenes
 from recnavi.core.project.update_project import update_project
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
-from recnavi.core.types.scene_input import SceneInput
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
@@ -25,21 +23,6 @@ from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
-
-
-def make_users_db(*user_ids: str, group_id: str = "group-1") -> MockDatabase:
-    """Build a users database holding staff users of the given group."""
-    return MockDatabase(
-        initial_items=[
-            {
-                "userId": user_id,
-                "userName": user_id,
-                "role": "staff",
-                "groupId": group_id,
-            }
-            for user_id in user_ids
-        ],
-    )
 
 
 def make_project(*, group_id: str = "group-1") -> Project:
@@ -67,112 +50,6 @@ def make_owner(*, group_id: str = "group-1") -> User:
         group_id=group_id,
         role=UserRole.OWNER,
     )
-
-
-def test_merge_scenes_adds_new_scene_when_scene_id_is_null():
-    """Test merge_scenes adds new scene with NOT_RECORDED status when scene_id is None."""
-    existing_scenes = [
-        Scene(
-            scene_id="scene-1",
-            scene_principal="cooking",
-            assigned_user_ids=[],
-            status=SceneStatus.NOT_RECORDED,
-        ),
-    ]
-    scene_inputs = [
-        SceneInput(
-            scene_id="scene-1",
-            scene_principal="cooking",
-            assigned_user_ids=[],
-        ),
-        SceneInput(
-            scene_principal="eating",
-            assigned_user_ids=["user-1"],
-        ),
-    ]
-
-    merged_scenes = merge_scenes(
-        existing_scenes=existing_scenes,
-        scene_inputs=scene_inputs,
-    )
-
-    assert len(merged_scenes) == 2
-    assert merged_scenes[0].scene_id == "scene-1"
-    assert merged_scenes[1].scene_id is not None
-    assert merged_scenes[1].scene_principal == "eating"
-    assert merged_scenes[1].status == SceneStatus.NOT_RECORDED
-    assert merged_scenes[1].assigned_user_ids == ["user-1"]
-
-
-def test_merge_scenes_preserves_recording_state_when_updating_existing_scene():
-    """Test merge_scenes preserves status, video_key, etc when updating scene."""
-    existing_scenes = [
-        Scene(
-            scene_id="scene-1",
-            scene_principal="cooking",
-            assigned_user_ids=["user-old"],
-            status=SceneStatus.APPROVE,
-            video_key="s3://bucket/video.mp4",
-            thumbnail_key="s3://bucket/thumb.jpg",
-            created_by="user-123",
-            created_at="2026-01-01T00:00:00Z",
-        ),
-    ]
-    scene_inputs = [
-        SceneInput(
-            scene_id="scene-1",
-            scene_principal="cooking-updated",
-            assigned_user_ids=["user-new"],
-        ),
-    ]
-
-    merged_scenes = merge_scenes(
-        existing_scenes=existing_scenes,
-        scene_inputs=scene_inputs,
-    )
-
-    assert len(merged_scenes) == 1
-    assert merged_scenes[0].scene_id == "scene-1"
-    assert merged_scenes[0].scene_principal == "cooking-updated"
-    assert merged_scenes[0].assigned_user_ids == ["user-new"]
-    assert merged_scenes[0].status == SceneStatus.APPROVE
-    assert merged_scenes[0].video_key == "s3://bucket/video.mp4"
-    assert merged_scenes[0].thumbnail_key == "s3://bucket/thumb.jpg"
-    assert merged_scenes[0].created_by == "user-123"
-    assert merged_scenes[0].created_at == "2026-01-01T00:00:00Z"
-
-
-def test_merge_scenes_deletes_scene_missing_from_input():
-    """Test merge_scenes deletes scene when not present in scene_inputs."""
-    existing_scenes = [
-        Scene(
-            scene_id="scene-1",
-            scene_principal="cooking",
-            assigned_user_ids=[],
-            status=SceneStatus.NOT_RECORDED,
-        ),
-        Scene(
-            scene_id="scene-2",
-            scene_principal="eating",
-            assigned_user_ids=[],
-            status=SceneStatus.NOT_RECORDED,
-        ),
-    ]
-    scene_inputs = [
-        SceneInput(
-            scene_id="scene-1",
-            scene_principal="cooking",
-            assigned_user_ids=[],
-        ),
-    ]
-
-    merged_scenes = merge_scenes(
-        existing_scenes=existing_scenes,
-        scene_inputs=scene_inputs,
-    )
-
-    assert len(merged_scenes) == 1
-    assert merged_scenes[0].scene_id == "scene-1"
 
 
 @pytest.mark.asyncio
@@ -203,7 +80,6 @@ async def test_update_project_increments_version():
     updated_project = await update_project(
         storage=MockObjectStorage(bucket_name="bucket"),
         projects_db=database,
-        users_db=MockDatabase(),
         project_id="proj-123",
         project_name="New Name",
         description="New Description",
@@ -246,7 +122,6 @@ async def test_update_project_raises_conflict_on_version_mismatch():
         await update_project(
             storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
-            users_db=MockDatabase(),
             project_id="proj-123",
             project_name="New Name",
             description="New Description",
@@ -288,7 +163,6 @@ async def test_update_project_raises_authorization_error_for_non_owner():
         await update_project(
             storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
-            users_db=MockDatabase(),
             project_id="proj-123",
             project_name="New Name",
             description="New Description",
@@ -338,16 +212,20 @@ async def test_update_project_preserves_video_key_and_recording_state():
     updated_project = await update_project(
         storage=MockObjectStorage(bucket_name="bucket"),
         projects_db=database,
-        users_db=make_users_db("user-2", "user-3"),
         project_id="proj-123",
         project_name="Updated Name",
         description="Updated Description",
         assigned_user_ids=["user-2"],
         scenes=[
-            SceneInput(
+            Scene(
                 scene_id="scene-1",
                 scene_principal="cooking-updated",
                 assigned_user_ids=["user-3"],
+                status=SceneStatus.APPROVE,
+                video_key="s3://bucket/video.mp4",
+                thumbnail_key="s3://bucket/thumb.jpg",
+                created_by="staff-1",
+                created_at="2026-01-01T00:00:00Z",
             ),
         ],
         expected_version=1,
@@ -388,7 +266,6 @@ async def test_update_project_raises_not_found_for_missing_project():
     with pytest.raises(ClientNotFoundError):
         await update_project(
             projects_db=database,
-            users_db=MockDatabase(),
             project_id="missing",
             project_name="Name",
             description="",
@@ -408,130 +285,52 @@ async def test_update_project_raises_not_found_for_missing_project():
 
 
 @pytest.mark.asyncio
-async def test_update_project_rejects_owner_of_another_group():
-    """Test update_project raises 403 error and keeps DB unchanged for cross-group owner."""
-    database = MockDatabase()
-    existing_project = make_project(group_id="group-1")
-    await database.put_item(existing_project.model_dump(by_alias=True))
-    before = [dict(item) for item in database.items]
-
-    with pytest.raises(ClientAuthorizationError):
-        await update_project(
-            storage=MockObjectStorage(bucket_name="bucket"),
-            projects_db=database,
-            users_db=MockDatabase(),
-            project_id="proj-123",
-            project_name="Hacked",
-            description="Hacked",
-            assigned_user_ids=[],
-            scenes=[],
-            expected_version=1,
-            user=make_owner(group_id="group-2"),
-        )
-
-    assert database.items == before
-
-
-@pytest.mark.asyncio
-async def test_update_project_checks_group_before_version():
-    """Test cross-group owner gets authorization error even with wrong version."""
+async def test_update_project_owner_can_assign_users_without_group_lookup():
+    """Project ownership is sufficient regardless of group or assignee records."""
     database = MockDatabase()
     await database.put_item(make_project().model_dump(by_alias=True))
-
-    with pytest.raises(ClientAuthorizationError):
-        await update_project(
-            storage=MockObjectStorage(bucket_name="bucket"),
-            projects_db=database,
-            users_db=MockDatabase(),
-            project_id="proj-123",
-            project_name="New Name",
-            description="Description",
-            assigned_user_ids=[],
-            scenes=[],
-            expected_version=99,
-            user=make_owner(group_id="group-2"),
-        )
-
-
-@pytest.mark.asyncio
-async def test_update_project_rejects_unknown_project_assignee():
-    """Test update_project rejects project assignee missing from users table."""
-    database = MockDatabase()
-    await database.put_item(make_project().model_dump(by_alias=True))
-    before = [dict(item) for item in database.items]
-
-    with pytest.raises(ClientAuthorizationError):
-        await update_project(
-            storage=MockObjectStorage(bucket_name="bucket"),
-            projects_db=database,
-            users_db=make_users_db("user-1"),
-            project_id="proj-123",
-            project_name="New Name",
-            description="Description",
-            assigned_user_ids=["ghost"],
-            scenes=[],
-            expected_version=1,
-            user=make_owner(),
-        )
-
-    assert database.items == before
-
-
-@pytest.mark.asyncio
-async def test_update_project_rejects_other_group_scene_assignee():
-    """Test update_project rejects scene assignee belonging to another group."""
-    database = MockDatabase()
-    await database.put_item(make_project().model_dump(by_alias=True))
-    before = [dict(item) for item in database.items]
-
-    with pytest.raises(ClientAuthorizationError):
-        await update_project(
-            storage=MockObjectStorage(bucket_name="bucket"),
-            projects_db=database,
-            users_db=make_users_db("outsider", group_id="group-2"),
-            project_id="proj-123",
-            project_name="New Name",
-            description="Description",
-            assigned_user_ids=[],
-            scenes=[
-                SceneInput(
-                    scene_principal="cooking",
-                    assigned_user_ids=["outsider"],
-                ),
-            ],
-            expected_version=1,
-            user=make_owner(),
-        )
-
-    assert database.items == before
-
-
-@pytest.mark.asyncio
-async def test_update_project_accepts_same_group_assignees():
-    """Test update_project accepts project and scene assignees of the same group."""
-    database = MockDatabase()
-    await database.put_item(make_project().model_dump(by_alias=True))
-
-    updated_project = await update_project(
-        storage=MockObjectStorage(bucket_name="bucket"),
+    updated = await update_project(
         projects_db=database,
-        users_db=make_users_db("user-1", "user-2"),
         project_id="proj-123",
         project_name="New Name",
         description="Description",
-        assigned_user_ids=["user-1"],
+        assigned_user_ids=["unknown-user"],
         scenes=[
-            SceneInput(
+            Scene(
+                scene_id="scene-new",
                 scene_principal="cooking",
-                assigned_user_ids=["user-2"],
+                assigned_user_ids=["outsider"],
             ),
         ],
         expected_version=1,
-        user=make_owner(),
+        user=make_owner(group_id="group-2"),
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
+    assert updated.assigned_user_ids == ["unknown-user"]
+    assert updated.scenes[0].assigned_user_ids == ["outsider"]
+    assert updated.version == 2
 
-    assert updated_project.assigned_user_ids == ["user-1"]
-    assert updated_project.scenes[0].assigned_user_ids == ["user-2"]
+
+@pytest.mark.asyncio
+async def test_update_project_rejects_other_project_owner():
+    """Another project owner cannot update this project, even in the same group."""
+    database = MockDatabase()
+    original = make_project()
+    await database.put_item(original.model_dump(by_alias=True))
+    user = make_owner().model_copy(update={"user_id": "another-owner"})
+    with pytest.raises(ClientAuthorizationError):
+        await update_project(
+            projects_db=database,
+            project_id="proj-123",
+            project_name="Changed",
+            description="",
+            assigned_user_ids=[],
+            scenes=[],
+            expected_version=99,
+            user=user,
+            storage=MockObjectStorage(bucket_name="bucket"),
+        )
+    assert database.items == [original.model_dump(by_alias=True)]
 
 
 @pytest.mark.asyncio
@@ -542,14 +341,14 @@ async def test_update_project_returns_null_urls_for_unrecorded_scene():
 
     updated_project = await update_project(
         projects_db=database,
-        users_db=make_users_db("user-2"),
         storage=MockObjectStorage(bucket_name="bucket"),
         project_id="proj-123",
         project_name="New Name",
         description="Description",
         assigned_user_ids=[],
         scenes=[
-            SceneInput(
+            Scene(
+                scene_id="scene-new",
                 scene_principal="cooking",
                 assigned_user_ids=["user-2"],
             ),
@@ -560,3 +359,41 @@ async def test_update_project_returns_null_urls_for_unrecorded_scene():
 
     assert updated_project.scenes[0].video_url is None
     assert updated_project.scenes[0].thumbnail_url is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("empty", [False, True])
+async def test_update_project_replaces_all_scenes_in_one_revision(empty):
+    """Full updates replace the scene collection and advance the revision once."""
+    database = MockDatabase()
+    original = make_project()
+    original.scenes = [
+        Scene(scene_id="removed", scene_principal="opening"),
+        Scene(scene_id="existing", scene_principal="cooking"),
+    ]
+    await database.put_item(original.model_dump(by_alias=True))
+    scenes = (
+        []
+        if empty
+        else [
+            Scene(scene_id="new", scene_principal="ending"),
+            Scene(scene_id="existing", scene_principal="updated"),
+        ]
+    )
+    updated = await update_project(
+        projects_db=database,
+        project_id=original.project_id,
+        project_name="Updated",
+        description="Updated description",
+        assigned_user_ids=[],
+        scenes=scenes,
+        expected_version=1,
+        user=make_owner(),
+        storage=MockObjectStorage(bucket_name="bucket"),
+    )
+    stored = Project.model_validate(
+        await database.get_item(key={"projectId": original.project_id}),
+    )
+    assert stored.scenes == scenes
+    assert stored.version == updated.version == 2
+    assert stored.updated_at != original.updated_at

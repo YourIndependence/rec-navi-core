@@ -9,15 +9,13 @@
 
 """Integration tests for POST /updateProject endpoint."""
 
-import os
-from contextlib import suppress
 from typing import cast
+from uuid import uuid4
 
 import pytest
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
-from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.user import User
@@ -46,7 +44,6 @@ def test_update_project_returns_400_when_no_token(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_update_project_returns_good(
     client,
     auth_headers,
@@ -56,18 +53,6 @@ async def test_update_project_returns_good(
         dict[str, BaseDatabase],
         app.state.database,
     )[PROJECTS_TABLE_NAME]
-    users_database = cast(
-        dict[str, BaseDatabase],
-        app.state.database,
-    )[USERS_TABLE_NAME]
-    await users_database.put_item(
-        {
-            "userId": "test-staff-456",
-            "userName": "Test Staff",
-            "role": "staff",
-            "groupId": "it-group",
-        },
-    )
     project_id = None
     try:
         create_response = client.post(
@@ -133,62 +118,55 @@ async def test_update_project_returns_good(
         assert project_record["version"] == 1
 
     finally:
-        with suppress(Exception):
-            if project_id:
-                await database.delete_item(
-                    {"projectId": project_id},
-                )
-        with suppress(Exception):
-            await users_database.delete_item({"userId": "test-staff-456"})
+        if project_id:
+            await database.delete_item(key={"projectId": project_id})
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(
-    os.environ.get("ENV") != "CI",
-    reason="Requires the in-memory infrastructure injected in CI",
-)
 async def test_update_project_returns_scene_urls_instead_of_keys(
     client,
     auth_headers,
 ):
     """Test POST /updateProject returns presigned urls and no keys."""
     databases = cast(dict[str, BaseDatabase], app.state.database)
-    await databases[PROJECTS_TABLE_NAME].put_item(
-        {
-            "projectId": "proj-view-1",
-            "groupId": "it-group",
-            "ownerUserId": "owner-1",
-            "projectName": "Project",
-            "description": "",
-            "assignedUserIds": [],
-            "status": ProjectStatus.IN_PROGRESS,
-            "version": 0,
-            "createdAt": "2026-01-01T00:00:00Z",
-            "scenes": [
-                {
-                    "sceneId": "scene-1",
-                    "scenePrincipal": "cooking",
-                    "status": "pending",
-                    "videoKey": "videos/scene-1.mp4",
-                    "thumbnailKey": "thumbnails/scene-1.jpg",
-                },
-            ],
-        },
-    )
+    database = databases[PROJECTS_TABLE_NAME]
+    project_id = f"test-update-project-{uuid4()}"
     previous_override = app.dependency_overrides[verify_user]
-    app.dependency_overrides[verify_user] = lambda: User(
-        user_id="owner-1",
-        user_name="Owner",
-        role=UserRole.OWNER,
-        group_id="it-group",
-    )
     try:
+        await database.put_item(
+            {
+                "projectId": project_id,
+                "groupId": "it-group",
+                "ownerUserId": "owner-1",
+                "projectName": "Project",
+                "description": "",
+                "assignedUserIds": [],
+                "status": ProjectStatus.IN_PROGRESS,
+                "version": 0,
+                "createdAt": "2026-01-01T00:00:00Z",
+                "scenes": [
+                    {
+                        "sceneId": "scene-1",
+                        "scenePrincipal": "cooking",
+                        "status": "pending",
+                        "videoKey": "videos/scene-1.mp4",
+                        "thumbnailKey": "thumbnails/scene-1.jpg",
+                    },
+                ],
+            },
+        )
+        app.dependency_overrides[verify_user] = lambda: User(
+            user_id="owner-1",
+            user_name="Owner",
+            role=UserRole.OWNER,
+            group_id="it-group",
+        )
         response = client.post(
             "/updateProject",
             headers=auth_headers,
             json={
                 "project": {
-                    "projectId": "proj-view-1",
+                    "projectId": project_id,
                     "projectName": "Renamed",
                     "description": "",
                     "assignedUserIds": [],
@@ -197,19 +175,22 @@ async def test_update_project_returns_scene_urls_instead_of_keys(
                             "sceneId": "scene-1",
                             "scenePrincipal": "cooking",
                             "assignedUserIds": [],
+                            "status": "pending",
+                            "videoKey": "videos/scene-1.mp4",
+                            "thumbnailKey": "thumbnails/scene-1.jpg",
                         },
                     ],
                     "version": 0,
                 },
             },
         )
+        assert response.status_code == 200
+        scene = response.json()["project"]["scenes"][0]
+        assert scene["videoUrl"].startswith(("mock://", "https://"))
+        assert "videos/scene-1.mp4" in scene["videoUrl"]
+        assert scene["thumbnailUrl"].startswith(("mock://", "https://"))
+        assert "videoKey" not in scene
+        assert "thumbnailKey" not in scene
     finally:
         app.dependency_overrides[verify_user] = previous_override
-
-    assert response.status_code == 200
-    scene = response.json()["project"]["scenes"][0]
-    assert scene["videoUrl"].startswith("mock://")
-    assert "videos/scene-1.mp4" in scene["videoUrl"]
-    assert scene["thumbnailUrl"].startswith("mock://")
-    assert "videoKey" not in scene
-    assert "thumbnailKey" not in scene
+        await database.delete_item(key={"projectId": project_id})

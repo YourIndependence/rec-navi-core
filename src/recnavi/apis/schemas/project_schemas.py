@@ -17,7 +17,7 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
-from recnavi.core.types.scene_input import SceneInput
+from recnavi.core.types.scene import Scene
 
 
 class GetProjectsResponse(BaseApiResponseModel):
@@ -81,9 +81,9 @@ class ProjectInput(BaseModel):
         default_factory=list,
         description="Staff assigned to project",
     )
-    scenes: list[SceneInput] = Field(
+    scenes: list[Scene] = Field(
         default_factory=list,
-        description="Scenes array",
+        description="Complete scene collection after the update. Omitted scenes are deleted; an empty list removes all scenes.",
     )
     version: int = Field(
         ...,

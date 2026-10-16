@@ -19,7 +19,7 @@ from recnavi.application.project.update_project_usecase import (
 )
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.scene_input import SceneInput
+from recnavi.core.types.scene import Scene
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_database import MockDatabase
@@ -30,7 +30,6 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 async def test_update_project_usecase_delegates_to_update_project():
     """Test usecase delegates to core update_project collaborator."""
     database = MockDatabase()
-    users_database = MockDatabase()
     owner = User(
         user_id="owner-1",
         user_name="Owner User",
@@ -54,7 +53,8 @@ async def test_update_project_usecase_delegates_to_update_project():
     storage = MockObjectStorage(bucket_name="bucket")
 
     scenes = [
-        SceneInput(
+        Scene(
+            scene_id="scene-new",
             scene_principal="cooking",
             assigned_user_ids=["staff-1"],
         ),
@@ -66,7 +66,6 @@ async def test_update_project_usecase_delegates_to_update_project():
     ) as mock_update:
         result = await update_project_usecase(
             projects_db=database,
-            users_db=users_database,
             project_id="proj-123",
             project_name="New Name",
             description="New Description",
@@ -79,7 +78,6 @@ async def test_update_project_usecase_delegates_to_update_project():
 
     mock_update.assert_awaited_once_with(
         projects_db=database,
-        users_db=users_database,
         project_id="proj-123",
         project_name="New Name",
         description="New Description",
@@ -96,17 +94,6 @@ async def test_update_project_usecase_delegates_to_update_project():
 async def test_update_project_usecase_returns_updated_project():
     """Test update_project_usecase returns updated project."""
     database = MockDatabase()
-    users_database = MockDatabase(
-        initial_items=[
-            {
-                "userId": uid,
-                "userName": uid,
-                "role": "staff",
-                "groupId": "group-1",
-            }
-            for uid in ("user-1", "staff-1")
-        ],
-    )
     owner = User(
         user_id="owner-1",
         user_name="Owner User",
@@ -130,13 +117,13 @@ async def test_update_project_usecase_returns_updated_project():
 
     updated_project = await update_project_usecase(
         projects_db=database,
-        users_db=users_database,
         project_id="proj-123",
         project_name="New Name",
         description="New Description",
         assigned_user_ids=["user-1"],
         scenes=[
-            SceneInput(
+            Scene(
+                scene_id="scene-new",
                 scene_principal="cooking",
                 assigned_user_ids=["staff-1"],
             ),

@@ -103,10 +103,18 @@ class Project(BaseModel):
 
     def update_scene(self, scene: Scene) -> None:
         """Replace a scene by ID and advance the project version."""
+        self._update_scene_impl(scene)
+        self.increment_version()
+
+    def _update_scene_impl(self, scene: Scene) -> None:
+        """Replace a scene without changing the project version."""
         for index, current_scene in enumerate(self.scenes):
             if current_scene.scene_id == scene.scene_id:
                 self.scenes[index] = scene
-                self.version += 1
-                self.updated_at = datetime.now(UTC).isoformat()
                 return
         raise ClientNotFoundError("Scene not found")
+
+    def increment_version(self) -> None:
+        """Advance the version and record the update time."""
+        self.version += 1
+        self.updated_at = datetime.now(UTC).isoformat()
