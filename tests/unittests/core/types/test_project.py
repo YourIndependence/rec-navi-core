@@ -152,6 +152,9 @@ def test_project_update_scene_raises_when_scene_is_missing():
     with pytest.raises(ClientNotFoundError, match="Scene not found"):
         project.update_scene(missing_scene)
 
+    assert project.version == 0
+    assert project.updated_at is None
+
 
 def test_project_validate_permission_allows_owner():
     """Test Project.validate_permission() allows the project owner."""
