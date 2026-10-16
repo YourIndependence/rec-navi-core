@@ -19,6 +19,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -65,7 +66,9 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
-    app.state.object_storage = MockObjectStorage()
+    app.state.object_storage = MockObjectStorage(
+        bucket_name=MEDIA_BUCKET_NAME,
+    )
 
 
 @pytest.fixture(scope="session")
