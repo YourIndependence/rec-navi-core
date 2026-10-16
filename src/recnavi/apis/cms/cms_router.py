@@ -11,7 +11,6 @@
 
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
@@ -19,28 +18,18 @@ from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
 from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
-from recnavi.apis.schemas.project_schemas import GetProjectRequest
-from recnavi.apis.schemas.project_schemas import GetProjectResponse
-from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
-from recnavi.application.project.delete_project_usecase import (
-    delete_project_usecase,
-)
-from recnavi.application.project.get_project import get_project_usecase
-from recnavi.application.project.get_projects import get_projects_usecase
-from recnavi.application.project.update_project_usecase import (
-    update_project_usecase,
-)
+from recnavi.application.project.delete_project import delete_project_usecase
+from recnavi.application.project.update_project import update_project_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
-from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -86,47 +75,6 @@ async def get_templates_endpoint(
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
     templates = await get_templates_usecase(templates_db=templates_db)
     return GetTemplatesResponse(templates=templates)
-
-
-@cms_router.get("/getProjects")
-async def get_projects_endpoint(
-    request: Request,
-    user: User = Depends(verify_user),
-    limit: int = Query(default=20, ge=1, le=100),
-    cursor: str | None = Query(default=None),
-) -> GetProjectsResponse:
-    """List projects for the authenticated user's group."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-    projects, next_cursor = await get_projects_usecase(
-        projects_db=projects_db,
-        user_id=user.user_id,
-        group_id=user.group_id,
-        limit=limit,
-        cursor=cursor,
-    )
-
-    return GetProjectsResponse(
-        projects=projects,
-        next_cursor=next_cursor,
-    )
-
-
-@cms_router.post("/getProject")
-async def get_project_endpoint(
-    request: Request,
-    item: GetProjectRequest,
-    user: User = Depends(verify_user),
-) -> GetProjectResponse:
-    """Get a project with all scenes."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    project = await get_project_usecase(
-        projects_db=projects_db,
-        project_id=item.project_id,
-        user=user,
-    )
-
-    return GetProjectResponse(project=project)
 
 
 @cms_router.post("/createProject")
@@ -188,7 +136,6 @@ async def delete_project_endpoint(
         project_id=item.project_id,
         user=user,
         storage=request.app.state.object_storage,
-        media_bucket_name=MEDIA_BUCKET_NAME,
     )
 
     return DeleteProjectResponse(project_id=item.project_id)

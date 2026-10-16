@@ -24,28 +24,18 @@ async def delete_project(
     project_id: str,
     user: User,
     storage: BaseObjectStorage,
-    bucket_name: str,
 ) -> str:
     """Delete a project and its stored media (owner-only operation)."""
-    if user.role != UserRole.OWNER:
-        raise ClientAuthorizationError("Only owners can delete projects")
-
     item = await projects_db.get_item(key={"projectId": project_id})
-
     if not item:
         raise ClientNotFoundError("Project not found")
 
     project = Project.model_validate(item)
 
-    if project.group_id != user.group_id:
-        raise ClientAuthorizationError(
-            "Access to other group's project is forbidden",
-        )
+    if not project.validate_permission(user=user, as_role=UserRole.OWNER):
+        raise ClientAuthorizationError("Only owners can delete projects")
 
     await projects_db.delete_item(key={"projectId": project_id})
-    await storage.delete_objects_by_prefix(
-        bucket_name=bucket_name,
-        prefix=f"projects/{project_id}/",
-    )
+    await storage.delete_objects_by_prefix(prefix=f"projects/{project_id}/")
 
     return project_id

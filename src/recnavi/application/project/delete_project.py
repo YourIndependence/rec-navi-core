@@ -21,7 +21,6 @@ async def delete_project_usecase(
     project_id: str,
     user: User,
     storage: BaseObjectStorage,
-    media_bucket_name: str,
 ) -> str:
     """Delete project from database and object storage."""
     return await delete_project(
@@ -29,5 +28,4 @@ async def delete_project_usecase(
         project_id=project_id,
         user=user,
         storage=storage,
-        bucket_name=media_bucket_name,
     )

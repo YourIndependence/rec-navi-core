@@ -43,7 +43,7 @@ async def test_delete_project_owner_can_delete():
         ],
     )
 
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     owner = User(
         user_id="owner-789",
         user_name="Owner User",
@@ -56,13 +56,49 @@ async def test_delete_project_owner_can_delete():
         project_id="proj-123",
         user=owner,
         storage=storage,
-        bucket_name=BUCKET,
     )
 
     assert project_id == "proj-123"
 
     deleted_project = await database.get_item({"projectId": "proj-123"})
     assert deleted_project is None
+
+
+@pytest.mark.asyncio
+async def test_delete_project_admin_can_delete_project_in_their_group():
+    """Test an admin can delete a project in their own group."""
+    database = MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-admin",
+                "groupId": "group-admin",
+                "projectName": "Admin Project",
+                "ownerUserId": "admin-123",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z",
+                "assignedUserIds": [],
+                "status": "in_progress",
+                "version": 1,
+                "scenes": [],
+            },
+        ],
+    )
+    admin = User(
+        user_id="admin-123",
+        user_name="Admin User",
+        group_id="group-admin",
+        role=UserRole.ADMIN,
+    )
+
+    project_id = await delete_project(
+        projects_db=database,
+        project_id="proj-admin",
+        user=admin,
+        storage=MockObjectStorage(bucket_name=BUCKET),
+    )
+
+    assert project_id == "proj-admin"
+    assert await database.get_item({"projectId": "proj-admin"}) is None
 
 
 @pytest.mark.asyncio
@@ -85,7 +121,7 @@ async def test_delete_project_staff_gets_403():
         ],
     )
 
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     staff = User(
         user_id="staff-002",
         user_name="Staff User",
@@ -102,7 +138,6 @@ async def test_delete_project_staff_gets_403():
             project_id="proj-456",
             user=staff,
             storage=storage,
-            bucket_name=BUCKET,
         )
 
     still_exists = await database.get_item({"projectId": "proj-456"})
@@ -129,7 +164,7 @@ async def test_delete_project_other_group_gets_403():
         ],
     )
 
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     other_owner = User(
         user_id="owner-bbb",
         user_name="Other Owner",
@@ -139,14 +174,13 @@ async def test_delete_project_other_group_gets_403():
 
     with pytest.raises(
         ClientAuthorizationError,
-        match="Access to other group's project",
+        match="Only owners can delete projects",
     ):
         await delete_project(
             projects_db=database,
             project_id="proj-999",
             user=other_owner,
             storage=storage,
-            bucket_name=BUCKET,
         )
 
     still_exists = await database.get_item({"projectId": "proj-999"})
@@ -158,7 +192,7 @@ async def test_delete_project_nonexistent_gets_404():
     """Test deleting nonexistent project returns 404."""
     database = MockDatabase(initial_items=[])
 
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     owner = User(
         user_id="owner-123",
         user_name="Owner User",
@@ -172,7 +206,6 @@ async def test_delete_project_nonexistent_gets_404():
             project_id="nonexistent-project",
             user=owner,
             storage=storage,
-            bucket_name=BUCKET,
         )
 
 
@@ -196,7 +229,7 @@ async def test_delete_project_idempotent_second_delete_gets_404():
         ],
     )
 
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     owner = User(
         user_id="owner-ccc",
         user_name="Owner User",
@@ -209,7 +242,6 @@ async def test_delete_project_idempotent_second_delete_gets_404():
         project_id="proj-777",
         user=owner,
         storage=storage,
-        bucket_name=BUCKET,
     )
     assert project_id == "proj-777"
 
@@ -219,7 +251,6 @@ async def test_delete_project_idempotent_second_delete_gets_404():
             project_id="proj-777",
             user=owner,
             storage=storage,
-            bucket_name=BUCKET,
         )
 
 
@@ -242,7 +273,7 @@ async def test_delete_project_deletes_only_project_prefix_objects():
             },
         ],
     )
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     storage.objects = {
         (BUCKET, "projects/proj-1/a.mp4"): (b"a", "video/mp4"),
         (BUCKET, "projects/proj-1/b.mp4"): (b"b", "video/mp4"),
@@ -261,7 +292,6 @@ async def test_delete_project_deletes_only_project_prefix_objects():
         project_id="proj-1",
         user=owner,
         storage=storage,
-        bucket_name=BUCKET,
     )
 
     assert set(storage.objects) == {
@@ -289,7 +319,7 @@ async def test_delete_project_forbidden_keeps_stored_objects():
             },
         ],
     )
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     storage.objects = {(BUCKET, "projects/proj-2/a.mp4"): (b"a", "video/mp4")}
     other_owner = User(
         user_id="owner-b",
@@ -304,7 +334,6 @@ async def test_delete_project_forbidden_keeps_stored_objects():
             project_id="proj-2",
             user=other_owner,
             storage=storage,
-            bucket_name=BUCKET,
         )
 
     assert (BUCKET, "projects/proj-2/a.mp4") in storage.objects

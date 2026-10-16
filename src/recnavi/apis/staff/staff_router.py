@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Public router for staff-facing endpoints."""
+"""Staff router for staff-facing endpoints."""
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -15,9 +15,12 @@ from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
+from recnavi.apis.schemas.project_schemas import GetProjectRequest
+from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
+from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.scene.update_scene_record_usecase import (
     update_scene_record_usecase,
@@ -26,22 +29,22 @@ from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
-pub_router = APIRouter(tags=["Public"])
+staff_router = APIRouter(tags=["Staff"])
 
 
-@pub_router.get("/getProjects")
+@staff_router.get("/getProjects")
 async def get_projects_endpoint(
     request: Request,
     user: User = Depends(verify_user),
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
 ) -> GetProjectsResponse:
-    """List projects assigned to the authenticated user."""
+    """List projects assigned to the authenticated staff user."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
-        group_id=user.group_id,
         user_id=user.user_id,
+        group_id=user.group_id,
         limit=limit,
         cursor=cursor,
     )
@@ -52,7 +55,23 @@ async def get_projects_endpoint(
     )
 
 
-@pub_router.post("/updateSceneRecord")
+@staff_router.post("/getProject")
+async def get_project_endpoint(
+    request: Request,
+    item: GetProjectRequest,
+    user: User = Depends(verify_user),
+) -> GetProjectResponse:
+    """Get a project with all scenes for the authenticated staff user."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+    project = await get_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        user=user,
+    )
+    return GetProjectResponse(project=project)
+
+
+@staff_router.post("/updateSceneRecord")
 async def update_scene_record_endpoint(
     request: Request,
     payload: UpdateSceneRecordRequest,

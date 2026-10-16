@@ -31,7 +31,6 @@ def test_delete_project_returns_400_when_no_token(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_delete_project_returns_good(
     client,
     auth_headers,
@@ -57,13 +56,13 @@ async def test_delete_project_returns_good(
         created_project = create_response.json()["project"]
         project_id = created_project["projectId"]
 
-        delete_response = client.post(
+        response = client.post(
             "/deleteProject",
             headers=auth_headers,
             json={"projectId": project_id},
         )
-        assert delete_response.status_code == 200
-        data = delete_response.json()
+        assert response.status_code == 200
+        data = response.json()
         assert data["status"] == "ok"
         assert data["projectId"] == project_id
 
