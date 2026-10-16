@@ -3,7 +3,7 @@ id: ARCH-011
 title: Test Implementation Rules
 domain: testing
 status: active
-date: 2026-09-20
+date: 2026-10-16
 rules: true
 files:
   - 'tests/**/*.py'
@@ -38,6 +38,31 @@ Integration tests must not use `@patch` or `monkeypatch.setattr()` to replace
 services, agents, stores, or I/O collaborators. FastAPI dependency overrides
 and environment configuration through `monkeypatch.setenv()` or
 `monkeypatch.setitem()` are allowed.
+
+Every `test_*` function or test method under `tests/integration/` must make
+an HTTP request in its own body and assign the result to `response`:
+
+```python
+def test_update_scene_record(client, auth_headers):
+    response = client.post(
+        "/updateSceneRecord",
+        headers=auth_headers,
+        json=payload,
+    )
+    assert response.status_code == 200
+```
+
+Use `response = client.get(...)`, `response = client.post(...)`, or the
+corresponding `put`, `patch`, `delete`, `options`, `head`, or `trace` method.
+Awaited calls and annotated response assignments are also supported.
+Model construction, `model_dump()`, direct application/core calls, and
+`app.openapi()` alone belong in unit tests and do not satisfy this requirement.
+
+The `integration-test-must-call-http-client` rule checks each test's Python
+AST independently, including methods in `Test*` classes. Fixtures, helpers,
+comments, string literals, and nested function/class/lambda bodies do not
+count as HTTP calls in the test. This is a structural check; reviewers must
+still verify that requests execute and assertions cover the intended behavior.
 
 ### 3. Fixture Scope
 
@@ -147,6 +172,7 @@ The following implementation rules are active:
 - `application-usecase-must-patch-core-collaborator`
 - `application-usecase-must-propagate-mock-output`
 - `every-api-endpoint-has-integration-test`
+- `integration-test-must-call-http-client`
 - `no-patch-in-integration-tests`
 - `no-monkeypatch-setattr-component-in-integration`
 - `async-fixture-must-use-pytest-asyncio-fixture`
@@ -164,6 +190,7 @@ violated.
 
 - Put reusable `Base*` mock implementations in `tests/mockups/`
 - Keep integration tests connected to real collaborators
+- Assign `response` from an HTTP `client` call in every integration test
 - Use `@pytest_asyncio.fixture` for asynchronous fixtures
 - Use `module` or `session` scope for expensive shared fixtures
 - Mock outbound HTTP in unit tests
@@ -177,6 +204,7 @@ violated.
 **Don't:**
 
 - Patch services, agents, stores, or I/O in integration tests
+- Put model-only or direct-function tests in `tests/integration/`
 - Define reusable `Base*` mock classes inside test files
 - Recreate database tables, HTTP clients, or indexes per test unnecessarily
 - Make unit tests call real external URLs

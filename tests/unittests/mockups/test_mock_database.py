@@ -17,6 +17,71 @@ from tests.mockups.mock_database import MockDatabase
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "placeholder",
+    [":expected_version", ":previous_version", ":expected"],
+)
+async def test_conditional_put_rejects_stale_versions_for_each_placeholder(
+    placeholder,
+):
+    """Reject stale versions regardless of the value placeholder name."""
+    original = {"projectId": "p1", "version": 3}
+    database = MockDatabase([original.copy()])
+    with pytest.raises(ClientConflictError):
+        await database.put_item(
+            {"projectId": "p1", "version": 2},
+            condition_expression=f"attribute_not_exists(version) OR version = {placeholder}",
+            expression_attribute_values={placeholder: 1},
+        )
+    assert database.items == [original]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("version", [None, 0, 4])
+async def test_recording_condition_accepts_missing_or_matching_version(
+    version,
+):
+    """Support legacy records and matching optimistic lock versions."""
+    item = {"projectId": "p1"}
+    if version is not None:
+        item["version"] = version
+    database = MockDatabase([item])
+    updated = {"projectId": "p1", "version": (version or 0) + 1}
+    await database.put_item(
+        updated,
+        condition_expression="attribute_not_exists(version) OR version = :previous_version",
+        expression_attribute_values={":previous_version": version or 0},
+    )
+    assert database.items == [updated]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("index", [0, 1, 10])
+async def test_scene_update_does_not_create_top_level_fields(index):
+    """Update only the requested scene without leaking partial field names."""
+    scenes = [{"sceneId": f"s{i}"} for i in range(11)]
+    database = MockDatabase([{"projectId": "p1", "scenes": scenes}])
+    result = await database.update_item(
+        key={"projectId": "p1"},
+        update_expression=f"SET scenes[{index}].videoKey = :key, scenes[{index}].#status = :status, updatedAt = :now",
+        expression_attribute_names={"#status": "status"},
+        expression_attribute_values={
+            ":key": "new.mp4",
+            ":status": "pending",
+            ":now": "now",
+        },
+    )
+    expected_scenes = [{"sceneId": f"s{i}"} for i in range(11)]
+    expected_scenes[index].update(videoKey="new.mp4", status="pending")
+    assert result == {
+        "projectId": "p1",
+        "scenes": expected_scenes,
+        "updatedAt": "now",
+    }
+    assert database.items == [result]
+
+
+@pytest.mark.asyncio
 async def test_put_item_replaces_by_key_names():
     """Test put_item replaces the item with the same configured key."""
     database = MockDatabase(key_names=("groupId", "sceneId"))

@@ -9,10 +9,27 @@
 
 """Integration tests for POST /updateSceneRecord endpoint."""
 
-from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
+import base64
+import time
+from collections.abc import AsyncIterator
+from typing import cast
+from urllib.parse import parse_qs
+from urllib.parse import unquote
+from urllib.parse import urlsplit
+from uuid import uuid4
+
+import pytest
+import pytest_asyncio
+from fastapi.testclient import TestClient
+
+from recnavi.config.variables import ENV
+from recnavi.config.variables import MEDIA_BUCKET_NAME
+from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
-from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.scene import SceneView
+from recnavi.core.types.scene import Scene
 from recnavi.main import app
 
 
@@ -32,42 +49,178 @@ def test_update_scene_record_returns_400_when_no_token(client):
     assert data["status"] == "error"
 
 
-def test_openapi_schema_builds():
-    """Test the OpenAPI schema generates (response models fully defined)."""
-    assert app.openapi()["paths"]["/updateSceneRecord"]
-
-
-def test_update_scene_record_response_accepts_a_project():
-    """Test the response model can hold a Project and serialises it."""
+@pytest_asyncio.fixture
+async def recording_project(
+    request: pytest.FixtureRequest,
+) -> AsyncIterator[Project]:
+    """Seed a project and remove its objects and database item after the test."""
+    database = cast(BaseDatabase, app.state.database[PROJECTS_TABLE_NAME])
+    storage = cast(BaseObjectStorage, app.state.object_storage)
     project = Project(
-        project_id="proj-123",
-        group_id="group-456",
+        project_id=f"it_recording_{uuid4().hex}",
+        group_id="it-group",
         project_name="Test Project",
-        status=ProjectStatus.IN_PROGRESS,
-        owner_user_id="owner-1",
+        owner_user_id="test-user-123",
         created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
+        assigned_user_ids=["test-user-123"],
+        version=request.param or 0,
         scenes=[
-            SceneView(
+            Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
-                video_key="private/video.mp4",
-                thumbnail_key="private/thumbnail.jpg",
-                video_url="https://example.test/video",
-                thumbnail_url="https://example.test/thumbnail",
+                assigned_user_ids=["test-user-123"],
             ),
+            Scene(scene_id="untouched", scene_principal="opening"),
         ],
     )
+    item = project.model_dump(by_alias=True)
+    if request.param is None:
+        item.pop("version")
+    await database.put_item(item)
+    try:
+        yield project
+    finally:
+        try:
+            await storage.delete_objects_by_prefix(
+                prefix=f"projects/{project.project_id}/",
+            )
+        finally:
+            await database.delete_item({"projectId": project.project_id})
 
-    data = UpdateSceneRecordResponse(project=project).model_dump(
-        by_alias=True,
-        mode="json",
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recording_project", [None, 0, 4], indirect=True)
+async def test_update_scene_record_persists_recording_through_http(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    recording_project: Project,
+) -> None:
+    """Exercise HTTP, use case, domain logic, persistence, and URL serialization."""
+    request_started_at = int(time.time())
+    response = client.post(
+        "/updateSceneRecord",
+        headers=auth_headers,
+        json={
+            "projectId": recording_project.project_id,
+            "sceneId": "scene-456",
+            "video": base64.b64encode(b"video-bytes").decode(),
+            "thumbnail": base64.b64encode(b"thumbnail-bytes").decode(),
+        },
     )
-
+    request_finished_at = int(time.time())
+    assert response.status_code == 200
+    data = response.json()
     assert data["status"] == "ok"
-    assert data["project"]["projectId"] == "proj-123"
-    scene = data["project"]["scenes"][0]
-    assert scene["videoUrl"] == "https://example.test/video"
-    assert scene["thumbnailUrl"] == "https://example.test/thumbnail"
-    assert "videoKey" not in scene
-    assert "thumbnailKey" not in scene
+    project = data["project"]
+    database = cast(BaseDatabase, app.state.database[PROJECTS_TABLE_NAME])
+    storage = cast(BaseObjectStorage, app.state.object_storage)
+    stored = await database.get_item(
+        {"projectId": recording_project.project_id},
+    )
+    assert stored is not None
+    assert (
+        stored["version"]
+        == project["version"]
+        == recording_project.version + 1
+    )
+    assert stored["updatedAt"] == project["updatedAt"]
+    assert stored["updatedAt"] != recording_project.updated_at
+    assert stored["scenes"][1] == recording_project.scenes[1].model_dump(
+        by_alias=True,
+    )
+    scene = stored["scenes"][0]
+    public_scene = project["scenes"][0]
+    assert scene["status"] == public_scene["status"] == "pending"
+    assert scene["createdBy"] == public_scene["createdBy"] == "test-user-123"
+    assert scene["createdAt"] == public_scene["createdAt"]
+    assert scene["createdAt"] is not None
+    for key_field, url_field, content in (
+        ("videoKey", "videoUrl", b"video-bytes"),
+        ("thumbnailKey", "thumbnailUrl", b"thumbnail-bytes"),
+    ):
+        assert scene[key_field].startswith(
+            f"projects/{recording_project.project_id}/scenes/scene-456/",
+        )
+        assert (
+            await storage.download_object(object_key=scene[key_field])
+            == content
+        )
+        url = urlsplit(public_scene[url_field])
+        path = unquote(url.path)
+        assert path.endswith(f"/{scene[key_field]}")
+        query = parse_qs(url.query)
+        if ENV == "CI":
+            assert url.scheme == "mock"
+            assert url.hostname == MEDIA_BUCKET_NAME
+            assert query["expires"] == [str(SCENE_URL_EXPIRATION_SECONDS)]
+        else:
+            assert url.scheme in ("https", "http")
+            assert url.hostname is not None
+            assert url.hostname.startswith(
+                f"{MEDIA_BUCKET_NAME}.",
+            ) or path.startswith(f"/{MEDIA_BUCKET_NAME}/")
+            if "X-Amz-Expires" in query:
+                assert query["X-Amz-Expires"] == [
+                    str(SCENE_URL_EXPIRATION_SECONDS),
+                ]
+                assert query["X-Amz-Signature"][0]
+            else:
+                assert (
+                    request_started_at + SCENE_URL_EXPIRATION_SECONDS
+                    <= int(query["Expires"][0])
+                    <= request_finished_at + SCENE_URL_EXPIRATION_SECONDS
+                )
+                assert query["Signature"][0]
+        assert key_field not in public_scene
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("recording_project", [0], indirect=True)
+async def test_rerecording_replaces_persisted_shot_through_http(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    recording_project: Project,
+) -> None:
+    """Record twice through HTTP and remove only the previous shot."""
+    payload = {
+        "projectId": recording_project.project_id,
+        "sceneId": "scene-456",
+        "video": "b2xk",
+        "thumbnail": "b2xk",
+    }
+    response = client.post(
+        "/updateSceneRecord",
+        headers=auth_headers,
+        json=payload,
+    )
+    assert response.status_code == 200
+    database = cast(BaseDatabase, app.state.database[PROJECTS_TABLE_NAME])
+    storage = cast(BaseObjectStorage, app.state.object_storage)
+    first = await database.get_item(
+        {"projectId": recording_project.project_id},
+    )
+    assert first is not None
+    old_scene = first["scenes"][0]
+    payload.update(video="bmV3", thumbnail="bmV3")
+    response = client.post(
+        "/updateSceneRecord",
+        headers=auth_headers,
+        json=payload,
+    )
+    assert response.status_code == 200
+    saved = await database.get_item(
+        {"projectId": recording_project.project_id},
+    )
+    assert saved is not None
+    assert saved["version"] == response.json()["project"]["version"] == 2
+    for key_field in ("videoKey", "thumbnailKey"):
+        assert saved["scenes"][0][key_field] != old_scene[key_field]
+        assert (
+            await storage.download_object(
+                object_key=saved["scenes"][0][key_field],
+            )
+            == b"new"
+        )
+    old_prefix = old_scene["videoKey"].removesuffix(".mp4")
+    assert await storage.delete_objects_by_prefix(prefix=old_prefix) == 0
+    assert saved["scenes"][1] == first["scenes"][1]

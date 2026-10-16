@@ -17,6 +17,32 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
+async def test_delete_exact_key_preserves_other_keys_and_buckets():
+    """Delete only the exact object and allow repeated deletion."""
+    storage = MockObjectStorage(bucket_name="b")
+    storage.objects = {
+        ("b", "video.mp4"): (b"video", "video/mp4"),
+        ("b", "video.mp4.backup"): (b"backup", "video/mp4"),
+        ("other", "video.mp4"): (b"other", "video/mp4"),
+    }
+    await storage.delete_object_by_key(object_key="video.mp4")
+    await storage.delete_object_by_key(object_key="video.mp4")
+    assert storage.objects == {
+        ("b", "video.mp4.backup"): (b"backup", "video/mp4"),
+        ("other", "video.mp4"): (b"other", "video/mp4"),
+    }
+
+
+@pytest.mark.asyncio
+async def test_delete_prefix_without_matches_returns_zero():
+    """Preserve unrelated data when the requested prefix is absent."""
+    storage = MockObjectStorage(bucket_name="b")
+    storage.objects[("b", "keep")] = (b"keep", "video/mp4")
+    assert await storage.delete_objects_by_prefix(prefix="missing/") == 0
+    assert storage.objects == {("b", "keep"): (b"keep", "video/mp4")}
+
+
+@pytest.mark.asyncio
 async def test_upload_then_download_round_trip():
     """Test uploaded base64 content is stored decoded."""
     storage = MockObjectStorage(bucket_name="b")

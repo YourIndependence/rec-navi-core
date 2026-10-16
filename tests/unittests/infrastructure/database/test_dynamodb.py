@@ -160,6 +160,65 @@ async def test_conditional_put_updates_only_matching_version(database):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("version", [None, 0, 4])
+async def test_recording_condition_updates_legacy_and_matching_versions(
+    database,
+    version,
+):
+    """Execute the exact recording condition against Moto, including legacy data."""
+    original = {"projectId": "p1"}
+    if version is not None:
+        original["version"] = version
+    await database.put_item(original)
+    updated = {"projectId": "p1", "version": (version or 0) + 1}
+    condition = "attribute_not_exists(version) OR version = :previous_version"
+    await database.put_item(
+        updated,
+        condition_expression=condition,
+        expression_attribute_values={":previous_version": version or 0},
+    )
+    assert await database.get_item({"projectId": "p1"}) == updated
+    with pytest.raises(ClientConflictError):
+        await database.put_item(
+            original,
+            condition_expression=condition,
+            expression_attribute_values={":previous_version": version or 0},
+        )
+    assert await database.get_item({"projectId": "p1"}) == updated
+
+
+@pytest.mark.asyncio
+async def test_scene_update_preserves_other_scenes_and_top_level_fields(
+    database,
+):
+    """Update a nested scene using placeholders and return the complete saved item."""
+    await database.put_item(
+        {"projectId": "p1", "scenes": [{"sceneId": "s1"}, {"sceneId": "s2"}]},
+    )
+    result = await database.update_item(
+        key={"projectId": "p1"},
+        update_expression="SET scenes[1].#status = :status, scenes[1].videoKey = :key, updatedAt = :now",
+        condition_expression="scenes[1].sceneId = :sceneId",
+        expression_attribute_names={"#status": "status"},
+        expression_attribute_values={
+            ":status": "pending",
+            ":key": "video.mp4",
+            ":now": "now",
+            ":sceneId": "s2",
+        },
+    )
+    assert result == {
+        "projectId": "p1",
+        "scenes": [
+            {"sceneId": "s1"},
+            {"sceneId": "s2", "status": "pending", "videoKey": "video.mp4"},
+        ],
+        "updatedAt": "now",
+    }
+    assert await database.get_item({"projectId": "p1"}) == result
+
+
+@pytest.mark.asyncio
 async def test_update_returns_persisted_item_with_native_numbers(database):
     await database.put_item({"projectId": "p1", "version": 1, "label": "keep"})
     result = await database.update_item(

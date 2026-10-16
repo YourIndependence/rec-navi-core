@@ -9,12 +9,72 @@
 
 """Tests for scene URL attachment."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.types.project import Project
 from tests.mockups.mock_object_storage import MockObjectStorage
+
+
+@pytest.mark.asyncio
+async def test_empty_project_needs_no_presigned_urls():
+    """Preserve an empty project without calling object storage."""
+    project = build_project(scenes=[])
+    storage = MockObjectStorage(bucket_name="bucket")
+    storage.generate_presigned_url = AsyncMock()
+    view = await attach_scene_urls(storage=storage, project=project)
+    assert view.model_dump() == project.model_dump()
+    storage.generate_presigned_url.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_mixed_scenes_preserve_order_metadata_and_original_keys():
+    """Handle absent, partial, and complete recording keys independently."""
+    scenes = [
+        {"sceneId": "empty", "scenePrincipal": "opening"},
+        {
+            "sceneId": "video",
+            "scenePrincipal": "cooking",
+            "videoKey": "video.mp4",
+        },
+        {
+            "sceneId": "thumbnail",
+            "scenePrincipal": "closing",
+            "thumbnailKey": "thumbnail.jpg",
+        },
+        {
+            "sceneId": "both",
+            "scenePrincipal": "closing",
+            "videoKey": "both.mp4",
+            "thumbnailKey": "both.jpg",
+        },
+    ]
+    project = build_project(scenes=scenes)
+    original = project.model_dump()
+    storage = MockObjectStorage(bucket_name="bucket")
+    presign = AsyncMock(wraps=storage.generate_presigned_url)
+    storage.generate_presigned_url = presign
+    view = await attach_scene_urls(storage=storage, project=project)
+    assert project.model_dump() == original
+    assert [scene.scene_id for scene in view.scenes] == [
+        scene.scene_id for scene in project.scenes
+    ]
+    for source, public in zip(project.scenes, view.scenes, strict=True):
+        expected = source.model_dump(exclude={"video_key", "thumbnail_key"})
+        for key, field in (
+            (source.video_key, "video_url"),
+            (source.thumbnail_key, "thumbnail_url"),
+        ):
+            expected[field] = (
+                None
+                if key is None
+                else f"mock://bucket/{key}?expires={SCENE_URL_EXPIRATION_SECONDS}"
+            )
+        assert public.model_dump() == expected
+    assert presign.await_count == 4
 
 
 def build_project(*, scenes: list[dict[str, object]]) -> Project:

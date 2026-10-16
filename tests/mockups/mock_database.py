@@ -119,14 +119,18 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any],
     ) -> bool:
         """Check if a put condition expression is satisfied."""
-        if "version = :expected_version" in condition_expression:
+        version_match = re.search(
+            r"\bversion\s*=\s*(:\w+)",
+            condition_expression,
+        )
+        if version_match:
             if (
                 "attribute_not_exists(version)" in condition_expression
                 and "version" not in item
             ):
                 return True
             expected_version = expression_attribute_values.get(
-                ":expected_version",
+                version_match.group(1),
             )
             return item.get("version") == expected_version
         return True
@@ -285,7 +289,7 @@ class MockDatabase(BaseDatabase):
                     expression_attribute_values[value_key]
                 )
 
-        top_level_pattern = r"(?<!scenes\[\d\]\.)(\#?\w+) = :(\w+)"
+        top_level_pattern = r"(?:^SET\s+|,\s*)(\#?\w+)\s*=\s*:(\w+)"
         for match in re.finditer(top_level_pattern, update_expression):
             field_name = self._resolve_name(
                 match.group(1),

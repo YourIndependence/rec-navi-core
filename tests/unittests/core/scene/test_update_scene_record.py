@@ -10,12 +10,16 @@
 """Unit tests for update_scene_record core logic."""
 
 import base64
+from copy import deepcopy
+from datetime import UTC
+from datetime import datetime
 from unittest.mock import AsyncMock
 
 import pytest
 
 from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.scene.update_scene_record import update_scene_record
+from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
@@ -71,6 +75,91 @@ async def _update(database, storage, *, scene_id="scene-1", user=None):
         thumbnail_base64=THUMB_B64,
         user=user or _staff(),
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("version", [None, 0, 7])
+async def test_recording_persists_keys_metadata_and_preserves_other_scenes(
+    version,
+):
+    """Persist the target scene and advance both legacy and versioned projects."""
+    item = _project_item()
+    if version is not None:
+        item["version"] = version
+    item["scenes"].insert(0, {"sceneId": "other", "scenePrincipal": "opening"})
+    original = Project.model_validate(item)
+    database = MockDatabase([item])
+    storage = MockObjectStorage(bucket_name=BUCKET)
+    before = datetime.now(UTC)
+    result = await _update(database, storage)
+    after = datetime.now(UTC)
+    saved = await database.get_item({"projectId": "proj-123"})
+    assert saved is not None
+    scene = saved["scenes"][1]
+    assert saved == {
+        **original.model_dump(by_alias=True),
+        "version": (version or 0) + 1,
+        "updatedAt": result.updated_at,
+        "scenes": [
+            original.scenes[0].model_dump(by_alias=True),
+            {
+                **original.scenes[1].model_dump(by_alias=True),
+                "status": "pending",
+                "videoKey": scene["videoKey"],
+                "thumbnailKey": scene["thumbnailKey"],
+                "createdBy": "staff-789",
+                "createdAt": result.scenes[1].created_at,
+            },
+        ],
+    }
+    assert before <= datetime.fromisoformat(scene["createdAt"]) <= after
+    assert before <= datetime.fromisoformat(saved["updatedAt"]) <= after
+    assert (
+        await storage.download_object(object_key=scene["videoKey"])
+        == b"video-bytes"
+    )
+    assert (
+        await storage.download_object(object_key=scene["thumbnailKey"])
+        == b"thumb-bytes"
+    )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_recording_rejects_stale_version_and_cleans_uploads(
+    monkeypatch,
+):
+    """Exercise the real mock condition evaluator instead of forcing a put error."""
+    old_key = "projects/proj-123/scenes/scene-1/old.mp4"
+    item = _project_item(video_key=old_key)
+    item["version"] = 7
+    database = MockDatabase([item])
+    storage = MockObjectStorage(bucket_name=BUCKET)
+    storage.objects[(BUCKET, old_key)] = (b"old", "video/mp4")
+    original_item = deepcopy(item)
+    original_upload = storage.upload_base64
+
+    async def upload_after_concurrent_change(
+        *,
+        object_key: str,
+        base64_data: str,
+        content_type: str,
+    ) -> None:
+        database.items[0]["version"] = 8
+        await original_upload(
+            object_key=object_key,
+            base64_data=base64_data,
+            content_type=content_type,
+        )
+
+    monkeypatch.setattr(
+        storage,
+        "upload_base64",
+        upload_after_concurrent_change,
+    )
+    with pytest.raises(ClientConflictError):
+        await _update(database, storage)
+    assert database.items == [{**original_item, "version": 8}]
+    assert storage.objects == {(BUCKET, old_key): (b"old", "video/mp4")}
 
 
 @pytest.mark.asyncio

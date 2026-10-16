@@ -1,5 +1,62 @@
 /// <reference path="rules.d.ts" />
 
+function isPythonNode(value: unknown): value is PythonAstNode {
+  return typeof value === "object" && value !== null && "_type" in value;
+}
+
+function pythonNodes(value: unknown): PythonAstNode[] {
+  return Array.isArray(value) ? value.filter(isPythonNode) : [];
+}
+
+function isFixture(node: PythonAstNode): boolean {
+  return pythonNodes(node.decorator_list).some((decorator) => {
+    const target = decorator._type === "Call" ? decorator.func : decorator;
+    return isPythonNode(target) && (
+      (target._type === "Attribute" && target.attr === "fixture") ||
+      (target._type === "Name" && target.id === "fixture")
+    );
+  });
+}
+
+function integrationTests(statements: PythonAstNode[]): PythonAstNode[] {
+  return statements.flatMap((node) => {
+    if (["FunctionDef", "AsyncFunctionDef"].includes(node._type)) {
+      return typeof node.name === "string" && node.name.startsWith("test_") && !isFixture(node)
+        ? [node]
+        : [];
+    }
+    if (node._type === "ClassDef" && typeof node.name === "string" && node.name.startsWith("Test")) {
+      return integrationTests(pythonNodes(node.body));
+    }
+    return [];
+  });
+}
+
+function hasHttpResponseAssignment(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasHttpResponseAssignment);
+  if (!isPythonNode(value)) return false;
+  if (["FunctionDef", "AsyncFunctionDef", "ClassDef", "Lambda"].includes(value._type)) return false;
+
+  const targets = value._type === "Assign"
+    ? pythonNodes(value.targets)
+    : value._type === "AnnAssign" && isPythonNode(value.target) ? [value.target] : [];
+  if (targets.some((target) => target._type === "Name" && target.id === "response")) {
+    const call = isPythonNode(value.value) && value.value._type === "Await"
+      ? value.value.value
+      : value.value;
+    if (isPythonNode(call) && call._type === "Call" && isPythonNode(call.func)) {
+      const func = call.func;
+      if (func._type === "Attribute" && isPythonNode(func.value) &&
+        func.value._type === "Name" && func.value.id === "client" &&
+        typeof func.attr === "string" &&
+        ["get", "post", "put", "patch", "delete", "options", "head", "trace"].includes(func.attr)) {
+        return true;
+      }
+    }
+  }
+  return Object.values(value).some(hasHttpResponseAssignment);
+}
+
 export default {
   rules: {
     /**
@@ -251,6 +308,26 @@ export default {
               file,
               line,
               fix: `Add a ${match[1].toUpperCase()} request test for ${normalizePath(match[2])} under tests/integration/.`,
+            });
+          }
+        }
+      },
+    },
+
+    "integration-test-must-call-http-client": {
+      description:
+        "Every integration test must assign an HTTP client response using response = client.get/post/etc. rather than only exercising models or functions directly.",
+      severity: "error",
+      check: async (ctx) => {
+        for (const file of await ctx.glob("tests/integration/**/*.py")) {
+          const tree = await ctx.ast(file, "python");
+          for (const test of integrationTests(tree.body)) {
+            if (hasHttpResponseAssignment(test.body)) continue;
+            ctx.report.violation({
+              message: `Integration test '${test.name}' must assign a response from an HTTP client call in its own body.`,
+              file,
+              line: test.lineno,
+              fix: "Exercise the endpoint with response = client.get(...) or response = client.post(...) and assert the HTTP response. Move model-only or direct-function checks to tests/unittests/.",
             });
           }
         }
