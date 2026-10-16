@@ -22,7 +22,6 @@ from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.scene.update_scene_record_usecase import (
     update_scene_record_usecase,
 )
-from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.user import User
 
@@ -70,7 +69,6 @@ async def update_scene_record_endpoint(
         video_base64=payload.video,
         thumbnail_base64=payload.thumbnail,
         user=user,
-        media_bucket_name=MEDIA_BUCKET_NAME,
     )
 
     return UpdateSceneRecordResponse(project=updated_project)

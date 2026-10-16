@@ -38,8 +38,7 @@ async def test_attach_scene_urls_returns_null_urls_for_unrecorded_scene():
     )
 
     view = await attach_scene_urls(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         project=project,
     )
 
@@ -64,8 +63,7 @@ async def test_attach_scene_urls_returns_urls_for_recorded_scene():
     expires = SCENE_URL_EXPIRATION_SECONDS
 
     view = await attach_scene_urls(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         project=project,
     )
 
@@ -92,8 +90,7 @@ async def test_attach_scene_urls_never_serializes_storage_keys():
     )
 
     view = await attach_scene_urls(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         project=project,
     )
 

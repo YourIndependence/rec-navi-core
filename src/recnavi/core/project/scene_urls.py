@@ -20,14 +20,12 @@ SCENE_URL_EXPIRATION_SECONDS = 3600
 async def attach_scene_urls(
     *,
     storage: BaseObjectStorage,
-    bucket_name: str,
     project: Project,
 ) -> Project:
     """Replace scene storage keys with presigned playback URLs."""
     scenes = [
         await _to_scene_view(
             storage=storage,
-            bucket_name=bucket_name,
             scene=scene,
         )
         for scene in project.scenes
@@ -40,17 +38,14 @@ async def attach_scene_urls(
 async def _to_scene_view(
     *,
     storage: BaseObjectStorage,
-    bucket_name: str,
     scene: Scene,
 ) -> SceneView:
     video_url = await _presign_or_none(
         storage=storage,
-        bucket_name=bucket_name,
         object_key=scene.video_key,
     )
     thumbnail_url = await _presign_or_none(
         storage=storage,
-        bucket_name=bucket_name,
         object_key=scene.thumbnail_key,
     )
     return SceneView.model_validate(
@@ -65,13 +60,11 @@ async def _to_scene_view(
 async def _presign_or_none(
     *,
     storage: BaseObjectStorage,
-    bucket_name: str,
     object_key: str | None,
 ) -> str | None:
     if object_key is None:
         return None
     return await storage.generate_presigned_url(
-        bucket_name=bucket_name,
         object_key=object_key,
         expiration=SCENE_URL_EXPIRATION_SECONDS,
     )

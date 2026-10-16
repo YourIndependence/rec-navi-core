@@ -23,6 +23,7 @@ from recnavi.apis.pub.pub_router import pub_router
 from recnavi.apis.root.root_router import root_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -53,7 +54,7 @@ async def lifespan(_app: FastAPI):
         }
         logger.info("database instances initialized.")
 
-        _app.state.object_storage = S3Client()
+        _app.state.object_storage = S3Client(bucket_name=MEDIA_BUCKET_NAME)
         logger.info("object storage initialized.")
 
         if ENV not in ["LOCAL", "CI"]:

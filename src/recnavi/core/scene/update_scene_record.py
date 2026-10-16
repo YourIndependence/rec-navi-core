@@ -38,7 +38,6 @@ async def update_scene_record(
     video_base64: str,
     thumbnail_base64: str,
     user: User,
-    bucket_name: str,
 ) -> Project:
     """Store a scene recording, then replace the previous shot.
 
@@ -87,13 +86,11 @@ async def update_scene_record(
 
     try:
         await storage.upload_base64(
-            bucket_name=bucket_name,
             object_key=video_key,
             base64_data=video_base64,
             content_type="video/mp4",
         )
         await storage.upload_base64(
-            bucket_name=bucket_name,
             object_key=thumbnail_key,
             base64_data=thumbnail_base64,
             content_type="image/jpeg",
@@ -101,7 +98,6 @@ async def update_scene_record(
     except Exception:
         await _cleanup_new_shot(
             storage=storage,
-            bucket_name=bucket_name,
             prefix=new_shot_prefix,
         )
         raise
@@ -120,24 +116,20 @@ async def update_scene_record(
     except ClientConflictError:
         await _cleanup_new_shot(
             storage=storage,
-            bucket_name=bucket_name,
             prefix=new_shot_prefix,
         )
         raise
 
     if old_video_key:
         await storage.delete_object_by_key(
-            bucket_name=bucket_name,
             object_key=old_video_key,
         )
         await storage.delete_object_by_key(
-            bucket_name=bucket_name,
             object_key=old_video_key.removesuffix(".mp4") + "_thumb.jpg",
         )
 
     return await attach_scene_urls(
         storage=storage,
-        bucket_name=bucket_name,
         project=project,
     )
 
@@ -145,13 +137,11 @@ async def update_scene_record(
 async def _cleanup_new_shot(
     *,
     storage: BaseObjectStorage,
-    bucket_name: str,
     prefix: str,
 ) -> None:
     """Delete partially uploaded or uncommitted recording objects."""
     try:
         await storage.delete_objects_by_prefix(
-            bucket_name=bucket_name,
             prefix=prefix,
         )
     except Exception as e:

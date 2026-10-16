@@ -70,7 +70,6 @@ async def _update(database, storage, *, scene_id="scene-1", user=None):
         video_base64=VIDEO_B64,
         thumbnail_base64=THUMB_B64,
         user=user or _staff(),
-        bucket_name=BUCKET,
     )
 
 
@@ -78,7 +77,7 @@ async def _update(database, storage, *, scene_id="scene-1", user=None):
 async def test_update_scene_record_uploads_and_marks_scene_pending():
     """Test video and thumbnail are stored and the scene becomes pending."""
     database = MockDatabase(initial_items=[_project_item()])
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
 
     project = await _update(database, storage)
 
@@ -112,7 +111,7 @@ async def test_update_scene_record_deletes_the_previous_shot():
     """Test re-recording replaces the old shot with a new one."""
     old_key = "projects/proj-123/scenes/scene-1/old-shot.mp4"
     database = MockDatabase(initial_items=[_project_item(video_key=old_key)])
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     storage.objects[(BUCKET, old_key)] = (b"old", "video/mp4")
     old_thumb = "projects/proj-123/scenes/scene-1/old-shot_thumb.jpg"
     storage.objects[(BUCKET, old_thumb)] = (b"old", "image/jpeg")
@@ -138,7 +137,7 @@ async def test_old_shot_is_deleted_only_after_project_is_saved(monkeypatch):
     """Test the prior recording remains until the updated project is saved."""
     old_key = "projects/proj-123/scenes/scene-1/old-shot.mp4"
     database = MockDatabase(initial_items=[_project_item(video_key=old_key)])
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     events = []
     original_put = database.put_item
     original_delete = storage.delete_object_by_key
@@ -147,10 +146,9 @@ async def test_old_shot_is_deleted_only_after_project_is_saved(monkeypatch):
         events.append("put")
         return await original_put(*args, **kwargs)
 
-    async def delete_object_by_key(*, bucket_name, object_key):
+    async def delete_object_by_key(*, object_key):
         events.append(("delete", object_key))
         return await original_delete(
-            bucket_name=bucket_name,
             object_key=object_key,
         )
 
@@ -178,7 +176,7 @@ async def test_partial_upload_failure_cleans_new_objects_and_skips_database_writ
     """Test a thumbnail upload failure removes the already uploaded video."""
     database = MockDatabase(initial_items=[_project_item()])
     original_item = database.items[0].copy()
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     original_upload = storage.upload_base64
     upload_calls = 0
 
@@ -209,7 +207,7 @@ async def test_database_conflict_cleans_new_objects_and_keeps_old_shot(
     old_key = "projects/proj-123/scenes/scene-1/old-shot.mp4"
     database = MockDatabase(initial_items=[_project_item(video_key=old_key)])
     original_item = database.items[0].copy()
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     old_thumb = "projects/proj-123/scenes/scene-1/old-shot_thumb.jpg"
     storage.objects[(BUCKET, old_key)] = (b"old video", "video/mp4")
     storage.objects[(BUCKET, old_thumb)] = (b"old thumb", "image/jpeg")
@@ -230,7 +228,7 @@ async def test_database_conflict_cleans_new_objects_and_keeps_old_shot(
 async def test_update_scene_record_deletes_nothing_on_first_recording():
     """Test no deletion happens when the scene had no recording."""
     database = MockDatabase(initial_items=[_project_item()])
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     storage.objects[(BUCKET, "projects/proj-123/other.mp4")] = (
         b"x",
         "video/mp4",
@@ -244,7 +242,7 @@ async def test_update_scene_record_deletes_nothing_on_first_recording():
 @pytest.mark.asyncio
 async def test_update_scene_record_raises_404_when_project_not_found():
     """Test an unknown project raises ClientNotFoundError."""
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
 
     with pytest.raises(ClientNotFoundError, match="Project not found"):
         await _update(MockDatabase(), storage)
@@ -255,7 +253,7 @@ async def test_update_scene_record_raises_404_when_project_not_found():
 @pytest.mark.asyncio
 async def test_update_scene_record_raises_404_when_scene_not_found():
     """Test an unknown scene raises ClientNotFoundError."""
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     database = MockDatabase(initial_items=[_project_item()])
 
     with pytest.raises(ClientNotFoundError, match="Scene not found"):
@@ -267,7 +265,7 @@ async def test_update_scene_record_raises_404_when_scene_not_found():
 @pytest.mark.asyncio
 async def test_update_scene_record_raises_403_when_not_assigned():
     """Test a staff member not assigned to the scene is forbidden."""
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     item = _project_item()
     item["assignedUserIds"].append("staff-other")
     database = MockDatabase(initial_items=[item])
@@ -282,7 +280,7 @@ async def test_update_scene_record_raises_403_when_not_assigned():
 @pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
 async def test_update_scene_record_allows_higher_role_to_act_as_staff(role):
     """Test higher-role users can record when assigned to the project."""
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name=BUCKET)
     database = MockDatabase(initial_items=[_project_item()])
     user = User(
         user_id="staff-789",
