@@ -14,9 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.project.update_project_usecase import (
-    update_project_usecase,
-)
+from recnavi.application.project.update_project import update_project_usecase
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
@@ -61,7 +59,7 @@ async def test_update_project_usecase_delegates_to_update_project():
     ]
 
     with patch(
-        "recnavi.application.project.update_project_usecase.update_project",
+        "recnavi.application.project.update_project.update_project",
         new=AsyncMock(return_value=expected_output),
     ) as mock_update:
         result = await update_project_usecase(

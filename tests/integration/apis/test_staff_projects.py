@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for POST /getProject endpoint."""
+"""Integration tests for staff project endpoints."""
 
 from collections.abc import AsyncIterator
 from contextlib import suppress

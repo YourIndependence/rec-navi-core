@@ -101,3 +101,15 @@ class UpdateProjectResponse(BaseApiResponseModel):
     """Response for POST /updateProject."""
 
     project: Project = Field(..., description="Updated project")
+
+
+class DeleteProjectRequest(BaseItemModel):
+    """Request payload for POST /deleteProject."""
+
+    project_id: str = Field(..., description="Project ID to delete")
+
+
+class DeleteProjectResponse(BaseApiResponseModel):
+    """Response for POST /deleteProject."""
+
+    project_id: str = Field(..., description="Deleted project ID")

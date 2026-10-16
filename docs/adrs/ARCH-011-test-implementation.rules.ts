@@ -1,5 +1,28 @@
 /// <reference path="rules.d.ts" />
 
+const SRC_ROOT = "src/recnavi/";
+const UNIT_ROOT = "tests/unittests/";
+const DECLARATIVE_DIRS = ["apis/schemas/", "core/types/"];
+const EXEMPT_MODULES = new Set([
+  "config/variables.py",
+  "exceptions/exceptions.py",
+]);
+
+const normalizePath = (path: string): string => path.replace(/\\/g, "/");
+const isDeclarative = (path: string): boolean =>
+  DECLARATIVE_DIRS.some((dir) => path.startsWith(dir));
+const isExemptModule = (path: string): boolean =>
+  EXEMPT_MODULES.has(path) || /(?:^|\/)base_[^/]+\.py$/.test(path);
+const isExemptTest = (path: string): boolean =>
+  isExemptModule(path.replace(/(^|\/)test_([^/]+)\.py$/, "$1$2.py"));
+const mirroredTestPath = (sourcePath: string): string => {
+  const normalized = normalizePath(sourcePath).slice(SRC_ROOT.length);
+  const slash = normalized.lastIndexOf("/");
+  const directory = slash < 0 ? "" : `${normalized.slice(0, slash + 1)}`;
+  const moduleName = normalized.slice(slash + 1, -3);
+  return `${UNIT_ROOT}${directory}test_${moduleName}.py`;
+};
+
 function isPythonNode(value: unknown): value is PythonAstNode {
   return typeof value === "object" && value !== null && "_type" in value;
 }
@@ -59,6 +82,87 @@ function hasHttpResponseAssignment(value: unknown): boolean {
 
 export default {
   rules: {
+    "src-module-must-have-mirrored-unittest": {
+      description:
+        "Every behavioral src/recnavi module must have a unit test at the exact mirrored path under tests/unittests/.",
+      severity: "error",
+      check: async (ctx) => {
+        const sourceFiles = await ctx.glob("src/recnavi/**/*.py");
+        const testFiles = new Set(
+          (await ctx.glob("tests/unittests/**/*.py")).map(normalizePath),
+        );
+
+        for (const sourceFile of sourceFiles) {
+          const sourcePath = normalizePath(sourceFile);
+          if (sourcePath.endsWith("/__init__.py")) continue;
+          const relativePath = sourcePath.slice(SRC_ROOT.length);
+          if (isDeclarative(relativePath) || isExemptModule(relativePath)) continue;
+
+          const expected = mirroredTestPath(sourcePath);
+          if (testFiles.has(expected)) continue;
+          ctx.report.violation({
+            message: `No unit test mirrors this implementation module; expected ${expected}.`,
+            file: sourceFile,
+            line: 1,
+            fix: `Add ${expected} and test the behavior implemented by this module.`,
+          });
+        }
+      },
+    },
+    "unittest-must-mirror-src-module": {
+      description:
+        "Every tests/unittests module must match an implementation module at the same relative path under src/recnavi/.",
+      severity: "error",
+      check: async (ctx) => {
+        const sourceFiles = new Set(
+          (await ctx.glob("src/recnavi/**/*.py")).map(normalizePath),
+        );
+        const testFiles = await ctx.glob("tests/unittests/**/*.py");
+
+        for (const testFile of testFiles) {
+          const testPath = normalizePath(testFile);
+          if (
+            testPath.endsWith("/__init__.py") ||
+            testPath.endsWith("/conftest.py") ||
+            testPath.startsWith(`${UNIT_ROOT}mockups/`)
+          ) {
+            continue;
+          }
+          const relativePath = testPath.slice(UNIT_ROOT.length);
+          if (isDeclarative(relativePath) || isExemptTest(relativePath)) continue;
+          const slash = relativePath.lastIndexOf("/");
+          const directory = slash < 0 ? "" : relativePath.slice(0, slash + 1);
+          const filename = relativePath.slice(slash + 1);
+          const testModule = filename.match(/^test_(.+)\.py$/)?.[1];
+          if (!testModule) continue;
+
+          const matchingSource = [...sourceFiles].find((sourcePath) => {
+            if (!sourcePath.startsWith(SRC_ROOT)) return false;
+            const sourceRelativePath = sourcePath.slice(SRC_ROOT.length);
+            if (isDeclarative(sourceRelativePath)) return false;
+            const sourceSlash = sourceRelativePath.lastIndexOf("/");
+            const sourceDirectory = sourceSlash < 0
+              ? ""
+              : sourceRelativePath.slice(0, sourceSlash + 1);
+            const sourceModule = sourceRelativePath
+              .slice(sourceSlash + 1)
+              .replace(/\.py$/, "");
+            return sourceDirectory === directory &&
+              (testModule === sourceModule ||
+                testModule.startsWith(`${sourceModule}_`));
+          });
+          if (matchingSource) continue;
+
+          ctx.report.violation({
+            message:
+              `This unit test does not match a source module at the same path under src/recnavi/.`,
+            file: testFile,
+            line: 1,
+            fix: `Move or rename the test so its directory mirrors the implementation module path and its filename starts with test_<module-name>.`,
+          });
+        }
+      },
+    },
     /**
      * Every application use case must have a focused unit test. The test is
      * identified by its reference to the use-case function rather than by a
@@ -246,6 +350,77 @@ export default {
                 fix: "Patch the core collaborator with AsyncMock(return_value=expected_output) and assert that the use-case result is or equals expected_output.",
               });
             }
+          }
+        }
+      },
+    },
+
+    /**
+     * Every FastAPI endpoint must be exercised by a unit test in the matching
+     * API router directory. Keeping the router scope prevents an endpoint
+     * test for one router from satisfying coverage for another router that
+     * happens to expose the same method and path.
+     */
+    "every-api-endpoint-has-unittest": {
+      description:
+        "Every FastAPI API endpoint must have a corresponding HTTP unit test under the matching tests/unittests/apis/ router directory.",
+      severity: "error",
+      check: async (ctx) => {
+        const apiFiles = await ctx.glob("src/recnavi/apis/**/*.py");
+        const routePattern =
+          /@[A-Za-z_][\w.]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/g;
+        const methodCallPattern =
+          /\b[A-Za-z_][\w]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/gi;
+        const requestCallPattern =
+          /\b[A-Za-z_][\w]*\.request\s*\(\s*["'](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|TRACE)["']\s*,\s*["']([^"']+)["']/g;
+
+        const normalizePath = (path: string): string => {
+          const withoutQuery = path.split("?", 1)[0];
+          const withLeadingSlash = withoutQuery.startsWith("/")
+            ? withoutQuery
+            : `/${withoutQuery}`;
+          return withLeadingSlash.length > 1
+            ? withLeadingSlash.replace(/\/$/, "")
+            : withLeadingSlash;
+        };
+
+        for (const file of apiFiles) {
+          const normalizedFile = normalizePath(file);
+          const apiSubpath = normalizedFile.slice("src/recnavi/apis/".length);
+          const routerScope = apiSubpath.split("/")[0];
+          if (!routerScope || routerScope === "schemas") continue;
+
+          const testFiles = await ctx.glob(
+            `tests/unittests/apis/${routerScope}/**/*.py`,
+          );
+          const testedEndpoints = new Set<string>();
+          for (const testFile of testFiles) {
+            const content = await ctx.readFile(testFile);
+            for (const match of content.matchAll(methodCallPattern)) {
+              testedEndpoints.add(
+                `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+              );
+            }
+            for (const match of content.matchAll(requestCallPattern)) {
+              testedEndpoints.add(
+                `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+              );
+            }
+          }
+
+          const content = await ctx.readFile(file);
+          for (const match of content.matchAll(routePattern)) {
+            const endpoint = `${match[1].toUpperCase()}:${normalizePath(match[2])}`;
+            if (testedEndpoints.has(endpoint)) continue;
+
+            const line = content.slice(0, match.index ?? 0).split("\n").length;
+            ctx.report.violation({
+              message:
+                `API endpoint ${endpoint} has no corresponding unit test under tests/unittests/apis/${routerScope}/`,
+              file,
+              line,
+              fix: `Add a ${match[1].toUpperCase()} HTTP request test under tests/unittests/apis/${routerScope}/ for ${normalizePath(match[2])}.`,
+            });
           }
         }
       },

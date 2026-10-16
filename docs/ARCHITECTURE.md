@@ -55,8 +55,8 @@ graph LR
 |       +-- apis/  # API presentation layer
 |       |   +-- auth/
 |       |   +-- root/
-|       |   +-- pub/
 |       |   +-- cms/
+|       |   +-- staff/
 |       |
 |       +-- application/  # application layer
 |       |   +-- analysis/
@@ -98,6 +98,15 @@ graph LR
 ## Test Architecture
 
 Tests follow the same boundary rule as production code: each layer should be verified at the cheapest layer that still proves the behavior.
+
+Unit test files mirror the implementation module tree. For example,
+`src/recnavi/apis/staff/staff_router.py` is tested in
+`tests/unittests/apis/staff/test_staff_router.py`. Keep additional tests for a
+module in that same mirrored directory. `__init__.py` files, tests of shared
+mockups, modules that only declare Pydantic schemas or core types, the modules
+`config/variables.py` and `exceptions/exceptions.py`, and modules named
+`base_*.py` are exempt. See
+[ARCH-011](adrs/ARCH-011-test-implementation.md) for the full rule and checks.
 
 | Test layer | Directory | External dependency policy |
 | ---------- | --------- | -------------------------- |

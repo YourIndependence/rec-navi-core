@@ -6,6 +6,7 @@ status: active
 date: 2026-10-16
 rules: true
 files:
+  - 'src/recnavi/**/*.py'
   - 'tests/**/*.py'
 ---
 
@@ -21,10 +22,40 @@ test suite misleading or nondeterministic.
 Tests must preserve the distinction between integration and unit behavior.
 Reusable abstract-class mocks belong in `tests/mockups/`; integration tests
 must keep real component wiring; and unit tests must use in-process doubles for
-external boundaries. Every API endpoint must have a corresponding test in
-`tests/integration/`. In CI, where `ENV=CI` is injected, integration tests use
+external boundaries. Every API endpoint must have at least one HTTP-boundary
+test in both `tests/unittests/apis/<router>/` and `tests/integration/`. Unit
+tests must be in the matching router directory so identical method/path pairs
+in different routers are checked independently. In CI, where `ENV=CI` is
+injected, integration tests use
 the `mock_infrastracture_injection_when_ci` fixture to replace external
 infrastructure with in-memory doubles while preserving the application wiring.
+
+Unit test paths mirror implementation module paths under `src/recnavi/`.
+For `src/recnavi/<path>/<module>.py`, the corresponding test is
+`tests/unittests/<path>/test_<module>.py`. The mapping is required in both
+directions: implementation modules require a mirrored test, and unit test
+modules must identify the implementation module they test. Package marker
+`__init__.py` files and tests of shared test doubles under `tests/unittests/mockups/`
+are excluded. Modules that only declare Pydantic models or types, including
+`apis/schemas/` and `core/types/`, are exempt until they contain behavior that
+needs testing; tests under `core/types/` are exempt as well. The modules
+`config/variables.py`, `exceptions/exceptions.py`, and any module named
+`base_*.py` are also exempt because they do not need unit tests.
+
+```text
+src/recnavi/apis/staff/staff_router.py
+tests/unittests/apis/staff/test_staff_router.py
+```
+
+The mirror check reports missing implementation or test mirrors as errors.
+
+Every API endpoint must be exercised at least once through an HTTP client in
+the unit test directory matching its router under
+`tests/unittests/apis/<router>/`, and at least once in `tests/integration/`.
+The `every-api-endpoint-has-unittest` and
+`every-api-endpoint-has-integration-test` rules enforce these requirements.
+Unit coverage is scoped to the router directory because separate routers may
+expose the same HTTP method and path.
 
 ### 1. Shared Mock Implementations
 
@@ -168,9 +199,12 @@ source inspection.
 
 The following implementation rules are active:
 
+- `src-module-must-have-mirrored-unittest`
+- `unittest-must-mirror-src-module`
 - `every-application-usecase-has-unit-test`
 - `application-usecase-must-patch-core-collaborator`
 - `application-usecase-must-propagate-mock-output`
+- `every-api-endpoint-has-unittest`
 - `every-api-endpoint-has-integration-test`
 - `integration-test-must-call-http-client`
 - `no-patch-in-integration-tests`
@@ -188,6 +222,8 @@ violated.
 
 **Do:**
 
+- Put unit tests at `tests/unittests/<src-relative-path>/test_<module>.py`
+- Keep additional tests for one implementation module in its mirrored directory
 - Put reusable `Base*` mock implementations in `tests/mockups/`
 - Keep integration tests connected to real collaborators
 - Assign `response` from an HTTP `client` call in every integration test
@@ -203,6 +239,7 @@ violated.
 
 **Don't:**
 
+- Put a unit test in a path or filename that cannot be mapped to its implementation module
 - Patch services, agents, stores, or I/O in integration tests
 - Put model-only or direct-function tests in `tests/integration/`
 - Define reusable `Base*` mock classes inside test files

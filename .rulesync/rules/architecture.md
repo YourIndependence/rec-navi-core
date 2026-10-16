@@ -58,7 +58,9 @@ All I/O -- database, HTTP, external APIs -- must be async. FastAPI endpoints are
 
 ## Testing Conventions
 
-- Unit tests: `tests/unittests/<same-path-as-src>/`
+- Unit tests mirror implementation module paths: `src/recnavi/apis/staff/staff_router.py` maps to `tests/unittests/apis/staff/test_staff_router.py`. Keep related test files in the same mirrored directory. See [ARCH-011](../../docs/adrs/ARCH-011-test-implementation.md).
+- Unit test paths exclude the `src/recnavi/` prefix and add `test_` to the implementation module filename.
+- `__init__.py` files, declarative-only modules under `apis/schemas/` or `core/types/`, `config/variables.py`, `exceptions/exceptions.py`, modules named `base_*.py`, and tests of shared doubles under `tests/unittests/mockups/` are exempt from mirrored test requirements.
 - Run a single file: `uv run pytest tests/unittests/path/to/test_file.py -v`
 - Run all non-LibreOffice unit tests: `uv run pytest tests/unittests/ -n auto --dist loadscope -m "not libreoffice" -v`
 - Unit tests must not require LocalStack, real AWS, Microsoft 365, Box, Azure, Google APIs, or repository secrets
