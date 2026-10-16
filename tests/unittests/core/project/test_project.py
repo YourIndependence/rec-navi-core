@@ -15,7 +15,7 @@ from recnavi.core.project.project import get_project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -108,7 +108,7 @@ async def test_get_project_raises_404_for_missing_project():
     )
 
     with pytest.raises(
-        ClientResourcesNotFoundError,
+        ClientNotFoundError,
         match="Project not found",
     ):
         await get_project(
