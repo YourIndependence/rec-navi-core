@@ -84,7 +84,7 @@ async def test_update_project_returns_good(
         created_project = create_response.json()["project"]
         project_id = created_project["projectId"]
 
-        update_response = client.post(
+        response = client.post(
             "/updateProject",
             headers=auth_headers,
             json={
@@ -104,8 +104,8 @@ async def test_update_project_returns_good(
                 },
             },
         )
-        assert update_response.status_code == 200
-        data = update_response.json()
+        assert response.status_code == 200
+        data = response.json()
         assert data["status"] == "ok"
 
         updated_project = data["project"]

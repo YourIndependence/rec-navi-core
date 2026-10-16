@@ -17,7 +17,6 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
-from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene_input import SceneInput
 
 
@@ -101,4 +100,4 @@ class UpdateProjectRequest(BaseItemModel):
 class UpdateProjectResponse(BaseApiResponseModel):
     """Response for POST /updateProject."""
 
-    project: ProjectView = Field(..., description="Updated project")
+    project: Project = Field(..., description="Updated project")

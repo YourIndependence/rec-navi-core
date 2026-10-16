@@ -12,7 +12,7 @@
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.update_project import update_project
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
-from recnavi.core.types.project_view import ProjectView
+from recnavi.core.types.project import Project
 from recnavi.core.types.scene_input import SceneInput
 from recnavi.core.types.user import User
 
@@ -29,8 +29,7 @@ async def update_project_usecase(
     expected_version: int,
     user: User,
     storage: BaseObjectStorage,
-    bucket_name: str,
-) -> ProjectView:
+) -> Project:
     """Update project use case."""
     return await update_project(
         projects_db=projects_db,
@@ -43,5 +42,4 @@ async def update_project_usecase(
         expected_version=expected_version,
         user=user,
         storage=storage,
-        bucket_name=bucket_name,
     )

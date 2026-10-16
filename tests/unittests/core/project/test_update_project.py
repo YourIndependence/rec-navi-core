@@ -22,6 +22,7 @@ from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
@@ -200,8 +201,7 @@ async def test_update_project_increments_version():
     await database.put_item(existing_project.model_dump(by_alias=True))
 
     updated_project = await update_project(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         projects_db=database,
         users_db=MockDatabase(),
         project_id="proj-123",
@@ -244,8 +244,7 @@ async def test_update_project_raises_conflict_on_version_mismatch():
 
     with pytest.raises(ClientConflictError) as exc_info:
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -287,8 +286,7 @@ async def test_update_project_raises_authorization_error_for_non_owner():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -338,8 +336,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
     await database.put_item(existing_project.model_dump(by_alias=True))
 
     updated_project = await update_project(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         projects_db=database,
         users_db=make_users_db("user-2", "user-3"),
         project_id="proj-123",
@@ -375,6 +372,40 @@ async def test_update_project_preserves_video_key_and_recording_state():
     assert scene.created_by == "staff-1"
     assert scene.created_at == "2026-01-01T00:00:00Z"
 
+    stored_project = await database.get_item({"projectId": "proj-123"})
+    assert stored_project is not None
+    stored_scene = stored_project["scenes"][0]
+    assert stored_scene["videoKey"] == "s3://bucket/video.mp4"
+    assert stored_scene["thumbnailKey"] == "s3://bucket/thumb.jpg"
+    assert "videoUrl" not in stored_scene
+    assert "thumbnailUrl" not in stored_scene
+
+
+@pytest.mark.asyncio
+async def test_update_project_raises_not_found_for_missing_project():
+    database = MockDatabase()
+
+    with pytest.raises(ClientNotFoundError):
+        await update_project(
+            projects_db=database,
+            users_db=MockDatabase(),
+            project_id="missing",
+            project_name="Name",
+            description="",
+            assigned_user_ids=[],
+            scenes=[],
+            expected_version=0,
+            user=User(
+                user_id="owner-1",
+                user_name="Owner",
+                group_id="group-1",
+                role=UserRole.OWNER,
+            ),
+            storage=MockObjectStorage(bucket_name="bucket"),
+        )
+
+    assert database.items == []
+
 
 @pytest.mark.asyncio
 async def test_update_project_rejects_owner_of_another_group():
@@ -386,8 +417,7 @@ async def test_update_project_rejects_owner_of_another_group():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -410,8 +440,7 @@ async def test_update_project_checks_group_before_version():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=MockDatabase(),
             project_id="proj-123",
@@ -433,8 +462,7 @@ async def test_update_project_rejects_unknown_project_assignee():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=make_users_db("user-1"),
             project_id="proj-123",
@@ -458,8 +486,7 @@ async def test_update_project_rejects_other_group_scene_assignee():
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
             projects_db=database,
             users_db=make_users_db("outsider", group_id="group-2"),
             project_id="proj-123",
@@ -486,8 +513,7 @@ async def test_update_project_accepts_same_group_assignees():
     await database.put_item(make_project().model_dump(by_alias=True))
 
     updated_project = await update_project(
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         projects_db=database,
         users_db=make_users_db("user-1", "user-2"),
         project_id="proj-123",
@@ -517,8 +543,7 @@ async def test_update_project_returns_null_urls_for_unrecorded_scene():
     updated_project = await update_project(
         projects_db=database,
         users_db=make_users_db("user-2"),
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
         project_id="proj-123",
         project_name="New Name",
         description="Description",

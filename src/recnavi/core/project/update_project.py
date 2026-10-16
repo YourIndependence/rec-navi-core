@@ -16,7 +16,6 @@ from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
-from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.scene_input import SceneInput
@@ -24,7 +23,7 @@ from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 def merge_scenes(
@@ -92,12 +91,11 @@ async def update_project(
     expected_version: int,
     user: User,
     storage: BaseObjectStorage,
-    bucket_name: str,
-) -> ProjectView:
+) -> Project:
     """Update project with optimistic locking."""
     existing_item = await projects_db.get_item({"projectId": project_id})
     if not existing_item:
-        raise ClientResourcesNotFoundError(f"Project {project_id} not found")
+        raise ClientNotFoundError(f"Project {project_id} not found")
 
     existing_project = Project.model_validate(existing_item)
 
@@ -146,6 +144,5 @@ async def update_project(
 
     return await attach_scene_urls(
         storage=storage,
-        bucket_name=bucket_name,
         project=updated_project,
     )
