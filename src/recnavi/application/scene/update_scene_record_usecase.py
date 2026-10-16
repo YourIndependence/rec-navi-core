@@ -25,7 +25,7 @@ async def update_scene_record_usecase(
     video_base64: str,
     thumbnail_base64: str,
     user: User,
-    video_bucket_name: str,
+    media_bucket_name: str,
 ) -> Project:
     """Store a scene recording and update the project."""
     return await update_scene_record(
@@ -36,5 +36,5 @@ async def update_scene_record_usecase(
         video_base64=video_base64,
         thumbnail_base64=thumbnail_base64,
         user=user,
-        bucket_name=video_bucket_name,
+        bucket_name=media_bucket_name,
     )

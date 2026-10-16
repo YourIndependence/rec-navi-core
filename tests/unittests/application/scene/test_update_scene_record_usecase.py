@@ -46,7 +46,7 @@ async def test_usecase_delegates_to_update_scene_record():
             video_base64="dmlkZW8=",
             thumbnail_base64="dGh1bWI=",
             user=staff,
-            video_bucket_name="test-bucket",
+            media_bucket_name="test-bucket",
         )
 
     mock_update.assert_awaited_once_with(
