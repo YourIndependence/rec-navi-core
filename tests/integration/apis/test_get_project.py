@@ -79,7 +79,6 @@ def test_get_project_returns_400_when_missing_project_id(client, auth_headers):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_get_projects_returns_injected_project(
     client,
     auth_headers,

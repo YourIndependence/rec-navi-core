@@ -54,3 +54,12 @@ class User(BaseModel):
         default=None,
         description="S3 URI of the user's profile image",
     )
+
+    def can_act_as(self, role: UserRole) -> bool:
+        """Return whether this user's role includes the requested role."""
+        role_rank = {
+            UserRole.STAFF: 1,
+            UserRole.OWNER: 2,
+            UserRole.ADMIN: 3,
+        }
+        return role_rank[self.role] >= role_rank[role]

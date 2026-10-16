@@ -57,7 +57,6 @@ def test_get_scene_masters_returns_400_when_no_token(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_get_scene_masters_returns_injected_scene(
     client,
     auth_headers,
