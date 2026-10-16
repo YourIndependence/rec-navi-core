@@ -98,6 +98,17 @@ async def delete_objects_by_prefix(
     return deleted_count
 
 
+async def delete_object_by_key(
+    *,
+    bucket_name: str,
+    object_key: str,
+) -> None:
+    """Delete one S3 object by its exact key."""
+    session = aioboto3.Session()
+    async with session.client("s3", region_name=REGION) as s3:
+        await s3.delete_object(Bucket=bucket_name, Key=object_key)
+
+
 async def upload_base64(
     *,
     bucket_name: str,
@@ -210,6 +221,18 @@ class S3Client(BaseObjectStorage):
         return await delete_objects_by_prefix(
             bucket_name=bucket_name,
             prefix=prefix,
+        )
+
+    async def delete_object_by_key(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> None:
+        """Delete one S3 object by its exact key."""
+        await delete_object_by_key(
+            bucket_name=bucket_name,
+            object_key=object_key,
         )
 
     async def download_object(

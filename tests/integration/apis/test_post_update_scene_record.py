@@ -10,8 +10,9 @@
 """Integration tests for POST /updateSceneRecord endpoint."""
 
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
+from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.project_view import ProjectView
+from recnavi.core.types.scene import SceneView
 from recnavi.main import app
 
 
@@ -37,8 +38,8 @@ def test_openapi_schema_builds():
 
 
 def test_update_scene_record_response_accepts_a_project():
-    """Test the response model can hold a ProjectView and serialises it."""
-    project = ProjectView(
+    """Test the response model can hold a Project and serialises it."""
+    project = Project(
         project_id="proj-123",
         group_id="group-456",
         project_name="Test Project",
@@ -46,7 +47,16 @@ def test_update_scene_record_response_accepts_a_project():
         owner_user_id="owner-1",
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
-        scenes=[],
+        scenes=[
+            SceneView(
+                scene_id="scene-456",
+                scene_principal="cooking",
+                video_key="private/video.mp4",
+                thumbnail_key="private/thumbnail.jpg",
+                video_url="https://example.test/video",
+                thumbnail_url="https://example.test/thumbnail",
+            ),
+        ],
     )
 
     data = UpdateSceneRecordResponse(project=project).model_dump(
@@ -56,5 +66,8 @@ def test_update_scene_record_response_accepts_a_project():
 
     assert data["status"] == "ok"
     assert data["project"]["projectId"] == "proj-123"
-    assert "videoKey" not in str(data)
-    assert "thumbnailKey" not in str(data)
+    scene = data["project"]["scenes"][0]
+    assert scene["videoUrl"] == "https://example.test/video"
+    assert scene["thumbnailUrl"] == "https://example.test/thumbnail"
+    assert "videoKey" not in scene
+    assert "thumbnailKey" not in scene

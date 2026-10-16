@@ -69,8 +69,7 @@ class MockDatabase(BaseDatabase):
 
         Args:
             item: Item to store.
-            condition_expression: Optional condition on the existing item
-                (only "version = :expected_version" is evaluated).
+            condition_expression: Optional condition on the existing item.
             expression_attribute_values: Values referenced by the condition.
 
         Raises:
@@ -121,6 +120,11 @@ class MockDatabase(BaseDatabase):
     ) -> bool:
         """Check if a put condition expression is satisfied."""
         if "version = :expected_version" in condition_expression:
+            if (
+                "attribute_not_exists(version)" in condition_expression
+                and "version" not in item
+            ):
+                return True
             expected_version = expression_attribute_values.get(
                 ":expected_version",
             )

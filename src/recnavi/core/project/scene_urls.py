@@ -10,9 +10,8 @@
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
-from recnavi.core.types.project_view import ProjectView
-from recnavi.core.types.project_view import SceneView
 from recnavi.core.types.scene import Scene
+from recnavi.core.types.scene import SceneView
 
 
 SCENE_URL_EXPIRATION_SECONDS = 3600
@@ -23,7 +22,7 @@ async def attach_scene_urls(
     storage: BaseObjectStorage,
     bucket_name: str,
     project: Project,
-) -> ProjectView:
+) -> Project:
     """Replace scene storage keys with presigned playback URLs."""
     scenes = [
         await _to_scene_view(
@@ -33,7 +32,7 @@ async def attach_scene_urls(
         )
         for scene in project.scenes
     ]
-    return ProjectView.model_validate(
+    return Project.model_validate(
         {**project.model_dump(exclude={"scenes"}), "scenes": scenes},
     )
 
