@@ -22,6 +22,7 @@ import pytest
 
 from recnavi.infrastructure.s3 import s3_client
 from recnavi.infrastructure.s3.s3_client import S3Client
+from recnavi.infrastructure.s3.s3_client import delete_object_by_key
 from recnavi.infrastructure.s3.s3_client import delete_objects_by_prefix
 from recnavi.infrastructure.s3.s3_client import download_object
 from recnavi.infrastructure.s3.s3_client import download_object_stream
@@ -255,6 +256,24 @@ async def test_delete_objects_by_prefix_returns_zero_when_empty():
 
 
 @pytest.mark.asyncio
+async def test_delete_object_by_key_deletes_exact_key():
+    """Test delete_object_by_key uses S3's single-object operation."""
+    mock_s3 = MagicMock()
+    mock_s3.delete_object = AsyncMock()
+
+    with _patch_s3(mock_s3):
+        await delete_object_by_key(
+            bucket_name="bucket",
+            object_key="p/shot.mp4",
+        )
+
+    mock_s3.delete_object.assert_awaited_once_with(
+        Bucket="bucket",
+        Key="p/shot.mp4",
+    )
+
+
+@pytest.mark.asyncio
 async def test_s3_client_delegates_async_methods_to_module_functions():
     """Test S3Client forwards each call to the module-level function."""
     client = S3Client()
@@ -266,6 +285,11 @@ async def test_s3_client_delegates_async_methods_to_module_functions():
             "delete_objects_by_prefix",
             AsyncMock(return_value=2),
         ) as delete,
+        patch.object(
+            s3_client,
+            "delete_object_by_key",
+            AsyncMock(),
+        ) as delete_one,
         patch.object(
             s3_client,
             "download_object",
@@ -287,6 +311,10 @@ async def test_s3_client_delegates_async_methods_to_module_functions():
             bucket_name="b",
             prefix="p/",
         )
+        await client.delete_object_by_key(
+            bucket_name="b",
+            object_key="k",
+        )
         data = await client.download_object(bucket_name="b", object_key="k")
         url = await client.generate_presigned_url(
             bucket_name="b",
@@ -301,6 +329,7 @@ async def test_s3_client_delegates_async_methods_to_module_functions():
         content_type="video/mp4",
     )
     delete.assert_awaited_once_with(bucket_name="b", prefix="p/")
+    delete_one.assert_awaited_once_with(bucket_name="b", object_key="k")
     download.assert_awaited_once_with(bucket_name="b", object_key="k")
     presign.assert_awaited_once_with(
         bucket_name="b",

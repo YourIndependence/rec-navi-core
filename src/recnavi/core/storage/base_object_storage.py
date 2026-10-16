@@ -60,6 +60,16 @@ class BaseObjectStorage(ABC):
         pass
 
     @abstractmethod
+    async def delete_object_by_key(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> None:
+        """Delete one object by its exact key."""
+        pass
+
+    @abstractmethod
     async def download_object(
         self,
         *,

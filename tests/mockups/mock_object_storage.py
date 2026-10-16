@@ -54,6 +54,15 @@ class MockObjectStorage(BaseObjectStorage):
             del self.objects[key]
         return len(doomed)
 
+    async def delete_object_by_key(
+        self,
+        *,
+        bucket_name: str,
+        object_key: str,
+    ) -> None:
+        """Remove one stored object by its exact key."""
+        self.objects.pop((bucket_name, object_key), None)
+
     async def download_object(
         self,
         *,
