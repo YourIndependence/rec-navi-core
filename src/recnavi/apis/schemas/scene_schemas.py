@@ -14,6 +14,10 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.apis.schemas.base_request_schemas import BaseItemModel
+from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+from recnavi.core.types.project import Project
+
 
 class SceneMasterView(BaseModel):
     """Scene master view for API responses.
@@ -51,3 +55,20 @@ class GetSceneMastersResponse(BaseModel):
         ...,
         description="List of all scene masters",
     )
+
+
+class UpdateSceneRecordRequest(BaseItemModel):
+    """Request for POST /updateSceneRecord."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    video: str = Field(..., description="Base64-encoded video data")
+    thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
+
+
+class UpdateSceneRecordResponse(BaseApiResponseModel):
+    """Response for POST /updateSceneRecord."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: Project = Field(..., description="Updated project")

@@ -22,6 +22,8 @@ from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
+from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
@@ -31,6 +33,9 @@ from recnavi.application.project.delete_project_usecase import (
 )
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.project.update_project_usecase import (
+    update_project_usecase,
+)
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
@@ -143,6 +148,30 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/updateProject")
+async def update_project_endpoint(
+    request: Request,
+    item: UpdateProjectRequest,
+    user: User = Depends(verify_user),
+) -> UpdateProjectResponse:
+    """Update project with optimistic locking."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await update_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project.project_id,
+        project_name=item.project.project_name,
+        description=item.project.description,
+        assigned_user_ids=item.project.assigned_user_ids,
+        scenes=item.project.scenes,
+        expected_version=item.project.version,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return UpdateProjectResponse(project=updated_project)
 
 
 @cms_router.post("/deleteProject")
