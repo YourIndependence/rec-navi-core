@@ -20,7 +20,7 @@ async def get_group_users(
 ) -> list[User]:
     """Get all users in a group (auto-paginated from groupId-index GSI)."""
     all_users: list[User] = []
-    last_evaluated_key: dict | None = None
+    last_evaluated_key = None
 
     while True:
         result = await users_db.query(
@@ -33,7 +33,7 @@ async def get_group_users(
         all_users.extend(users)
 
         last_evaluated_key = result.last_evaluated_key
-        if last_evaluated_key is None:
+        if not last_evaluated_key:
             break
 
     return all_users

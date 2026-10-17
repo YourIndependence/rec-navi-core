@@ -11,13 +11,17 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from recnavi.core.user.users import get_group_users
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 
 
 async def get_group_users_usecase(
     *,
     users_db: BaseDatabase,
-    group_id: str,
+    user: User,
 ) -> list[User]:
-    """Get all users in a group."""
-    return await get_group_users(users_db=users_db, group_id=group_id)
+    """List members of the authenticated owner's group."""
+    if not user.can_act_as(UserRole.OWNER):
+        raise ClientAuthorizationError("Only owners can list group users")
+    return await get_group_users(users_db=users_db, group_id=user.group_id)

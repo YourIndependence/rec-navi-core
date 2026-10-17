@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Unit tests for get_group_users_usecase."""
+"""Authorization and tenant isolation for group user listing."""
 
 from unittest.mock import AsyncMock
 from unittest.mock import patch
@@ -17,94 +17,51 @@ import pytest
 from recnavi.application.user.get_group_users_usecase import (
     get_group_users_usecase,
 )
+from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from tests.mockups.mock_database import MockDatabase
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_get_group_users():
-    """Test usecase delegates to core get_group_users collaborator."""
-    mock_db = AsyncMock()
+@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
+async def test_lists_only_authenticated_users_group(role):
+    user = User(
+        user_id="caller",
+        user_name="Caller",
+        role=role,
+        group_id="group-1",
+    )
+    database = AsyncMock(spec=BaseDatabase)
     expected_users = [
         User(
-            user_id="user-1",
-            user_name="Alice",
-            group_id="group-1",
-            role=UserRole.OWNER,
-        ),
-        User(
-            user_id="user-2",
-            user_name="Bob",
-            group_id="group-1",
+            user_id="member",
+            user_name="Member",
             role=UserRole.STAFF,
+            group_id="group-1",
         ),
     ]
-
     with patch(
         "recnavi.application.user.get_group_users_usecase.get_group_users",
         new=AsyncMock(return_value=expected_users),
-    ) as mock_get:
-        result = await get_group_users_usecase(
-            users_db=mock_db,
-            group_id="group-1",
-        )
-
-    mock_get.assert_awaited_once_with(users_db=mock_db, group_id="group-1")
+    ) as get_users:
+        result = await get_group_users_usecase(users_db=database, user=user)
     assert result is expected_users
+    get_users.assert_awaited_once_with(
+        users_db=database,
+        group_id=user.group_id,
+    )
 
 
 @pytest.mark.asyncio
-async def test_get_group_users_usecase_returns_all_users():
-    """Test usecase returns all users in a group."""
-    database = MockDatabase(
-        initial_items=[
-            {
-                "userId": "user-1",
-                "userName": "Alice",
-                "role": "owner",
-                "groupId": "group-1",
-            },
-            {
-                "userId": "user-2",
-                "userName": "Bob",
-                "role": "staff",
-                "groupId": "group-1",
-            },
-        ],
-    )
-
-    users = await get_group_users_usecase(
-        users_db=database,
+async def test_staff_is_rejected_before_database_access():
+    database = AsyncMock(spec=BaseDatabase)
+    user = User(
+        user_id="staff",
+        user_name="Staff",
+        role=UserRole.STAFF,
         group_id="group-1",
     )
-
-    assert len(users) == 2
-    assert users[0].user_id == "user-1"
-    assert users[1].user_id == "user-2"
-
-
-@pytest.mark.asyncio
-async def test_get_group_users_usecase_calls_core_layer():
-    """Test usecase delegates to core layer get_group_users."""
-    database = MockDatabase(
-        initial_items=[
-            {
-                "userId": "user-123",
-                "userName": "Test User",
-                "role": "admin",
-                "groupId": "group-abc",
-            },
-        ],
-    )
-
-    users = await get_group_users_usecase(
-        users_db=database,
-        group_id="group-abc",
-    )
-
-    assert len(users) == 1
-    assert users[0].user_id == "user-123"
-    assert users[0].user_name == "Test User"
-    assert users[0].role == UserRole.ADMIN
-    assert users[0].group_id == "group-abc"
+    with pytest.raises(ClientAuthorizationError):
+        await get_group_users_usecase(users_db=database, user=user)
+    database.query.assert_not_awaited()

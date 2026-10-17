@@ -39,11 +39,51 @@ class BaseDatabase(ABC):
         pass
 
     @abstractmethod
-    async def put_item(self, item: dict[str, Any]) -> None:
+    async def put_item(
+        self,
+        item: dict[str, Any],
+        condition_expression: str | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> None:
         """Put an item into the table.
 
         Args:
             item: Item to store as a dictionary. Must include primary key.
+            condition_expression: Optional condition that must hold for the
+                write to succeed (e.g., "version = :expected_version").
+            expression_attribute_values: Values referenced by the condition.
+
+        Raises:
+            ClientConflictError: The condition expression was not satisfied.
+
+        """
+        pass
+
+    @abstractmethod
+    async def update_item(
+        self,
+        *,
+        key: dict[str, Any],
+        update_expression: str,
+        condition_expression: str | None = None,
+        expression_attribute_names: dict[str, str] | None = None,
+        expression_attribute_values: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Update an item with an update expression.
+
+        Args:
+            key: Primary key (and sort key if applicable) as a dictionary.
+            update_expression: Update expression (e.g., "SET #n = :n").
+            condition_expression: Optional condition that must hold for the
+                update to succeed.
+            expression_attribute_names: Placeholders for attribute names.
+            expression_attribute_values: Values referenced by the expressions.
+
+        Returns:
+            The updated item.
+
+        Raises:
+            ClientConflictError: The condition expression was not satisfied.
 
         """
         pass
