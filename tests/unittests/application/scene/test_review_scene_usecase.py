@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 
 from recnavi.application.scene.review_scene_usecase import review_scene_usecase
-from recnavi.core.types.project_view import ProjectView
+from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 
@@ -31,7 +31,7 @@ async def test_usecase_delegates_to_review_scene():
         role=UserRole.OWNER,
     )
 
-    expected_output = ProjectView.model_validate(
+    expected_output = Project.model_validate(
         {
             "projectId": "proj-123",
             "groupId": "group-1",
@@ -56,7 +56,6 @@ async def test_usecase_delegates_to_review_scene():
             review_comment="Looks great!",
             user=user,
             storage=mock_storage,
-            bucket_name="bucket",
         )
 
     mock_review_scene.assert_awaited_once_with(
@@ -67,6 +66,5 @@ async def test_usecase_delegates_to_review_scene():
         review_comment="Looks great!",
         user=user,
         storage=mock_storage,
-        bucket_name="bucket",
     )
     assert result is expected_output

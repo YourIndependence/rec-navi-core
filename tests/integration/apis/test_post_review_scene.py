@@ -9,9 +9,9 @@
 
 """Integration tests for POST /reviewScene endpoint."""
 
-from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
-from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.project_view import ProjectView
+import pytest
+
+from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.main import app
 
 
@@ -31,28 +31,53 @@ def test_review_scene_returns_400_when_no_token(client):
     assert data["status"] == "error"
 
 
-def test_openapi_schema_builds():
-    """Test the OpenAPI schema generates (response models fully defined)."""
-    assert app.openapi()["paths"]["/reviewScene"]
+def test_openapi_schema_builds(client):
+    """The HTTP OpenAPI endpoint includes the review route."""
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    assert response.json()["paths"]["/reviewScene"]
 
 
-def test_review_scene_response_accepts_a_project():
-    """Test the response model can hold a ProjectView and serialises it."""
-    project = ProjectView(
-        project_id="proj-123",
-        group_id="group-456",
-        project_name="Test Project",
-        status=ProjectStatus.IN_PROGRESS,
-        owner_user_id="owner-1",
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-        scenes=[],
+@pytest.mark.asyncio
+async def test_review_scene_persists_review_through_http(client, auth_headers):
+    """Review writes metadata and version and returns a client-safe project."""
+    create_response = client.post(
+        "/createProject",
+        headers=auth_headers,
+        json={
+            "projectName": "Review Project",
+            "description": "",
+            "scenePrincipals": ["cooking"],
+            "assignedUserIds": [],
+        },
     )
-
-    data = ReviewSceneResponse(project=project).model_dump(
-        by_alias=True,
-        mode="json",
-    )
-
-    assert data["status"] == "ok"
-    assert data["project"]["projectId"] == "proj-123"
+    assert create_response.status_code == 200
+    project = create_response.json()["project"]
+    project_id = project["projectId"]
+    database = app.state.database[PROJECTS_TABLE_NAME]
+    try:
+        response = client.post(
+            "/reviewScene",
+            headers=auth_headers,
+            json={
+                "projectId": project_id,
+                "sceneId": project["scenes"][0]["sceneId"],
+                "result": "reject",
+                "comment": "Please re-record",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()["project"]
+        assert data["version"] == 1
+        scene = data["scenes"][0]
+        assert scene["status"] == "reject"
+        assert scene["reviewComment"] == "Please re-record"
+        assert scene["reviewedBy"] == "test-user-123"
+        assert scene["reviewedAt"] is not None
+        assert "videoKey" not in scene
+        assert "thumbnailKey" not in scene
+        saved = await database.get_item({"projectId": project_id})
+        assert saved["version"] == data["version"]
+        assert saved["scenes"][0]["reviewComment"] == scene["reviewComment"]
+    finally:
+        await database.delete_item({"projectId": project_id})

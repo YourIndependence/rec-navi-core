@@ -28,5 +28,8 @@ jobs:
           ln -sfn ../docs/adrs .archgate/adrs
           ln -sfn ../docs/adrs/rules.d.ts .archgate/rules.d.ts
 
+      - name: Test Archgate rules
+        run: node --experimental-strip-types --test tests/archgate/*.test.mjs
+
       - name: Run archgate check
         run: archgate check

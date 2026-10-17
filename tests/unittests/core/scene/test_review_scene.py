@@ -9,6 +9,8 @@
 
 """Tests for review_scene core function."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
@@ -20,6 +22,7 @@ from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
@@ -59,8 +62,7 @@ async def test_review_scene_approve_returns_correct_data():
         result="approve",
         review_comment=None,
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert result_project.project_id == "proj-123"
@@ -100,8 +102,7 @@ async def test_review_scene_reject_returns_correct_data():
         result="reject",
         review_comment=None,
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert result_project.project_id == "proj-123"
@@ -142,8 +143,7 @@ async def test_review_scene_raises_403_for_non_owner():
             result="approve",
             review_comment=None,
             user=staff_user,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
         )
 
 
@@ -181,8 +181,7 @@ async def test_review_scene_raises_403_for_wrong_group():
             result="approve",
             review_comment=None,
             user=other_owner,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
         )
 
 
@@ -220,8 +219,7 @@ async def test_review_scene_raises_404_when_scene_not_found():
             result="approve",
             review_comment=None,
             user=user,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
         )
 
 
@@ -259,8 +257,7 @@ async def test_review_scene_raises_422_for_invalid_result():
             result="pending",
             review_comment=None,
             user=user,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
+            storage=MockObjectStorage(bucket_name="bucket"),
         )
 
 
@@ -297,8 +294,7 @@ async def test_review_scene_allows_re_review():
         result="reject",
         review_comment=None,
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert result_project.scenes[0].status == SceneStatus.REJECT
@@ -345,8 +341,7 @@ async def test_review_scene_returns_view_with_urls_and_no_keys():
         result="approve",
         review_comment=None,
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     expires = SCENE_URL_EXPIRATION_SECONDS
@@ -398,8 +393,7 @@ async def test_review_scene_reject_moves_submitted_project_to_in_progress():
         result="reject",
         review_comment="Please re-record",
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert view.status == ProjectStatus.IN_PROGRESS
@@ -439,9 +433,119 @@ async def test_review_scene_approve_keeps_submitted_project_submitted():
         result="approve",
         review_comment=None,
         user=user,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
+        storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert view.status == ProjectStatus.SUBMITTED
     assert view.scenes[0].status == SceneStatus.APPROVE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("legacy", [False, True])
+async def test_review_advances_version_and_clears_previous_comment(
+    legacy: bool,
+):
+    """Review participates in project locking and replaces prior review data."""
+    project = Project(
+        project_id="p",
+        project_name="P",
+        owner_user_id="owner",
+        group_id="g",
+        created_at="2026-01-01T00:00:00Z",
+        version=4,
+        scenes=[
+            Scene(
+                scene_id="s",
+                scene_principal="cooking",
+                status=SceneStatus.REJECT,
+                review_comment="Old comment",
+            ),
+        ],
+    )
+    item = project.model_dump(by_alias=True)
+    if legacy:
+        item.pop("version")
+    db = MockDatabase([item])
+    result = await review_scene(
+        projects_db=db,
+        project_id="p",
+        scene_id="s",
+        result="approve",
+        review_comment=None,
+        user=User(
+            user_id="owner",
+            user_name="Owner",
+            group_id="g",
+            role=UserRole.OWNER,
+        ),
+        storage=MockObjectStorage(bucket_name="bucket"),
+    )
+    saved = await db.get_item({"projectId": "p"})
+    assert saved["version"] == (1 if legacy else 5)
+    assert saved["updatedAt"] is not None
+    assert saved["scenes"][0]["reviewComment"] is None
+    assert saved["scenes"][0]["reviewedBy"] == "owner"
+    assert result.scenes[0].reviewed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_review_propagates_concurrent_write_conflict():
+    """A concurrent recording or project update cannot be overwritten."""
+    project = Project(
+        project_id="p",
+        project_name="P",
+        owner_user_id="owner",
+        group_id="g",
+        created_at="2026-01-01T00:00:00Z",
+        version=4,
+        scenes=[Scene(scene_id="s", scene_principal="cooking")],
+    )
+    db = AsyncMock()
+    db.get_item.return_value = project.model_dump(by_alias=True)
+    db.put_item.side_effect = ClientConflictError("Concurrent write")
+    with pytest.raises(ClientConflictError):
+        await review_scene(
+            projects_db=db,
+            project_id="p",
+            scene_id="s",
+            result="approve",
+            review_comment=None,
+            user=User(
+                user_id="owner",
+                user_name="Owner",
+                group_id="g",
+                role=UserRole.OWNER,
+            ),
+            storage=MockObjectStorage(bucket_name="bucket"),
+        )
+    assert db.put_item.call_args.kwargs["expression_attribute_values"] == {
+        ":previous_version": 4,
+    }
+
+
+@pytest.mark.asyncio
+async def test_review_denies_another_owner_in_same_group():
+    """Group membership alone does not grant project owner permissions."""
+    project = Project(
+        project_id="p",
+        project_name="P",
+        owner_user_id="owner",
+        group_id="g",
+        created_at="2026-01-01T00:00:00Z",
+        scenes=[Scene(scene_id="s", scene_principal="cooking")],
+    )
+    with pytest.raises(ClientAuthorizationError):
+        await review_scene(
+            projects_db=MockDatabase([project.model_dump(by_alias=True)]),
+            project_id="p",
+            scene_id="s",
+            result="approve",
+            review_comment=None,
+            user=User(
+                user_id="other",
+                user_name="Other",
+                group_id="g",
+                role=UserRole.OWNER,
+            ),
+            storage=MockObjectStorage(bucket_name="bucket"),
+        )

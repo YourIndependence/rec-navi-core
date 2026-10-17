@@ -80,3 +80,18 @@ class Scene(BaseModel):
         default=None,
         description="Review comment from the owner",
     )
+
+
+class SceneView(Scene):
+    """A scene with presigned playback URLs for API responses."""
+
+    video_key: str | None = Field(default=None, exclude=True)
+    thumbnail_key: str | None = Field(default=None, exclude=True)
+    video_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the recorded video. None if not recorded",
+    )
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the thumbnail. None if not recorded",
+    )

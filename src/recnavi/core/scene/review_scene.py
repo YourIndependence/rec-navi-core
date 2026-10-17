@@ -17,7 +17,6 @@ from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.project_view import ProjectView
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -35,16 +34,12 @@ async def review_scene(
     review_comment: str | None,
     user: User,
     storage: BaseObjectStorage,
-    bucket_name: str,
-) -> ProjectView:
+) -> Project:
     """Review a scene recording and return the project with presigned URLs."""
     if result not in ("approve", "reject"):
         raise ClientUnprocessableEntityError(
             f"Invalid result value: {result}. Must be 'approve' or 'reject'.",
         )
-
-    if user.role != UserRole.OWNER:
-        raise ClientAuthorizationError("Only owners can review scenes")
 
     item = await projects_db.get_item(key={"projectId": project_id})
     if not item:
@@ -52,9 +47,9 @@ async def review_scene(
 
     project = Project.model_validate(item)
 
-    if project.group_id != user.group_id:
+    if not project.validate_permission(user=user, as_role=UserRole.OWNER):
         raise ClientAuthorizationError(
-            "Access to other group's project is forbidden",
+            "User does not have access permission to this project",
         )
 
     scene_index = next(
@@ -70,49 +65,23 @@ async def review_scene(
         SceneStatus.APPROVE if result == "approve" else SceneStatus.REJECT
     )
 
-    update_expressions = [
-        f"scenes[{scene_index}].#status = :status",
-        f"scenes[{scene_index}].reviewedBy = :reviewedBy",
-        f"scenes[{scene_index}].reviewedAt = :reviewedAt",
-    ]
-
-    expression_values = {
-        ":status": new_status.value,
-        ":reviewedBy": user.user_id,
-        ":reviewedAt": timestamp,
-        ":sceneId": scene_id,
-    }
-
-    if review_comment is not None:
-        update_expressions.append(
-            f"scenes[{scene_index}].reviewComment = :reviewComment",
-        )
-        expression_values[":reviewComment"] = review_comment
-
-    expression_attribute_names = {"#sceneStatus": "status"}
-
+    scene = project.scenes[scene_index]
+    scene.status = new_status
+    scene.reviewed_by = user.user_id
+    scene.reviewed_at = timestamp
+    scene.review_comment = review_comment
     if result == "reject" and project.status == ProjectStatus.SUBMITTED:
-        update_expressions.append("#projectStatus = :projectStatus")
-        expression_attribute_names["#projectStatus"] = "status"
-        expression_values[":projectStatus"] = ProjectStatus.IN_PROGRESS.value
-
-    update_expression_with_names = "SET " + ", ".join(update_expressions)
-    update_expression_with_names = update_expression_with_names.replace(
-        "#status",
-        "#sceneStatus",
+        project.status = ProjectStatus.IN_PROGRESS
+    previous_version = project.version
+    project.update_scene(scene)
+    await projects_db.put_item(
+        item=project.model_dump(by_alias=True),
+        condition_expression=(
+            "attribute_not_exists(version) OR version = :previous_version"
+        ),
+        expression_attribute_values={":previous_version": previous_version},
     )
-
-    await projects_db.update_item(
-        key={"projectId": project_id},
-        update_expression=update_expression_with_names,
-        condition_expression=f"scenes[{scene_index}].sceneId = :sceneId",
-        expression_attribute_names=expression_attribute_names,
-        expression_attribute_values=expression_values,
-    )
-
-    updated_item = await projects_db.get_item(key={"projectId": project_id})
     return await attach_scene_urls(
         storage=storage,
-        bucket_name=bucket_name,
-        project=Project.model_validate(updated_item),
+        project=project,
     )

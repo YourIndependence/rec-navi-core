@@ -7,11 +7,14 @@
 # For internal use only.
 # developer team.
 
-"""Tests for DynamoDb Decimal conversion logic."""
+"""DynamoDB adapter behavior against Moto and numeric conversion tests."""
 
+from collections.abc import AsyncIterator
 from decimal import Decimal
 
+import aioboto3
 import pytest
+import pytest_asyncio
 from botocore.exceptions import ClientError
 
 from recnavi.exceptions.exceptions import ClientConflictError
@@ -24,133 +27,333 @@ from recnavi.infrastructure.database.dynamodb import (
 )
 
 
-class MockDynamoTable:
-    """Minimal async DynamoDB table fake for query tests."""
-
-    def __init__(self) -> None:
-        self.query_kwargs: dict[str, object] | None = None
-        self.scan_kwargs: dict[str, object] | None = None
-
-    async def query(self, **kwargs: object) -> dict[str, list[dict[str, str]]]:
-        self.query_kwargs = kwargs
-        return {"Items": [{"userId": "user-123"}]}
-
-    async def scan(self, **kwargs: object) -> dict[str, list[dict[str, str]]]:
-        self.scan_kwargs = kwargs
-        return {"Items": [{"userId": "user-123"}]}
+TABLE = "it_projects"
+INDEX = "groupId-createdAt-index"
 
 
-class MockDynamoResource:
-    """Minimal async DynamoDB resource fake for query tests."""
+@pytest_asyncio.fixture(scope="module")
+async def dynamodb_table(
+    mock_aws_session: aioboto3.Session,
+) -> AsyncIterator[str]:
+    async with mock_aws_session.resource("dynamodb") as resource:
+        await resource.create_table(
+            TableName=TABLE,
+            KeySchema=[{"AttributeName": "projectId", "KeyType": "HASH"}],
+            AttributeDefinitions=[
+                {"AttributeName": name, "AttributeType": "S"}
+                for name in ("projectId", "groupId", "createdAt")
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    "IndexName": INDEX,
+                    "KeySchema": [
+                        {"AttributeName": "groupId", "KeyType": "HASH"},
+                        {"AttributeName": "createdAt", "KeyType": "RANGE"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                },
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+    try:
+        yield TABLE
+    finally:
+        async with mock_aws_session.client("dynamodb") as client:
+            await client.delete_table(TableName=TABLE)
 
-    def __init__(self, table: MockDynamoTable) -> None:
-        self.table = table
 
-    async def __aenter__(self) -> "MockDynamoResource":
-        return self
+@pytest_asyncio.fixture
+async def database(
+    dynamodb_table,
+    mock_aws_session: aioboto3.Session,
+) -> AsyncIterator[DynamoDb]:
+    database = DynamoDb(table_name=dynamodb_table)
+    database.session = mock_aws_session
+    yield database
+    async with mock_aws_session.resource("dynamodb") as resource:
+        table = await resource.Table(dynamodb_table)
+        response = await table.scan()
+        for item in response["Items"]:
+            await table.delete_item(Key={"projectId": item["projectId"]})
 
-    async def __aexit__(self, *args: object) -> None:
-        return None
 
-    async def Table(self, _table_name: str) -> MockDynamoTable:  # noqa: N802
-        return self.table
-
-
-class MockDynamoSession:
-    """Minimal aioboto3 session fake for query tests."""
-
-    def __init__(self, resource: MockDynamoResource) -> None:
-        self.dynamodb_resource = resource
-
-    def resource(self, _service_name: str) -> MockDynamoResource:
-        return self.dynamodb_resource
+async def seed_projects(database: DynamoDb) -> None:
+    for number in range(3):
+        await database.put_item(
+            {
+                "projectId": f"p{number}",
+                "groupId": "group-1",
+                "createdAt": f"2026-01-0{number + 1}",
+                "isActive": number != 1,
+                "category": "recording" if number != 2 else "other",
+                "version": number,
+            },
+        )
+    await database.put_item(
+        {
+            "projectId": "outsider",
+            "groupId": "group-2",
+            "createdAt": "2026-01-01",
+        },
+    )
 
 
 @pytest.mark.asyncio
-async def test_query_passes_index_name_to_dynamodb():
-    """Test query passes the optional index as DynamoDB IndexName."""
-    table = MockDynamoTable()
-    resource = MockDynamoResource(table)
-    database = DynamoDb(table_name="users")
-    database.session = MockDynamoSession(resource)
+async def test_put_and_get_preserve_nested_values(database):
+    item = {
+        "projectId": "p1",
+        "version": 2,
+        "rating": 4.5,
+        "isActive": True,
+        "profile": {"scores": [1, 2.5], "label": "test"},
+    }
+    await database.put_item(item)
+    result = await database.get_item({"projectId": "p1"})
 
-    result = await database.query(
-        key_condition={"userId": "user-123"},
-        index="group-index",
+    assert result == item
+    assert type(result["version"]) is int
+    assert type(result["rating"]) is float
+    assert result["isActive"] is True
+    async with database.session.resource(
+        "dynamodb",
+    ) as resource:
+        table = await resource.Table(TABLE)
+        stored = (await table.get_item(Key={"projectId": "p1"}))["Item"]
+        assert stored["rating"] == Decimal("4.5")
+        assert isinstance(stored["rating"], Decimal)
+
+
+@pytest.mark.asyncio
+async def test_missing_item_returns_none(database):
+    assert await database.get_item({"projectId": "missing"}) is None
+
+
+@pytest.mark.asyncio
+async def test_delete_preserves_other_items(database):
+    await database.put_item({"projectId": "delete"})
+    await database.put_item({"projectId": "keep"})
+    await database.delete_item({"projectId": "delete"})
+    assert await database.get_item({"projectId": "delete"}) is None
+    assert await database.get_item({"projectId": "keep"}) == {
+        "projectId": "keep",
+    }
+
+
+@pytest.mark.asyncio
+async def test_conditional_put_updates_only_matching_version(database):
+    await database.put_item({"projectId": "p1", "version": 1})
+    await database.put_item(
+        {"projectId": "p1", "version": 2},
+        condition_expression="version = :expected",
+        expression_attribute_values={":expected": 1},
     )
+    with pytest.raises(ClientConflictError):
+        await database.put_item(
+            {"projectId": "p1", "version": 3},
+            condition_expression="version = :expected",
+            expression_attribute_values={":expected": 1},
+        )
+    assert await database.get_item({"projectId": "p1"}) == {
+        "projectId": "p1",
+        "version": 2,
+    }
 
-    assert result.items == [{"userId": "user-123"}]
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("version", [None, 0, 4])
+async def test_recording_condition_updates_legacy_and_matching_versions(
+    database,
+    version,
+):
+    """Execute the exact recording condition against Moto, including legacy data."""
+    original = {"projectId": "p1"}
+    if version is not None:
+        original["version"] = version
+    await database.put_item(original)
+    updated = {"projectId": "p1", "version": (version or 0) + 1}
+    condition = "attribute_not_exists(version) OR version = :previous_version"
+    await database.put_item(
+        updated,
+        condition_expression=condition,
+        expression_attribute_values={":previous_version": version or 0},
+    )
+    assert await database.get_item({"projectId": "p1"}) == updated
+    with pytest.raises(ClientConflictError):
+        await database.put_item(
+            original,
+            condition_expression=condition,
+            expression_attribute_values={":previous_version": version or 0},
+        )
+    assert await database.get_item({"projectId": "p1"}) == updated
+
+
+@pytest.mark.asyncio
+async def test_scene_update_preserves_other_scenes_and_top_level_fields(
+    database,
+):
+    """Update a nested scene using placeholders and return the complete saved item."""
+    await database.put_item(
+        {"projectId": "p1", "scenes": [{"sceneId": "s1"}, {"sceneId": "s2"}]},
+    )
+    result = await database.update_item(
+        key={"projectId": "p1"},
+        update_expression="SET scenes[1].#status = :status, scenes[1].videoKey = :key, updatedAt = :now",
+        condition_expression="scenes[1].sceneId = :sceneId",
+        expression_attribute_names={"#status": "status"},
+        expression_attribute_values={
+            ":status": "pending",
+            ":key": "video.mp4",
+            ":now": "now",
+            ":sceneId": "s2",
+        },
+    )
+    assert result == {
+        "projectId": "p1",
+        "scenes": [
+            {"sceneId": "s1"},
+            {"sceneId": "s2", "status": "pending", "videoKey": "video.mp4"},
+        ],
+        "updatedAt": "now",
+    }
+    assert await database.get_item({"projectId": "p1"}) == result
+
+
+@pytest.mark.asyncio
+async def test_update_returns_persisted_item_with_native_numbers(database):
+    await database.put_item({"projectId": "p1", "version": 1, "label": "keep"})
+    result = await database.update_item(
+        key={"projectId": "p1"},
+        update_expression="SET #v = :next, rating = :rating",
+        condition_expression="#v = :expected",
+        expression_attribute_names={"#v": "version"},
+        expression_attribute_values={
+            ":next": 2,
+            ":expected": 1,
+            ":rating": 4.5,
+        },
+    )
+    assert result == {
+        "projectId": "p1",
+        "version": 2,
+        "label": "keep",
+        "rating": 4.5,
+    }
+    assert type(result["version"]) is int
+    assert type(result["rating"]) is float
+    assert await database.get_item({"projectId": "p1"}) == result
+
+
+@pytest.mark.asyncio
+async def test_rejected_update_keeps_stored_item(database):
+    original = {"projectId": "p1", "version": 2}
+    await database.put_item(original)
+    with pytest.raises(ClientConflictError):
+        await database.update_item(
+            key={"projectId": "p1"},
+            update_expression="SET #v = :next",
+            condition_expression="#v = :expected",
+            expression_attribute_names={"#v": "version"},
+            expression_attribute_values={":next": 3, ":expected": 1},
+        )
+    assert await database.get_item({"projectId": "p1"}) == original
+
+
+@pytest.mark.asyncio
+async def test_query_primary_key_excludes_other_items(database):
+    await seed_projects(database)
+    result = await database.query(key_condition={"projectId": "p1"})
+    assert [item["projectId"] for item in result.items] == ["p1"]
     assert result.last_evaluated_key is None
-    assert table.query_kwargs is not None
-    assert table.query_kwargs["IndexName"] == "group-index"
-    expression = table.query_kwargs["KeyConditionExpression"].get_expression()
-    assert expression["operator"] == "="
-    assert expression["values"][0].name == "userId"
-    assert expression["values"][1] == "user-123"
+    assert type(result.items[0]["version"]) is int
 
 
 @pytest.mark.asyncio
-async def test_query_converts_attribute_key_condition_to_expression():
-    """Test query converts attribute equality conditions for DynamoDB."""
-    table = MockDynamoTable()
-    resource = MockDynamoResource(table)
-    database = DynamoDb(table_name="projects")
-    database.session = MockDynamoSession(resource)
-
-    await database.query(
-        key_condition={"groupId": "group-123"},
-        index="GSI1",
+async def test_query_index_applies_all_filters(database):
+    await seed_projects(database)
+    result = await database.query(
+        key_condition={"groupId": "group-1"},
+        index=INDEX,
+        filter_expression={"isActive": True, "category": "recording"},
     )
-
-    assert table.query_kwargs is not None
-    assert "groupId" not in table.query_kwargs
-    key_expression = table.query_kwargs["KeyConditionExpression"]
-    expression = key_expression.get_expression()
-    assert expression["operator"] == "="
-    assert expression["values"][0].name == "groupId"
-    assert expression["values"][1] == "group-123"
-    assert table.query_kwargs["IndexName"] == "GSI1"
+    assert [item["projectId"] for item in result.items] == ["p0"]
 
 
 @pytest.mark.asyncio
-async def test_query_passes_filter_expression_to_dynamodb():
-    """Test query converts equality filters to a DynamoDB condition."""
-    table = MockDynamoTable()
-    resource = MockDynamoResource(table)
-    database = DynamoDb(table_name="users")
-    database.session = MockDynamoSession(resource)
-
-    await database.query(
-        key_condition={"userId": "user-123"},
-        filter_expression={"isActive": True},
+async def test_query_pagination_returns_each_matching_item_once(database):
+    await seed_projects(database)
+    first = await database.query(
+        key_condition={"groupId": "group-1"},
+        index=INDEX,
+        limit=1,
     )
-
-    assert table.query_kwargs is not None
-    filter_expression = table.query_kwargs["FilterExpression"]
-    expression = filter_expression.get_expression()
-    assert expression["format"] == "{0} {operator} {1}"
-    assert expression["operator"] == "="
-    assert expression["values"][0].name == "isActive"
-    assert expression["values"][1] is True
+    assert len(first.items) == 1
+    assert first.last_evaluated_key is not None
+    items = list(first.items)
+    start_key = first.last_evaluated_key
+    while start_key:
+        page = await database.query(
+            key_condition={"groupId": "group-1"},
+            index=INDEX,
+            limit=1,
+            exclusive_start_key=start_key,
+        )
+        items.extend(page.items)
+        start_key = page.last_evaluated_key
+    assert [item["projectId"] for item in items] == ["p0", "p1", "p2"]
 
 
 @pytest.mark.asyncio
-async def test_scan_passes_filter_expression_to_dynamodb():
-    """Test scan converts equality filters to a DynamoDB condition."""
-    table = MockDynamoTable()
-    resource = MockDynamoResource(table)
-    database = DynamoDb(table_name="users")
-    database.session = MockDynamoSession(resource)
+async def test_scan_applies_all_filters(database):
+    await seed_projects(database)
+    result = await database.scan(
+        filter_expression={"groupId": "group-1", "isActive": True},
+    )
+    assert {item["projectId"] for item in result.items} == {"p0", "p2"}
 
-    await database.scan(filter_expression={"role": "admin"})
 
-    assert table.scan_kwargs is not None
-    filter_expression = table.scan_kwargs["FilterExpression"]
-    expression = filter_expression.get_expression()
-    assert expression["format"] == "{0} {operator} {1}"
-    assert expression["operator"] == "="
-    assert expression["values"][0].name == "role"
-    assert expression["values"][1] == "admin"
+@pytest.mark.asyncio
+async def test_scan_pagination_returns_every_item_once(database):
+    await seed_projects(database)
+    first = await database.scan(limit=1)
+    assert len(first.items) == 1
+    assert first.last_evaluated_key is not None
+    items = list(first.items)
+    start_key = first.last_evaluated_key
+    while start_key:
+        page = await database.scan(limit=1, exclusive_start_key=start_key)
+        items.extend(page.items)
+        start_key = page.last_evaluated_key
+    assert sorted(item["projectId"] for item in items) == [
+        "outsider",
+        "p0",
+        "p1",
+        "p2",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["put", "update", "get"])
+async def test_missing_table_propagates_resource_error(
+    dynamodb_table,
+    mock_aws_session,
+    operation,
+):
+    missing = DynamoDb(table_name="it_missing")
+    missing.session = mock_aws_session
+    with pytest.raises(ClientError) as exc_info:
+        if operation == "put":
+            await missing.put_item({"projectId": "p1"})
+        elif operation == "update":
+            await missing.update_item(
+                key={"projectId": "p1"},
+                update_expression="SET n = :n",
+                expression_attribute_values={":n": 1},
+            )
+        else:
+            await missing.get_item({"projectId": "p1"})
+    assert (
+        exc_info.value.response["Error"]["Code"] == "ResourceNotFoundException"
+    )
 
 
 def test_convert_to_dynamodb_converts_int_to_decimal():
@@ -332,124 +535,3 @@ def test_convert_roundtrip_preserves_data():
     assert converted_back["isActive"] == original["isActive"]
     assert converted_back["profile"]["level"] == original["profile"]["level"]
     assert converted_back["profile"]["score"] == original["profile"]["score"]
-
-
-class MockWriteTable:
-    """Async DynamoDB table fake for put_item/update_item tests."""
-
-    def __init__(self, error_code: str | None = None) -> None:
-        self.error_code = error_code
-        self.put_kwargs: dict[str, object] | None = None
-        self.update_kwargs: dict[str, object] | None = None
-
-    def _raise_if_configured(self) -> None:
-        if self.error_code is not None:
-            raise ClientError(
-                {"Error": {"Code": self.error_code, "Message": "rejected"}},
-                "Write",
-            )
-
-    async def put_item(self, **kwargs: object) -> dict[str, object]:
-        self.put_kwargs = kwargs
-        self._raise_if_configured()
-        return {}
-
-    async def update_item(self, **kwargs: object) -> dict[str, object]:
-        self.update_kwargs = kwargs
-        self._raise_if_configured()
-        return {"Attributes": {"projectId": "p1", "version": 2}}
-
-
-def _build_database(table: MockWriteTable) -> DynamoDb:
-    database = DynamoDb(table_name="projects")
-    database.session = MockDynamoSession(MockDynamoResource(table))
-    return database
-
-
-@pytest.mark.asyncio
-async def test_put_item_without_condition_sends_only_item():
-    """Test put_item omits condition arguments when none are given."""
-    table = MockWriteTable()
-
-    await _build_database(table).put_item({"projectId": "p1"})
-
-    assert table.put_kwargs == {"Item": {"projectId": "p1"}}
-
-
-@pytest.mark.asyncio
-async def test_put_item_passes_condition_to_dynamodb():
-    """Test put_item forwards the condition and converted values."""
-    table = MockWriteTable()
-
-    await _build_database(table).put_item(
-        {"projectId": "p1", "version": 2},
-        condition_expression="version = :expected_version",
-        expression_attribute_values={":expected_version": 1},
-    )
-
-    assert table.put_kwargs is not None
-    assert table.put_kwargs["ConditionExpression"] == (
-        "version = :expected_version"
-    )
-    assert table.put_kwargs["ExpressionAttributeValues"] == {
-        ":expected_version": Decimal(1),
-    }
-
-
-@pytest.mark.asyncio
-async def test_put_item_conditional_failure_raises_conflict():
-    """Test ConditionalCheckFailedException becomes ClientConflictError."""
-    table = MockWriteTable(error_code="ConditionalCheckFailedException")
-
-    with pytest.raises(ClientConflictError, match="rejected"):
-        await _build_database(table).put_item(
-            {"projectId": "p1"},
-            condition_expression="version = :expected_version",
-            expression_attribute_values={":expected_version": 1},
-        )
-
-
-@pytest.mark.asyncio
-async def test_put_item_reraises_other_client_errors():
-    """Test other DynamoDB errors are not converted."""
-    table = MockWriteTable(error_code="ProvisionedThroughputExceeded")
-
-    with pytest.raises(ClientError):
-        await _build_database(table).put_item({"projectId": "p1"})
-
-
-@pytest.mark.asyncio
-async def test_update_item_returns_converted_attributes():
-    """Test update_item sends expressions and returns the new item."""
-    table = MockWriteTable()
-
-    result = await _build_database(table).update_item(
-        key={"projectId": "p1"},
-        update_expression="SET #s = :s",
-        condition_expression="attribute_exists(projectId)",
-        expression_attribute_names={"#s": "status"},
-        expression_attribute_values={":s": "SUBMITTED"},
-    )
-
-    assert result == {"projectId": "p1", "version": 2}
-    assert table.update_kwargs == {
-        "Key": {"projectId": "p1"},
-        "UpdateExpression": "SET #s = :s",
-        "ReturnValues": "ALL_NEW",
-        "ConditionExpression": "attribute_exists(projectId)",
-        "ExpressionAttributeNames": {"#s": "status"},
-        "ExpressionAttributeValues": {":s": "SUBMITTED"},
-    }
-
-
-@pytest.mark.asyncio
-async def test_update_item_conditional_failure_raises_conflict():
-    """Test a failed update condition becomes ClientConflictError."""
-    table = MockWriteTable(error_code="ConditionalCheckFailedException")
-
-    with pytest.raises(ClientConflictError):
-        await _build_database(table).update_item(
-            key={"projectId": "p1"},
-            update_expression="SET #s = :s",
-            condition_expression="scenes[0].sceneId = :sceneId",
-        )
