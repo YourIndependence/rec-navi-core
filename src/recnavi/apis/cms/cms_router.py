@@ -33,10 +33,8 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
-from recnavi.application.scene.review_scene_usecase import review_scene_usecase
-from recnavi.application.user.get_group_users_usecase import (
-    get_group_users_usecase,
-)
+from recnavi.application.scene.review_scene import review_scene_usecase
+from recnavi.application.user.get_group_users import get_group_users_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME

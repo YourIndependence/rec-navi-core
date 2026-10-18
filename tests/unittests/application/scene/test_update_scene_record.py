@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.scene.update_scene_record_usecase import (
+from recnavi.application.scene.update_scene_record import (
     update_scene_record_usecase,
 )
 from recnavi.core.types.user import User
@@ -35,7 +35,7 @@ async def test_usecase_delegates_to_update_scene_record():
     expected_output = object()
 
     with patch(
-        "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
+        "recnavi.application.scene.update_scene_record.update_scene_record",
         new=AsyncMock(return_value=expected_output),
     ) as mock_update:
         result = await update_scene_record_usecase(

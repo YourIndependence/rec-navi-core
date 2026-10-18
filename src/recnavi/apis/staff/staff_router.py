@@ -22,7 +22,7 @@ from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
-from recnavi.application.scene.update_scene_record_usecase import (
+from recnavi.application.scene.update_scene_record import (
     update_scene_record_usecase,
 )
 from recnavi.config.variables import PROJECTS_TABLE_NAME

@@ -115,3 +115,13 @@ mockups, modules that only declare Pydantic schemas or core types, the modules
 | Real AWS tests | `tests/integration/` with markers | Use `pytest.mark.real_aws`; ECS dispatch tests also use `pytest.mark.ecs`. These tests are skipped automatically only when `AWS_ENDPOINT_URL` points to LocalStack. |
 
 This keeps the everyday development workflow fast and deterministic while preserving a place for real-cloud validation when it is intentionally requested.
+
+
+## Application module naming
+
+Application module filenames use `<verb>_<noun>.py` without `_usecase`.
+Use-case function names retain `_usecase`, for example
+`application/scene/review_scene.py` exports `review_scene_usecase`.
+Unit test filenames mirror the module: `test_review_scene.py`.
+See [ARCH-013](adrs/ARCH-013-application-module-naming.md) for the decision
+and its automated enforcement.

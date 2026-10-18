@@ -14,9 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.user.get_group_users_usecase import (
-    get_group_users_usecase,
-)
+from recnavi.application.user.get_group_users import get_group_users_usecase
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -42,7 +40,7 @@ async def test_lists_only_authenticated_users_group(role):
         ),
     ]
     with patch(
-        "recnavi.application.user.get_group_users_usecase.get_group_users",
+        "recnavi.application.user.get_group_users.get_group_users",
         new=AsyncMock(return_value=expected_users),
     ) as get_users:
         result = await get_group_users_usecase(users_db=database, user=user)
