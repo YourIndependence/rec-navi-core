@@ -7,13 +7,4 @@
 # For internal use only.
 # developer team.
 
-"""Master data application use cases."""
-
-from recnavi.application.master.get_template_thumbnail_usecase import (
-    get_template_thumbnail_usecase,
-)
-
-
-__all__ = [
-    "get_template_thumbnail_usecase",
-]
+"""Staff-facing API routers."""

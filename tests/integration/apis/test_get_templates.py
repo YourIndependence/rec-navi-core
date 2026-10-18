@@ -56,7 +56,6 @@ def test_get_templates_returns_400_when_no_token(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_get_templates_returns_injected_template(
     client,
     auth_headers,

@@ -7,26 +7,25 @@
 # For internal use only.
 # developer team.
 
-"""Get template thumbnail image use case."""
-
-from collections.abc import AsyncIterator
+"""Delete project use case."""
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.scene.scenes_template import get_template_thumbnail
+from recnavi.core.project.delete_project import delete_project
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.user import User
 
 
-async def get_template_thumbnail_usecase(
+async def delete_project_usecase(
     *,
-    templates_db: BaseDatabase,
-    template_id: str,
-    bucket_name: str,
+    projects_db: BaseDatabase,
+    project_id: str,
+    user: User,
     storage: BaseObjectStorage,
-) -> tuple[AsyncIterator[bytes], str]:
-    """Get template thumbnail image."""
-    return await get_template_thumbnail(
-        templates_db=templates_db,
-        template_id=template_id,
-        bucket_name=bucket_name,
+) -> str:
+    """Delete project from database and object storage."""
+    return await delete_project(
+        projects_db=projects_db,
+        project_id=project_id,
+        user=user,
         storage=storage,
     )

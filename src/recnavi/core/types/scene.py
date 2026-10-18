@@ -23,8 +23,15 @@ class SceneStatus(StrEnum):
 
     NOT_RECORDED = "not_recorded"
     PENDING = "pending"
-    REJECT = "reject"
-    APPROVE = "approve"
+    REJECTED = "rejected"
+    APPROVED = "approved"
+
+
+class ReviewSceneResult(StrEnum):
+    """Decision made when reviewing a scene recording."""
+
+    APPROVED = SceneStatus.APPROVED
+    REJECTED = SceneStatus.REJECTED
 
 
 class Scene(BaseModel):
@@ -67,4 +74,31 @@ class Scene(BaseModel):
     assigned_user_ids: list[str] = Field(
         default_factory=list,
         description="Identifiers of the staff who record the scene",
+    )
+    reviewed_by: str | None = Field(
+        default=None,
+        description="Identifier of the owner who reviewed the scene",
+    )
+    reviewed_at: str | None = Field(
+        default=None,
+        description="Datetime the scene was reviewed",
+    )
+    review_comment: str | None = Field(
+        default=None,
+        description="Review comment from the owner",
+    )
+
+
+class SceneView(Scene):
+    """A scene with presigned playback URLs for API responses."""
+
+    video_key: str | None = Field(default=None, exclude=True)
+    thumbnail_key: str | None = Field(default=None, exclude=True)
+    video_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the recorded video. None if not recorded",
+    )
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the thumbnail. None if not recorded",
     )

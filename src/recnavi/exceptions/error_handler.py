@@ -22,6 +22,8 @@ from recnavi.core.utils.discord_handler import post_error_discord
 
 from .exceptions import BaseClientExceptionError
 from .exceptions import ClientAuthorizationError
+from .exceptions import ClientNotFoundError
+from .exceptions import ClientUnprocessableEntityError
 
 
 ERROR_LOG_BUCKET_NAME = "trust-api-error-log"
@@ -46,6 +48,12 @@ async def custom_exception_handler(request: Request, exc: Exception):
     if isinstance(exc, ClientAuthorizationError):
         message = str(exc)
         status_code = 403
+    elif isinstance(exc, ClientNotFoundError):
+        message = str(exc)
+        status_code = 404
+    elif isinstance(exc, ClientUnprocessableEntityError):
+        message = str(exc)
+        status_code = 422
     elif isinstance(exc, BaseClientExceptionError):
         message = str(exc)
         status_code = 400
