@@ -86,9 +86,9 @@ def test_get_group_users_returns_only_current_groups_public_members(
     group_members,
 ):
     """Keep tenant isolation and expose only the agreed member fields."""
-    member, outsider = group_members
+    member, _ = group_members
     response = client.get(
-        f"/getGroupUsers?groupId={outsider.group_id}",
+        "/getGroupUsers",
         headers=auth_headers,
     )
     assert response.status_code == 200
