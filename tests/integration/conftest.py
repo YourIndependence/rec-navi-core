@@ -52,7 +52,7 @@ def client():
         mock_infrastracture_injection_when_ci(app)
         yield client
 
-    app.dependency_overrides.clear()
+    app.dependency_overrides.pop(verify_user, None)
 
 
 def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:

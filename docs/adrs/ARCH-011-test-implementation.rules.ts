@@ -509,101 +509,38 @@ export default {
       },
     },
 
-    /**
-     * Integration tests must not use @patch or unittest.mock.patch.
-     * Patching out real components turns the test into a unit test and removes
-     * the ability to verify that actual component interactions work correctly.
-     * (Moved from ARCH-004 — this is an implementation-level enforcement.)
-     */
     "no-patch-in-integration-tests": {
       description:
-        "Integration tests must not patch application collaborators. Deterministic boundary doubles are allowed for LLM model resolution, notification sending, ECS handoff setup, and startup registry isolation.",
+        "Integration files must not contain patch text. Only verify_user may be overridden through FastAPI dependency_overrides.",
       severity: "error",
       check: async (ctx) => {
-        const matches = await ctx.grepFiles(
-          /@patch\s*\(|with\s+patch\s*\(/,
-          "tests/integration/**/*.py",
-        );
-        for (const match of matches) {
-          if (match.file.endsWith("conftest.py")) continue;
-          const allowedBoundaryPatch =
-            match.content.includes("_resolve_model") ||
-            match.content.includes("get_sentence_transformer_model") ||
-            match.content.includes("send_notice") ||
-            match.content.includes("run_task") ||
-            match.content.includes("initialize_store_registry") ||
-            match.content.includes("initialize_agent_registry");
-          if (allowedBoundaryPatch) continue;
-
-          ctx.report.violation({
-            message:
-              "unittest.mock.patch used in integration test — patching application collaborators turns this into a unit test",
-            file: match.file,
-            line: match.line,
-            fix: [
-              "Use real local services or framework-provided test doubles instead:",
-              "  - AWS services: use the LocalStack-backed integration profile",
-              "  - ADK sessions: use InMemorySessionService",
-              "  - FastAPI dependencies: use app.dependency_overrides",
-              "  - LLM determinism: patch only _resolve_model / MockModel boundary",
-              "  - If unit-level isolation is truly needed, move to tests/unittests/",
-            ].join("\n"),
-          });
-        }
-      },
-    },
-
-    /**
-     * monkeypatch.setattr() in integration tests must not replace components.
-     * Using monkeypatch.setattr() on a service, agent, store, or I/O attribute
-     * has the same effect as @patch — it removes a real collaborator from the
-     * integration path.
-     *
-     * monkeypatch is permitted ONLY for environment configuration (setenv, setitem).
-     */
-    "no-monkeypatch-setattr-component-in-integration": {
-      description:
-        "monkeypatch.setattr() must not replace services, agents, stores, or I/O in integration tests. It is allowed only for environment configuration (setenv, setitem).",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/**/*.py");
-        for (const file of testFiles) {
-          if (file.endsWith("conftest.py")) continue;
-          const content = await ctx.readFile(file);
-          if (!content.includes("monkeypatch.setattr")) continue;
-
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes("monkeypatch.setattr")) {
+        for (const file of await ctx.glob("tests/integration/**/*.py")) {
+          const lines = (await ctx.readFile(file)).split("\n");
+          for (let index = 0; index < lines.length; index++) {
+            const line = lines[index];
+            if (/patch/i.test(line)) {
               ctx.report.violation({
-                message:
-                  "monkeypatch.setattr() in integration test replaces a real component — this defeats the purpose of integration testing",
+                message: "Integration file contains patch text; replacing collaborators is forbidden",
                 file,
-                line: i + 1,
-                fix: [
-                  "Replace with an environment-safe alternative:",
-                  "  - For FastAPI dependencies: app.dependency_overrides[dep] = stub",
-                  "  - For AWS services: use moto @mock_aws",
-                  "  - For environment config: monkeypatch.setenv() or monkeypatch.setitem() are allowed",
-                  "  - If component isolation is needed, move to tests/unittests/",
-                ].join("\n"),
+                line: index + 1,
+                fix: "Use the shared infrastructure and seed data through its public interface. For authentication only, use app.dependency_overrides[verify_user] and restore it afterward.",
               });
-              break;
+            }
+            for (const occurrence of line.matchAll(/dependency_overrides/g)) {
+              const access = line.slice(occurrence.index + occurrence[0].length);
+              if (!/^\s*(?:\[\s*verify_user\s*\]|\.pop\(\s*verify_user\s*[,\)])/.test(access)) {
+                ctx.report.violation({
+                  message: "Only verify_user may be accessed through dependency_overrides in integration files",
+                  file,
+                  line: index + 1,
+                  fix: "Use app.dependency_overrides[verify_user] for authentication only; preserve all other application dependencies.",
+                });
+              }
             }
           }
         }
       },
     },
-
-
-
-
-
-
-
-
-
-
 
     /**
      * Async fixtures must use @pytest_asyncio.fixture, not @pytest.fixture.
