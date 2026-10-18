@@ -22,7 +22,7 @@ def test_review_scene_returns_400_when_no_token(client):
         json={
             "projectId": "proj-123",
             "sceneId": "scene-456",
-            "result": "approve",
+            "result": "approved",
             "comment": "Looks good!",
         },
     )
@@ -62,7 +62,7 @@ async def test_review_scene_persists_review_through_http(client, auth_headers):
             json={
                 "projectId": project_id,
                 "sceneId": project["scenes"][0]["sceneId"],
-                "result": "reject",
+                "result": "rejected",
                 "comment": "Please re-record",
             },
         )
@@ -70,7 +70,7 @@ async def test_review_scene_persists_review_through_http(client, auth_headers):
         data = response.json()["project"]
         assert data["version"] == 1
         scene = data["scenes"][0]
-        assert scene["status"] == "reject"
+        assert scene["status"] == "rejected"
         assert scene["reviewComment"] == "Please re-record"
         assert scene["reviewedBy"] == "test-user-123"
         assert scene["reviewedAt"] is not None

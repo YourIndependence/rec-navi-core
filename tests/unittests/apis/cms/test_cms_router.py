@@ -247,17 +247,20 @@ def test_review_scene_forwards_comment(
             json={
                 "projectId": "proj-123",
                 "sceneId": "scene-456",
-                "result": "approve",
+                "result": "approved",
                 "comment": "Looks good",
             },
         )
     assert response.status_code == 200
-    assert usecase.call_args.kwargs["result"] is ReviewSceneResult.APPROVE
+    assert usecase.call_args.kwargs["result"] is ReviewSceneResult.APPROVED
     assert usecase.call_args.kwargs["review_comment"] == "Looks good"
     assert response.json()["project"]["projectId"] == "proj-123"
 
 
-@pytest.mark.parametrize("result", ["pending", "not_recorded", "invalid"])
+@pytest.mark.parametrize(
+    "result",
+    ["pending", "not_recorded", "invalid", "approve", "reject"],
+)
 def test_review_scene_rejects_invalid_result(
     cms_client: TestClient,
     auth_headers: dict[str, str],

@@ -30,8 +30,8 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
-async def test_review_scene_approve_returns_correct_data():
-    """Test review_scene updates project with APPROVE status."""
+async def test_review_scene_approved_returns_correct_data():
+    """Test review_scene updates project with APPROVED status."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -59,19 +59,23 @@ async def test_review_scene_approve_returns_correct_data():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.APPROVE,
+        result=ReviewSceneResult.APPROVED,
         review_comment=None,
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert result_project.project_id == "proj-123"
-    assert result_project.scenes[0].status == SceneStatus.APPROVE
+    assert result_project.scenes[0].status == SceneStatus.APPROVED
+    assert (
+        result_project.model_dump(mode="json")["scenes"][0]["status"]
+        == "approved"
+    )
 
 
 @pytest.mark.asyncio
-async def test_review_scene_reject_returns_correct_data():
-    """Test review_scene updates project with REJECT status."""
+async def test_review_scene_rejected_returns_correct_data():
+    """Test review_scene updates project with REJECTED status."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -81,7 +85,7 @@ async def test_review_scene_reject_returns_correct_data():
             Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.APPROVED,
             ),
         ],
         created_at="2026-01-01T00:00:00Z",
@@ -99,14 +103,14 @@ async def test_review_scene_reject_returns_correct_data():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.REJECT,
+        result=ReviewSceneResult.REJECTED,
         review_comment=None,
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert result_project.project_id == "proj-123"
-    assert result_project.scenes[0].status == SceneStatus.REJECT
+    assert result_project.scenes[0].status == SceneStatus.REJECTED
 
 
 @pytest.mark.asyncio
@@ -140,7 +144,7 @@ async def test_review_scene_raises_403_for_non_owner():
             projects_db=db,
             project_id="proj-123",
             scene_id="scene-456",
-            result=ReviewSceneResult.APPROVE,
+            result=ReviewSceneResult.APPROVED,
             review_comment=None,
             user=staff_user,
             storage=MockObjectStorage(bucket_name="bucket"),
@@ -178,7 +182,7 @@ async def test_review_scene_raises_403_for_wrong_group():
             projects_db=db,
             project_id="proj-123",
             scene_id="scene-456",
-            result=ReviewSceneResult.APPROVE,
+            result=ReviewSceneResult.APPROVED,
             review_comment=None,
             user=other_owner,
             storage=MockObjectStorage(bucket_name="bucket"),
@@ -216,7 +220,7 @@ async def test_review_scene_raises_404_when_scene_not_found():
             projects_db=db,
             project_id="proj-123",
             scene_id="nonexistent-scene",
-            result=ReviewSceneResult.APPROVE,
+            result=ReviewSceneResult.APPROVED,
             review_comment=None,
             user=user,
             storage=MockObjectStorage(bucket_name="bucket"),
@@ -225,7 +229,7 @@ async def test_review_scene_raises_404_when_scene_not_found():
 
 @pytest.mark.asyncio
 async def test_review_scene_allows_re_review():
-    """Test review_scene allows changing APPROVE to REJECT."""
+    """Test review_scene allows changing APPROVED to REJECTED."""
     project = Project(
         project_id="proj-123",
         group_id="group-1",
@@ -235,7 +239,7 @@ async def test_review_scene_allows_re_review():
             Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.APPROVED,
             ),
         ],
         created_at="2026-01-01T00:00:00Z",
@@ -253,13 +257,13 @@ async def test_review_scene_allows_re_review():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.REJECT,
+        result=ReviewSceneResult.REJECTED,
         review_comment=None,
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
     )
 
-    assert result_project.scenes[0].status == SceneStatus.REJECT
+    assert result_project.scenes[0].status == SceneStatus.REJECTED
     assert result_project.scenes[0].scene_id == "scene-456"
 
 
@@ -300,14 +304,14 @@ async def test_review_scene_returns_view_with_urls_and_no_keys():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.APPROVE,
+        result=ReviewSceneResult.APPROVED,
         review_comment=None,
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     expires = SCENE_URL_EXPIRATION_SECONDS
-    assert view.scenes[0].status == SceneStatus.APPROVE
+    assert view.scenes[0].status == SceneStatus.APPROVED
     assert view.scenes[0].video_url == (
         f"mock://bucket/videos/s456.mp4?expires={expires}"
     )
@@ -322,7 +326,7 @@ async def test_review_scene_returns_view_with_urls_and_no_keys():
 
 
 @pytest.mark.asyncio
-async def test_review_scene_reject_moves_submitted_project_to_in_progress():
+async def test_review_scene_rejected_moves_submitted_project_to_in_progress():
     """Test rejecting a scene reopens a SUBMITTED project."""
     project = Project(
         project_id="proj-123",
@@ -334,7 +338,7 @@ async def test_review_scene_reject_moves_submitted_project_to_in_progress():
             Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.APPROVED,
             ),
         ],
         created_at="2026-01-01T00:00:00Z",
@@ -352,7 +356,7 @@ async def test_review_scene_reject_moves_submitted_project_to_in_progress():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.REJECT,
+        result=ReviewSceneResult.REJECTED,
         review_comment="Please re-record",
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
@@ -362,7 +366,7 @@ async def test_review_scene_reject_moves_submitted_project_to_in_progress():
 
 
 @pytest.mark.asyncio
-async def test_review_scene_approve_keeps_submitted_project_submitted():
+async def test_review_scene_approved_keeps_submitted_project_submitted():
     """Test approving a scene does not change the project status."""
     project = Project(
         project_id="proj-123",
@@ -392,14 +396,14 @@ async def test_review_scene_approve_keeps_submitted_project_submitted():
         projects_db=db,
         project_id="proj-123",
         scene_id="scene-456",
-        result=ReviewSceneResult.APPROVE,
+        result=ReviewSceneResult.APPROVED,
         review_comment=None,
         user=user,
         storage=MockObjectStorage(bucket_name="bucket"),
     )
 
     assert view.status == ProjectStatus.SUBMITTED
-    assert view.scenes[0].status == SceneStatus.APPROVE
+    assert view.scenes[0].status == SceneStatus.APPROVED
 
 
 @pytest.mark.asyncio
@@ -419,7 +423,7 @@ async def test_review_advances_version_and_clears_previous_comment(
             Scene(
                 scene_id="s",
                 scene_principal="cooking",
-                status=SceneStatus.REJECT,
+                status=SceneStatus.REJECTED,
                 review_comment="Old comment",
             ),
         ],
@@ -432,7 +436,7 @@ async def test_review_advances_version_and_clears_previous_comment(
         projects_db=db,
         project_id="p",
         scene_id="s",
-        result=ReviewSceneResult.APPROVE,
+        result=ReviewSceneResult.APPROVED,
         review_comment=None,
         user=User(
             user_id="owner",
@@ -470,7 +474,7 @@ async def test_review_propagates_concurrent_write_conflict():
             projects_db=db,
             project_id="p",
             scene_id="s",
-            result=ReviewSceneResult.APPROVE,
+            result=ReviewSceneResult.APPROVED,
             review_comment=None,
             user=User(
                 user_id="owner",
@@ -501,7 +505,7 @@ async def test_review_denies_another_owner_in_same_group():
             projects_db=MockDatabase([project.model_dump(by_alias=True)]),
             project_id="p",
             scene_id="s",
-            result=ReviewSceneResult.APPROVE,
+            result=ReviewSceneResult.APPROVED,
             review_comment=None,
             user=User(
                 user_id="other",

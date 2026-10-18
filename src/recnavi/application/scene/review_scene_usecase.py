@@ -27,7 +27,7 @@ async def review_scene_usecase(
     user: User,
     storage: BaseObjectStorage,
 ) -> Project:
-    """Review a scene recording (approve or reject)."""
+    """Review a scene recording (approved or rejected)."""
     return await review_scene(
         projects_db=projects_db,
         project_id=project_id,

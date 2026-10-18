@@ -56,11 +56,7 @@ async def review_scene(
         raise ClientNotFoundError("Scene not found")
 
     timestamp = datetime.now(UTC).isoformat()
-    new_status = (
-        SceneStatus.APPROVE
-        if result == ReviewSceneResult.APPROVE
-        else SceneStatus.REJECT
-    )
+    new_status = SceneStatus(result.value)
 
     scene = project.scenes[scene_index]
     scene.status = new_status
@@ -68,7 +64,7 @@ async def review_scene(
     scene.reviewed_at = timestamp
     scene.review_comment = review_comment
     if (
-        result == ReviewSceneResult.REJECT
+        result == ReviewSceneResult.REJECTED
         and project.status == ProjectStatus.SUBMITTED
     ):
         project.status = ProjectStatus.IN_PROGRESS

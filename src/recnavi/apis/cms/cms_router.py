@@ -107,7 +107,7 @@ async def review_scene_endpoint(
     item: ReviewSceneRequest,
     user: User = Depends(verify_user),
 ) -> ReviewSceneResponse:
-    """Review a scene recording (approve or reject)."""
+    """Review a scene recording (approved or rejected)."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
     updated_project = await review_scene_usecase(

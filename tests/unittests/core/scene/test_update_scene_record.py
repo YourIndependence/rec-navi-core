@@ -47,7 +47,7 @@ def _project_item(video_key: str | None = None) -> dict:
             {
                 "sceneId": "scene-1",
                 "scenePrincipal": "cooking",
-                "status": "reject" if video_key else "not_recorded",
+                "status": "rejected" if video_key else "not_recorded",
                 "videoKey": video_key,
                 "thumbnailKey": None,
                 "assignedUserIds": ["staff-789"],
