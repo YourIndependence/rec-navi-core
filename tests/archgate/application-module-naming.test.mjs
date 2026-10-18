@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import ruleSet from "../../docs/adrs/ARCH-013-application-module-naming.rules.ts";
+import ruleSet from "../../docs/adrs/ARCH-001-clean-architecture.rules.ts";
 
 async function check(files) {
   const rule = ruleSet.rules["application-module-no-usecase-suffix"];

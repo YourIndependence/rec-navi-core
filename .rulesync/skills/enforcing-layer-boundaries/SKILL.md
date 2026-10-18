@@ -54,7 +54,7 @@ async def get_projects(
 **`application/` -- use cases only.** A use case answers "what does the caller
 want to achieve". It is the only place that composes several core calls, applies
 authorization decisions, or sequences steps. It is named `<verb>_<noun>_usecase`
-and is callable with no HTTP present. Module filenames omit `_usecase`; function names retain it (ARCH-013).
+and is callable with no HTTP present. Module filenames omit `_usecase`; function names retain it (ARCH-001).
 
 ```python
 async def get_projects_usecase(

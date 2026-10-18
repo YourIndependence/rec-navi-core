@@ -123,5 +123,5 @@ Application module filenames use `<verb>_<noun>.py` without `_usecase`.
 Use-case function names retain `_usecase`, for example
 `application/scene/review_scene.py` exports `review_scene_usecase`.
 Unit test filenames mirror the module: `test_review_scene.py`.
-See [ARCH-013](adrs/ARCH-013-application-module-naming.md) for the decision
+See [ARCH-001](adrs/ARCH-001-clean-architecture.md#file-naming) for the decision
 and its automated enforcement.

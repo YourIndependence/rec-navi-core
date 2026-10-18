@@ -3,7 +3,7 @@ id: ARCH-001
 title: 4-Layer Clean Architecture (apis / application / core / infrastructure)
 domain: architecture
 status: active
-date: 2026-05-05
+date: 2026-10-19
 rules: true
 files:
   - 'src/**/*.py'
@@ -37,7 +37,28 @@ Dependency direction: `apis/ → application/ → core/ ← infrastructure/`
 | `exceptions/`  | Custom exceptions (accessible from all layers)                  |
 | `task_runner/` | Background task management                                      |
 
+### File Naming
+
+Application module filenames use `<verb>_<noun>.py` without the `_usecase`
+suffix. The `application/` directory already identifies the layer. Use-case
+function names retain `_usecase` to distinguish them from core operations.
+
+```python
+from recnavi.application.user.get_group_users import get_group_users_usecase
+```
+
+The implementation module `application/user/get_group_users.py` is tested by
+`tests/unittests/application/user/test_get_group_users.py` under ARCH-011.
+Rename imports, mock patch targets, and mirrored tests together. Do not retain
+compatibility modules ending in `_usecase.py`.
+
 ## Rationale
+
+**Alternative: `_usecase` on both modules and functions.** The module suffix
+repeats the layer and conflicts with the existing project application modules.
+Removing the function suffix as well would obscure application entry points at
+call sites, so this decision changes only module names and import paths.
+
 
 **Alternative: Feature-Sliced Design**
 Organizes directories by feature domain. As feature count grows, cross-cutting concerns like LLM clients and DB connections scatter across multiple features, making dependency graphs complex and hard to reason about.
@@ -84,6 +105,9 @@ See [known-deviations.md](./known-deviations.md) for the full list of accepted c
 
 **Do:**
 
+- Name application modules `<verb>_<noun>.py`, retaining `_usecase` on use-case functions
+- Update imports, mock patch targets, and mirrored unit tests when modules move
+
 - Add new external clients in `infrastructure/external_clients/` and implement the ABC from `core/external_clients_interface/`
 - Create new DB adapters in `infrastructure/database/*_database.py` with an `initialize()` function (auto-detected)
 - Resolve dependencies in `application/` through registry functions (`get_database()`, `get_store_instance_by_name()`, etc.)
@@ -91,6 +115,8 @@ See [known-deviations.md](./known-deviations.md) for the full list of accepted c
 - Add agent-specific tools in `core/agents/*/tools.py` with an `initialize(prefix: str)` function as defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md)
 
 **Don't:**
+
+- Add or retain application Python modules ending in `_usecase.py`
 
 - Import from `application/` or `apis/` inside `infrastructure/`
 - Import `apis/` Pydantic schemas inside `application/` (use `core/types/` instead)
