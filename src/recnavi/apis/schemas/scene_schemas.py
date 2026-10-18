@@ -17,6 +17,7 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import ReviewSceneResult
 
 
 class SceneMasterView(BaseModel):
@@ -55,6 +56,23 @@ class GetSceneMastersResponse(BaseModel):
         ...,
         description="List of all scene masters",
     )
+
+
+class ReviewSceneRequest(BaseItemModel):
+    """Request for POST /reviewScene."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    result: ReviewSceneResult = Field(..., description="Review result")
+    comment: str | None = Field(default=None, description="Review comment")
+
+
+class ReviewSceneResponse(BaseApiResponseModel):
+    """Response for POST /reviewScene."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: Project = Field(..., description="Updated project")
 
 
 class UpdateSceneRecordRequest(BaseItemModel):
