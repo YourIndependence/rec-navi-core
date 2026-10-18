@@ -19,12 +19,8 @@ from recnavi.application.project.submit_project_usecase import (
 )
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.project_view import ProjectView
-from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
@@ -32,7 +28,7 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 async def test_usecase_delegates_to_submit_project():
     """Test usecase delegates to core submit_project collaborator."""
     mock_db = AsyncMock()
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name="bucket")
     user = User(
         user_id="staff-1",
         user_name="Staff One",
@@ -40,7 +36,7 @@ async def test_usecase_delegates_to_submit_project():
         role=UserRole.STAFF,
     )
 
-    mock_project = ProjectView(
+    mock_project = Project(
         project_id="proj-123",
         group_id="group-1",
         owner_user_id="owner-1",
@@ -63,7 +59,6 @@ async def test_usecase_delegates_to_submit_project():
         result = await submit_project_usecase(
             projects_db=mock_db,
             storage=storage,
-            bucket_name="bucket",
             project_id="proj-123",
             user=user,
         )
@@ -71,160 +66,7 @@ async def test_usecase_delegates_to_submit_project():
     mock_submit.assert_awaited_once_with(
         projects_db=mock_db,
         storage=storage,
-        bucket_name="bucket",
         project_id="proj-123",
         user=user,
     )
     assert result is expected_output
-
-
-@pytest.mark.asyncio
-async def test_usecase_updates_status_when_all_recorded():
-    """Test usecase updates project status to SUBMITTED when every scene is recorded."""
-    project = Project(
-        project_id="proj-123",
-        group_id="group-1",
-        owner_user_id="owner-1",
-        project_name="Test Project",
-        assigned_user_ids=["staff-1"],
-        scenes=[
-            Scene(
-                scene_id="scene-1",
-                scene_principal="cooking",
-                status=SceneStatus.PENDING,
-                video_key="videos/scene-1.mp4",
-            ),
-            Scene(
-                scene_id="scene-2",
-                scene_principal="interview",
-                status=SceneStatus.REJECT,
-                video_key="videos/scene-2.mp4",
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-1",
-        user_name="Staff One",
-        group_id="group-1",
-        role=UserRole.STAFF,
-    )
-
-    updated_project, missing_scene_ids = await submit_project_usecase(
-        projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-123",
-        user=user,
-    )
-
-    assert updated_project.status == ProjectStatus.SUBMITTED
-    assert missing_scene_ids == []
-    assert updated_project.updated_at != "2026-01-01T00:00:00Z"
-
-
-@pytest.mark.asyncio
-async def test_usecase_does_not_update_when_missing():
-    """Test usecase does not update status when a scene is unrecorded."""
-    project = Project(
-        project_id="proj-456",
-        group_id="group-2",
-        owner_user_id="owner-2",
-        project_name="Test Project 2",
-        assigned_user_ids=["staff-2"],
-        scenes=[
-            Scene(
-                scene_id="scene-3",
-                scene_principal="cooking",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-3.mp4",
-            ),
-            Scene(
-                scene_id="scene-4",
-                scene_principal="interview",
-                status=SceneStatus.NOT_RECORDED,
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-2",
-        user_name="Staff Two",
-        group_id="group-2",
-        role=UserRole.STAFF,
-    )
-
-    updated_project, missing_scene_ids = await submit_project_usecase(
-        projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-456",
-        user=user,
-    )
-
-    assert updated_project.status == ProjectStatus.IN_PROGRESS
-    assert missing_scene_ids == ["scene-4"]
-    assert updated_project.updated_at == "2026-01-01T00:00:00Z"
-
-
-@pytest.mark.asyncio
-async def test_usecase_returns_only_unrecorded_scene_ids():
-    """Test usecase reports only unrecorded scenes as missing."""
-    project = Project(
-        project_id="proj-789",
-        group_id="group-3",
-        owner_user_id="owner-3",
-        project_name="Test Project 3",
-        assigned_user_ids=["staff-3"],
-        scenes=[
-            Scene(
-                scene_id="scene-5",
-                scene_principal="cooking",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-5.mp4",
-            ),
-            Scene(
-                scene_id="scene-6",
-                scene_principal="interview",
-                status=SceneStatus.NOT_RECORDED,
-            ),
-            Scene(
-                scene_id="scene-7",
-                scene_principal="outro",
-                status=SceneStatus.REJECT,
-                video_key="videos/scene-7.mp4",
-            ),
-            Scene(
-                scene_id="scene-8",
-                scene_principal="intro",
-                status=SceneStatus.NOT_RECORDED,
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-3",
-        user_name="Staff Three",
-        group_id="group-3",
-        role=UserRole.STAFF,
-    )
-
-    updated_project, missing_scene_ids = await submit_project_usecase(
-        projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-789",
-        user=user,
-    )
-
-    assert updated_project.status == ProjectStatus.IN_PROGRESS
-    assert set(missing_scene_ids) == {"scene-6", "scene-8"}

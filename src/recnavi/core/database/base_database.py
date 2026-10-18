@@ -25,10 +25,16 @@ class BaseDatabase(ABC):
     """
 
     @abstractmethod
-    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
+    async def get_item(
+        self,
+        key: dict[str, Any],
+        *,
+        consistent_read: bool = False,
+    ) -> dict[str, Any] | None:
         """Get a single item by primary key.
 
         Args:
+            consistent_read: Request the latest committed item.
             key: Primary key (and sort key if applicable) as a dictionary.
                  Example: {"userId": "abc123"}
 

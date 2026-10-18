@@ -11,25 +11,28 @@
 
 from fastapi import APIRouter
 from fastapi import Depends
-from fastapi import Query
 from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
-from recnavi.apis.schemas.project_schemas import GetProjectRequest
-from recnavi.apis.schemas.project_schemas import GetProjectResponse
-from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
+from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
+from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
+from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
+from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
+from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
-from recnavi.application.project.get_project import get_project_usecase
-from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.project.delete_project import delete_project_usecase
+from recnavi.application.project.update_project import update_project_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.scene.review_scene_usecase import review_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -77,47 +80,6 @@ async def get_templates_endpoint(
     return GetTemplatesResponse(templates=templates)
 
 
-@cms_router.get("/getProjects")
-async def get_projects_endpoint(
-    request: Request,
-    user: User = Depends(verify_user),
-    limit: int = Query(default=20, ge=1, le=100),
-    cursor: str | None = Query(default=None),
-) -> GetProjectsResponse:
-    """List projects for the authenticated user's group."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-    projects, next_cursor = await get_projects_usecase(
-        projects_db=projects_db,
-        user_id=user.user_id,
-        group_id=user.group_id,
-        limit=limit,
-        cursor=cursor,
-    )
-
-    return GetProjectsResponse(
-        projects=projects,
-        next_cursor=next_cursor,
-    )
-
-
-@cms_router.post("/getProject")
-async def get_project_endpoint(
-    request: Request,
-    item: GetProjectRequest,
-    user: User = Depends(verify_user),
-) -> GetProjectResponse:
-    """Get a project with all scenes."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    project = await get_project_usecase(
-        projects_db=projects_db,
-        project_id=item.project_id,
-        user=user,
-    )
-
-    return GetProjectResponse(project=project)
-
-
 @cms_router.post("/createProject")
 async def create_project_endpoint(
     request: Request,
@@ -137,3 +99,68 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/reviewScene")
+async def review_scene_endpoint(
+    request: Request,
+    item: ReviewSceneRequest,
+    user: User = Depends(verify_user),
+) -> ReviewSceneResponse:
+    """Review a scene recording (approved or rejected)."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await review_scene_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        scene_id=item.scene_id,
+        result=item.result,
+        review_comment=item.comment,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return ReviewSceneResponse(project=updated_project)
+
+
+@cms_router.post("/updateProject")
+async def update_project_endpoint(
+    request: Request,
+    item: UpdateProjectRequest,
+    user: User = Depends(verify_user),
+) -> UpdateProjectResponse:
+    """Update project with optimistic locking."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await update_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project.project_id,
+        project_name=item.project.project_name,
+        description=item.project.description,
+        assigned_user_ids=item.project.assigned_user_ids,
+        scenes=item.project.scenes,
+        expected_version=item.project.version,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return UpdateProjectResponse(project=updated_project)
+
+
+@cms_router.post("/deleteProject")
+async def delete_project_endpoint(
+    request: Request,
+    item: DeleteProjectRequest,
+    user: User = Depends(verify_user),
+) -> DeleteProjectResponse:
+    """Delete project and associated S3 files."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    await delete_project_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return DeleteProjectResponse(project_id=item.project_id)

@@ -10,6 +10,8 @@
 
 """Project"""
 
+from datetime import UTC
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import BaseModel
@@ -18,7 +20,11 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.core.types.scene import Scene
+from recnavi.core.types.scene import SceneStatus
+from recnavi.core.types.scene import SceneView
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 class ProjectStatus(StrEnum):
@@ -46,7 +52,7 @@ class Project(BaseModel):
         default=ProjectStatus.IN_PROGRESS,
         description="How far the project has progressed",
     )
-    scenes: list[Scene] = Field(
+    scenes: list[Scene | SceneView] = Field(
         default_factory=list,
         description="Scenes to record in the project",
     )
@@ -75,12 +81,56 @@ class Project(BaseModel):
         description="Optimistic lock version (incremented on each update)",
     )
 
-    def is_accessible(self, *, user: User) -> bool:
-        """Check if user can access this project."""
-        if self.group_id != user.group_id:
+    def validate_permission(
+        self,
+        *,
+        user: User,
+        as_role: UserRole,
+    ) -> bool:
+        """Return whether the user can access this project as the given role."""
+        if not user.can_act_as(as_role):
             return False
 
-        is_owner = self.owner_user_id == user.user_id
-        is_assigned_staff = user.user_id in self.assigned_user_ids
+        match as_role:
+            case UserRole.STAFF:
+                return (
+                    user.user_id == self.owner_user_id
+                    or user.user_id in self.assigned_user_ids
+                )
+            case UserRole.OWNER:
+                return self.owner_user_id == user.user_id
+            case UserRole.ADMIN:
+                return True
 
-        return is_owner or is_assigned_staff
+    def update_scene(self, scene: Scene) -> None:
+        """Replace a scene by ID and advance the project version."""
+        self._update_scene_impl(scene)
+        self.reconcile_submission_status()
+        self.increment_version()
+
+    def _update_scene_impl(self, scene: Scene) -> None:
+        """Replace a scene without changing the project version."""
+        for index, current_scene in enumerate(self.scenes):
+            if current_scene.scene_id == scene.scene_id:
+                self.scenes[index] = scene
+                return
+        raise ClientNotFoundError("Scene not found")
+
+    def get_missing_scene_ids(self) -> list[str]:
+        """Return scenes needing a recording or a retake."""
+        return [
+            scene.scene_id
+            for scene in self.scenes
+            if scene.status in (SceneStatus.NOT_RECORDED, SceneStatus.REJECTED)
+            or not scene.video_key
+        ]
+
+    def reconcile_submission_status(self) -> None:
+        """Reopen submitted work when shooting becomes incomplete."""
+        if not self.scenes or self.get_missing_scene_ids():
+            self.status = ProjectStatus.IN_PROGRESS
+
+    def increment_version(self) -> None:
+        """Advance the version and record the update time."""
+        self.version += 1
+        self.updated_at = datetime.now(UTC).isoformat()

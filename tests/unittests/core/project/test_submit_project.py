@@ -7,11 +7,12 @@
 # For internal use only.
 # developer team.
 
-"""Tests for submit_project core function."""
+"""Submission rules, authorization, persistence, and concurrent updates."""
+
+from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.project.submit_project import submit_project
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
@@ -21,366 +22,246 @@ from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
-@pytest.mark.asyncio
-async def test_submit_project_all_recorded():
-    """Test submit_project updates status to SUBMITTED when every scene is recorded."""
-    project = Project(
-        project_id="proj-123",
+@pytest.fixture
+def project() -> Project:
+    return Project(
+        project_id="project-1",
+        project_name="Shooting",
         group_id="group-1",
         owner_user_id="owner-1",
-        project_name="Test Project",
-        assigned_user_ids=["staff-1", "staff-2"],
+        assigned_user_ids=["staff-1"],
+        created_at="2026-01-01T00:00:00Z",
+        version=4,
         scenes=[
             Scene(
                 scene_id="scene-1",
-                scene_principal="cooking",
+                scene_principal="intro",
                 status=SceneStatus.PENDING,
-                video_key="videos/scene-1.mp4",
-            ),
-            Scene(
-                scene_id="scene-2",
-                scene_principal="interview",
-                status=SceneStatus.REJECT,
-                video_key="videos/scene-2.mp4",
-            ),
-            Scene(
-                scene_id="scene-2b",
-                scene_principal="outro",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-2b.mp4",
+                video_key="video.mp4",
+                thumbnail_key="thumb.jpg",
             ),
         ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
+
+
+@pytest.fixture
+def user() -> User:
+    return User(
         user_id="staff-1",
-        user_name="Staff One",
+        user_name="Staff",
+        role=UserRole.STAFF,
         group_id="group-1",
-        role=UserRole.STAFF,
     )
 
-    result_project, missing_scene_ids = await submit_project(
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("version", [None, 0, 4])
+async def test_submission_advances_version_and_returns_public_urls(
+    project,
+    user,
+    version,
+):
+    item = project.model_dump(by_alias=True)
+    if version is None:
+        item.pop("version")
+    else:
+        item["version"] = version
+    db = MockDatabase(initial_items=[item])
+    result, missing = await submit_project(
         projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-123",
+        storage=MockObjectStorage(bucket_name="media"),
+        project_id=project.project_id,
         user=user,
     )
-
-    assert result_project.project_id == "proj-123"
-    assert missing_scene_ids == []
-    assert result_project.status == ProjectStatus.SUBMITTED
-    assert result_project.updated_at != "2026-01-01T00:00:00Z"
-    urls = [scene.video_url for scene in result_project.scenes]
-    assert urls == [
-        f"mock://bucket/videos/scene-1.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
-        f"mock://bucket/videos/scene-2.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
-        f"mock://bucket/videos/scene-2b.mp4?expires={SCENE_URL_EXPIRATION_SECONDS}",
-    ]
-    dumped = str(result_project.model_dump(by_alias=True))
-    assert "videoKey" not in dumped
-    assert "thumbnailKey" not in dumped
-    stored = await db.get_item(key={"projectId": "proj-123"})
-    assert stored["status"] == ProjectStatus.SUBMITTED.value
+    assert missing == []
+    assert result.status == ProjectStatus.SUBMITTED
+    assert result.version == (version or 0) + 1
+    assert result.updated_at is not None
+    public_scene = result.model_dump(by_alias=True)["scenes"][0]
+    assert public_scene["videoUrl"].startswith("mock://media/video.mp4?")
+    assert public_scene["thumbnailUrl"].startswith("mock://media/thumb.jpg?")
+    assert "videoKey" not in public_scene
+    assert "thumbnailKey" not in public_scene
+    stored = await db.get_item({"projectId": project.project_id})
+    assert stored["version"] == result.version
+    assert stored["status"] == "submitted"
+    assert stored["scenes"][0]["videoKey"] == "video.mp4"
+    assert "videoUrl" not in stored["scenes"][0]
 
 
 @pytest.mark.asyncio
-async def test_submit_project_one_not_recorded():
-    """Test submit_project returns missing scene ID and does not update status."""
-    project = Project(
-        project_id="proj-456",
-        group_id="group-2",
-        owner_user_id="owner-2",
-        project_name="Test Project 2",
-        assigned_user_ids=["staff-3"],
-        scenes=[
-            Scene(
-                scene_id="scene-3",
-                scene_principal="cooking",
-                status=SceneStatus.PENDING,
-                video_key="videos/scene-3.mp4",
-            ),
-            Scene(
-                scene_id="scene-4",
-                scene_principal="interview",
-                status=SceneStatus.NOT_RECORDED,
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-3",
-        user_name="Staff Three",
-        group_id="group-2",
-        role=UserRole.STAFF,
-    )
-
-    result_project, missing_scene_ids = await submit_project(
+@pytest.mark.parametrize(
+    "status,video,missing",
+    [
+        (SceneStatus.PENDING, "video.mp4", []),
+        (SceneStatus.APPROVED, "video.mp4", []),
+        (SceneStatus.REJECTED, "video.mp4", ["scene-1"]),
+        (SceneStatus.NOT_RECORDED, "video.mp4", ["scene-1"]),
+        (SceneStatus.PENDING, None, ["scene-1"]),
+        (SceneStatus.APPROVED, "", ["scene-1"]),
+    ],
+)
+async def test_submission_reports_incomplete_scenes_without_writing(
+    project,
+    user,
+    status,
+    video,
+    missing,
+):
+    project.scenes[0].status = status
+    project.scenes[0].video_key = video
+    original = project.model_dump(by_alias=True)
+    db = MockDatabase(initial_items=[original])
+    result, actual_missing = await submit_project(
         projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-456",
+        storage=MockObjectStorage(bucket_name="media"),
+        project_id=project.project_id,
         user=user,
     )
-
-    assert result_project.project_id == "proj-456"
-    assert missing_scene_ids == ["scene-4"]
-    assert result_project.status == ProjectStatus.IN_PROGRESS
-    assert result_project.updated_at == "2026-01-01T00:00:00Z"
-    assert result_project.scenes[0].video_url is not None
-    assert result_project.scenes[1].video_url is None
-    assert result_project.scenes[1].thumbnail_url is None
+    assert actual_missing == missing
+    if missing:
+        assert result.status == ProjectStatus.IN_PROGRESS
+        assert await db.get_item({"projectId": project.project_id}) == original
 
 
 @pytest.mark.asyncio
-async def test_submit_project_rejected_counts_as_recorded():
-    """Test rejected scene is recorded, so project is submitted."""
-    project = Project(
-        project_id="proj-789",
-        group_id="group-3",
-        owner_user_id="owner-3",
-        project_name="Test Project 3",
-        assigned_user_ids=["staff-4"],
-        scenes=[
-            Scene(
-                scene_id="scene-5",
-                scene_principal="cooking",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-5.mp4",
-            ),
-            Scene(
-                scene_id="scene-6",
-                scene_principal="interview",
-                status=SceneStatus.REJECT,
-                video_key="videos/scene-6.mp4",
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
+async def test_submission_retry_is_idempotent(project, user):
     db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-4",
-        user_name="Staff Four",
-        group_id="group-3",
-        role=UserRole.STAFF,
-    )
-
-    result_project, missing_scene_ids = await submit_project(
+    storage = MockObjectStorage(bucket_name="media")
+    first = await submit_project(
         projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-789",
+        storage=storage,
+        project_id=project.project_id,
         user=user,
     )
-
-    assert result_project.project_id == "proj-789"
-    assert missing_scene_ids == []
-    assert result_project.status == ProjectStatus.SUBMITTED
-    assert result_project.updated_at != "2026-01-01T00:00:00Z"
-
-
-@pytest.mark.asyncio
-async def test_submit_project_missing_video_key_is_unrecorded():
-    """Test scene without a video is reported missing despite its status."""
-    project = Project(
-        project_id="proj-novideo",
-        group_id="group-7",
-        owner_user_id="owner-7",
-        project_name="No Video Project",
-        assigned_user_ids=["staff-9"],
-        scenes=[
-            Scene(
-                scene_id="scene-9",
-                scene_principal="cooking",
-                status=SceneStatus.PENDING,
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-9",
-        user_name="Staff Nine",
-        group_id="group-7",
-        role=UserRole.STAFF,
-    )
-
-    result_project, missing_scene_ids = await submit_project(
+    second = await submit_project(
         projects_db=db,
-        storage=MockObjectStorage(),
-        bucket_name="bucket",
-        project_id="proj-novideo",
+        storage=storage,
+        project_id=project.project_id,
         user=user,
     )
-
-    assert missing_scene_ids == ["scene-9"]
-    assert result_project.status == ProjectStatus.IN_PROGRESS
-
-
-@pytest.mark.asyncio
-async def test_submit_project_empty_scenes_raises_422():
-    """Test submit_project raises 422 when project has no scenes."""
-    project = Project(
-        project_id="proj-empty",
-        group_id="group-4",
-        owner_user_id="owner-4",
-        project_name="Empty Project",
-        assigned_user_ids=["staff-5"],
-        scenes=[],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-5",
-        user_name="Staff Five",
-        group_id="group-4",
-        role=UserRole.STAFF,
-    )
-
-    with pytest.raises(ClientUnprocessableEntityError):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
-            project_id="proj-empty",
-            user=user,
-        )
+    assert first == second
+    assert second[0].version == 5
 
 
 @pytest.mark.asyncio
-async def test_submit_project_already_submitted_raises_409():
-    """Test submit_project raises 409 when project already submitted."""
-    project = Project(
-        project_id="proj-submitted",
-        group_id="group-5",
-        owner_user_id="owner-5",
-        project_name="Submitted Project",
-        assigned_user_ids=["staff-6"],
-        scenes=[
-            Scene(
-                scene_id="scene-7",
-                scene_principal="cooking",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-7.mp4",
-            ),
-        ],
-        status=ProjectStatus.SUBMITTED,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="staff-6",
-        user_name="Staff Six",
-        group_id="group-5",
-        role=UserRole.STAFF,
-    )
-
-    with pytest.raises(ClientConflictError):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
-            project_id="proj-submitted",
-            user=user,
-        )
-
-
-@pytest.mark.asyncio
-async def test_submit_project_not_assigned_raises_403():
-    """Test submit_project raises 403 when user not in assigned_user_ids."""
-    project = Project(
-        project_id="proj-999",
-        group_id="group-6",
-        owner_user_id="owner-6",
-        project_name="Test Project 6",
-        assigned_user_ids=["staff-7"],
-        scenes=[
-            Scene(
-                scene_id="scene-8",
-                scene_principal="cooking",
-                status=SceneStatus.APPROVE,
-                video_key="videos/scene-8.mp4",
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    unassigned_user = User(
-        user_id="staff-8",
-        user_name="Staff Eight",
-        group_id="group-6",
-        role=UserRole.STAFF,
-    )
-
+@pytest.mark.parametrize(
+    "role,group,user_id",
+    [
+        (UserRole.OWNER, "group-1", "staff-1"),
+        (UserRole.ADMIN, "group-1", "staff-1"),
+        (UserRole.STAFF, "other-group", "staff-1"),
+        (UserRole.STAFF, "group-1", "unassigned"),
+    ],
+)
+async def test_submission_rejects_unauthorized_users(
+    project,
+    role,
+    group,
+    user_id,
+):
+    original = project.model_dump(by_alias=True)
+    db = MockDatabase(initial_items=[original])
+    user = User(user_id=user_id, user_name="Caller", role=role, group_id=group)
     with pytest.raises(ClientAuthorizationError):
         await submit_project(
             projects_db=db,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
-            project_id="proj-999",
-            user=unassigned_user,
+            storage=MockObjectStorage(bucket_name="media"),
+            project_id=project.project_id,
+            user=user,
+        )
+    assert await db.get_item({"projectId": project.project_id}) == original
+
+
+@pytest.mark.asyncio
+async def test_submission_rejects_empty_project(project, user):
+    project.scenes = []
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    with pytest.raises(ClientUnprocessableEntityError):
+        await submit_project(
+            projects_db=db,
+            storage=MockObjectStorage(bucket_name="media"),
+            project_id=project.project_id,
+            user=user,
         )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
-async def test_submit_project_non_staff_raises_403(role):
-    """Test submit_project raises 403 and leaves the DB unchanged for non-staff."""
-    project = Project(
-        project_id="proj-role",
-        group_id="group-9",
-        owner_user_id="user-9",
-        project_name="Test Project 9",
-        assigned_user_ids=["user-9"],
-        scenes=[
-            Scene(
-                scene_id="scene-9",
-                scene_principal="cooking",
-                status=SceneStatus.PENDING,
-                video_key="videos/scene-9.mp4",
-            ),
-        ],
-        status=ProjectStatus.IN_PROGRESS,
-        created_at="2026-01-01T00:00:00Z",
-        updated_at="2026-01-01T00:00:00Z",
-    )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    user = User(
-        user_id="user-9",
-        user_name="Non Staff",
-        group_id="group-9",
-        role=role,
-    )
-
-    with pytest.raises(ClientAuthorizationError, match="Only staff"):
+async def test_submission_rejects_missing_project(user):
+    with pytest.raises(ClientNotFoundError):
         await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(),
-            bucket_name="bucket",
-            project_id="proj-role",
+            projects_db=MockDatabase(),
+            storage=MockObjectStorage(bucket_name="media"),
+            project_id="missing",
             user=user,
         )
 
-    stored = await db.get_item(key={"projectId": "proj-role"})
-    assert stored["status"] == ProjectStatus.IN_PROGRESS.value
-    assert stored["updatedAt"] == "2026-01-01T00:00:00Z"
+
+@pytest.mark.asyncio
+async def test_submission_does_not_overwrite_concurrent_scene_edit(
+    project,
+    user,
+):
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    original_put = db.put_item
+
+    async def concurrent_put(*args, **kwargs):
+        db.items[0] = {
+            **db.items[0],
+            "version": 5,
+            "description": "Concurrent edit",
+        }
+        await original_put(*args, **kwargs)
+
+    db.put_item = concurrent_put
+    with pytest.raises(ClientConflictError):
+        await submit_project(
+            projects_db=db,
+            storage=MockObjectStorage(bucket_name="media"),
+            project_id=project.project_id,
+            user=user,
+        )
+    stored = await db.get_item({"projectId": project.project_id})
+    assert stored["status"] == "in_progress"
+    assert stored["description"] == "Concurrent edit"
+
+
+@pytest.mark.asyncio
+async def test_submission_propagates_database_failure(project, user):
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db.put_item = AsyncMock(side_effect=RuntimeError("Database unavailable"))
+    with pytest.raises(RuntimeError, match="Database unavailable"):
+        await submit_project(
+            projects_db=db,
+            storage=MockObjectStorage(bucket_name="media"),
+            project_id=project.project_id,
+            user=user,
+        )
+
+
+@pytest.mark.asyncio
+async def test_concurrent_submission_returns_committed_result(project, user):
+    """Two submissions of the same complete version both succeed."""
+    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    original_put = db.put_item
+
+    async def submit_first(*args, **kwargs):
+        db.items[0] = {**db.items[0], "version": 5, "status": "submitted"}
+        await original_put(*args, **kwargs)
+
+    db.put_item = submit_first
+    result, missing = await submit_project(
+        projects_db=db,
+        storage=MockObjectStorage(bucket_name="media"),
+        project_id=project.project_id,
+        user=user,
+    )
+    assert result.status == ProjectStatus.SUBMITTED
+    assert result.version == 5
+    assert missing == []

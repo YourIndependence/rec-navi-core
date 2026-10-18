@@ -81,7 +81,7 @@ comments that narrate the flow -- if the endpoint needs a comment to explain
 what it is doing, the explanation belongs in a use case name.
 
 ```python
-@cms_router.get("/getProjects")
+@staff_router.get("/getProjects")
 async def get_projects_endpoint(
     request: Request,
     user: User = Depends(verify_user),

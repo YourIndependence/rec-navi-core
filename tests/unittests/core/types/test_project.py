@@ -9,10 +9,18 @@
 
 """Tests for Project type."""
 
+from datetime import UTC
+from datetime import datetime
+
+import pytest
+
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.scene import Scene
+from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 def test_project_type_has_version_field_with_default():
@@ -86,8 +94,70 @@ def test_project_preserves_existing_fields():
     assert len(project.scenes) == 0  # default_factory=list
 
 
-def test_project_is_accessible_returns_true_for_owner():
-    """Test Project.is_accessible() returns True when user is the owner."""
+def test_project_update_scene_replaces_matching_scene_and_increments_version():
+    """Test Project.update_scene replaces by ID and advances its version."""
+    first_scene = Scene(
+        scene_id="scene-1",
+        scene_principal="opening",
+    )
+    target_scene = Scene(
+        scene_id="scene-2",
+        scene_principal="cooking",
+    )
+    project = Project(
+        project_id="proj-123",
+        group_id="group-456",
+        project_name="Test Project",
+        owner_user_id="user-owner",
+        created_at="2026-01-01T00:00:00Z",
+        scenes=[first_scene, target_scene],
+        version=4,
+    )
+    recorded_scene = Scene(
+        scene_id="scene-2",
+        scene_principal="cooking",
+        status=SceneStatus.PENDING,
+        video_key="videos/scene-2.mp4",
+        thumbnail_key="thumbnails/scene-2.jpg",
+        created_by="staff-1",
+        created_at="2026-01-02T00:00:00Z",
+    )
+
+    before_update = datetime.now(UTC)
+    result = project.update_scene(recorded_scene)
+    after_update = datetime.now(UTC)
+
+    assert project.scenes[0] == first_scene
+    assert project.scenes[1] == recorded_scene
+    assert project.version == 5
+    assert result is None
+    updated_at = datetime.fromisoformat(project.updated_at)
+    assert before_update <= updated_at <= after_update
+
+
+def test_project_update_scene_raises_when_scene_is_missing():
+    """Test Project.update_scene raises when no scene has the given ID."""
+    project = Project(
+        project_id="proj-123",
+        group_id="group-456",
+        project_name="Test Project",
+        owner_user_id="user-owner",
+        created_at="2026-01-01T00:00:00Z",
+    )
+    missing_scene = Scene(
+        scene_id="scene-missing",
+        scene_principal="cooking",
+    )
+
+    with pytest.raises(ClientNotFoundError, match="Scene not found"):
+        project.update_scene(missing_scene)
+
+    assert project.version == 0
+    assert project.updated_at is None
+
+
+def test_project_validate_permission_allows_owner():
+    """Test Project.validate_permission() allows the project owner."""
     project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -105,11 +175,11 @@ def test_project_is_accessible_returns_true_for_owner():
         role=UserRole.OWNER,
     )
 
-    assert project.is_accessible(user=user) is True
+    assert project.validate_permission(user=user, as_role=UserRole.OWNER)
 
 
-def test_project_is_accessible_returns_true_for_assigned_staff():
-    """Test Project.is_accessible() returns True for assigned staff."""
+def test_project_validate_permission_allows_assigned_staff():
+    """Test Project.validate_permission() allows assigned staff."""
     project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -127,11 +197,11 @@ def test_project_is_accessible_returns_true_for_assigned_staff():
         role=UserRole.STAFF,
     )
 
-    assert project.is_accessible(user=user) is True
+    assert project.validate_permission(user=user, as_role=UserRole.STAFF)
 
 
-def test_project_is_accessible_returns_false_for_different_group():
-    """Test Project.is_accessible() returns False for different group user."""
+def test_project_validate_permission_allows_admin_across_groups():
+    """Test admins can access projects from any group."""
     project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -146,14 +216,34 @@ def test_project_is_accessible_returns_false_for_different_group():
         user_id="user-other",
         user_name="Other User",
         group_id="group-999",
+        role=UserRole.ADMIN,
+    )
+
+    assert project.validate_permission(user=user, as_role=UserRole.ADMIN)
+
+
+def test_project_validate_permission_allows_owner_to_act_as_staff():
+    """Test a project owner may access their project as staff."""
+    project = Project(
+        project_id="proj-123",
+        group_id="group-456",
+        project_name="Test Project",
+        owner_user_id="user-owner",
+        created_at="2026-01-01T00:00:00Z",
+        assigned_user_ids=[],
+    )
+    user = User(
+        user_id="user-owner",
+        user_name="Owner",
+        group_id="group-456",
         role=UserRole.OWNER,
     )
 
-    assert project.is_accessible(user=user) is False
+    assert project.validate_permission(user=user, as_role=UserRole.STAFF)
 
 
-def test_project_is_accessible_returns_false_for_non_assigned_same_group():
-    """Test Project.is_accessible() returns False for same-group non-assigned user."""
+def test_project_validate_permission_rejects_non_assigned_same_group():
+    """Test Project.validate_permission() rejects unassigned staff."""
     project = Project(
         project_id="proj-123",
         group_id="group-456",
@@ -171,4 +261,35 @@ def test_project_is_accessible_returns_false_for_non_assigned_same_group():
         role=UserRole.STAFF,
     )
 
-    assert project.is_accessible(user=user) is False
+    assert not project.validate_permission(user=user, as_role=UserRole.STAFF)
+
+
+@pytest.mark.parametrize(
+    "status,expected",
+    [
+        (SceneStatus.REJECTED, ProjectStatus.IN_PROGRESS),
+        (SceneStatus.NOT_RECORDED, ProjectStatus.IN_PROGRESS),
+        (SceneStatus.PENDING, ProjectStatus.SUBMITTED),
+        (SceneStatus.APPROVED, ProjectStatus.SUBMITTED),
+    ],
+)
+def test_scene_update_reconciles_submission_status(status, expected):
+    """Scene updates and reviews share the submission completeness rule."""
+    scene = Scene(
+        scene_id="s",
+        scene_principal="intro",
+        status=status,
+        video_key="video.mp4",
+    )
+    project = Project(
+        project_id="p",
+        project_name="P",
+        group_id="g",
+        owner_user_id="owner",
+        created_at="2026-01-01T00:00:00Z",
+        status=ProjectStatus.SUBMITTED,
+        scenes=[scene],
+    )
+    project.update_scene(scene)
+    assert project.status == expected
+    assert project.version == 1

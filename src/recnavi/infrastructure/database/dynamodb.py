@@ -38,10 +38,16 @@ class DynamoDb(BaseDatabase):
         self.table_name = table_name
         self.session = aioboto3.Session(region_name=REGION)
 
-    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
+    async def get_item(
+        self,
+        key: dict[str, Any],
+        *,
+        consistent_read: bool = False,
+    ) -> dict[str, Any] | None:
         """Get an item by primary key.
 
         Args:
+            consistent_read: Request the latest committed item.
             key: Primary key as a dictionary.
 
         Returns:
@@ -50,7 +56,10 @@ class DynamoDb(BaseDatabase):
         """
         async with self.session.resource("dynamodb") as dynamodb:
             table = await dynamodb.Table(self.table_name)
-            response = await table.get_item(Key=key)
+            response = await table.get_item(
+                Key=key,
+                ConsistentRead=consistent_read,
+            )
             item = response.get("Item")
             return _convert_from_dynamodb_format(item) if item else None
 

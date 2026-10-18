@@ -40,16 +40,23 @@ class MockDatabase(BaseDatabase):
         self.items: list[dict[str, Any]] = initial_items or []
         self.key_names = key_names
 
-    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
+    async def get_item(
+        self,
+        key: dict[str, Any],
+        *,
+        consistent_read: bool = False,
+    ) -> dict[str, Any] | None:
         """Get an item by primary key.
 
         Args:
+            consistent_read: Request the latest committed item.
             key: Primary key as a dictionary.
 
         Returns:
             Item if found, None otherwise.
 
         """
+        _ = consistent_read
         for item in self.items:
             if all(item.get(k) == v for k, v in key.items()):
                 return item
@@ -69,8 +76,7 @@ class MockDatabase(BaseDatabase):
 
         Args:
             item: Item to store.
-            condition_expression: Optional condition on the existing item
-                (only "version = :expected_version" is evaluated).
+            condition_expression: Optional condition on the existing item.
             expression_attribute_values: Values referenced by the condition.
 
         Raises:
@@ -120,9 +126,18 @@ class MockDatabase(BaseDatabase):
         expression_attribute_values: dict[str, Any],
     ) -> bool:
         """Check if a put condition expression is satisfied."""
-        if "version = :expected_version" in condition_expression:
+        version_match = re.search(
+            r"\bversion\s*=\s*(:\w+)",
+            condition_expression,
+        )
+        if version_match:
+            if (
+                "attribute_not_exists(version)" in condition_expression
+                and "version" not in item
+            ):
+                return True
             expected_version = expression_attribute_values.get(
-                ":expected_version",
+                version_match.group(1),
             )
             return item.get("version") == expected_version
         return True
@@ -281,7 +296,7 @@ class MockDatabase(BaseDatabase):
                     expression_attribute_values[value_key]
                 )
 
-        top_level_pattern = r"(?<!scenes\[\d\]\.)(\#?\w+) = :(\w+)"
+        top_level_pattern = r"(?:^SET\s+|,\s*)(\#?\w+)\s*=\s*:(\w+)"
         for match in re.finditer(top_level_pattern, update_expression):
             field_name = self._resolve_name(
                 match.group(1),
