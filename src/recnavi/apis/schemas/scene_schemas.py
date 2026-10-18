@@ -63,10 +63,7 @@ class ReviewSceneRequest(BaseItemModel):
 
     project_id: str = Field(..., description="Project ID")
     scene_id: str = Field(..., description="Scene ID")
-    result: ReviewSceneResult = Field(
-        ...,
-        description="Review result (approved or rejected)",
-    )
+    result: ReviewSceneResult = Field(..., description="Review result")
     comment: str | None = Field(default=None, description="Review comment")
 
 
