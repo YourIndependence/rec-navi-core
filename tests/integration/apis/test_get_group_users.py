@@ -70,7 +70,13 @@ def test_get_group_users_returns_only_current_groups_public_members(
         "status": "ok",
         "message": None,
         "users": [
-            {"userId": "member", "userName": "Member", "role": "staff"},
+            {
+                "userId": "member",
+                "userName": "Member",
+                "role": "staff",
+                "groupId": "group-1",
+                "profileImageUri": "s3://private/avatar",
+            },
         ],
     }
 

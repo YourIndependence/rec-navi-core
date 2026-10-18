@@ -260,7 +260,13 @@ def test_get_group_users_uses_authenticated_user_and_exposes_only_member_fields(
         "status": "ok",
         "message": None,
         "users": [
-            {"userId": "member", "userName": "Member", "role": "staff"},
+            {
+                "userId": "member",
+                "userName": "Member",
+                "role": "staff",
+                "groupId": "it-group",
+                "profileImageUri": "s3://private/avatar.png",
+            },
         ],
     }
     usecase.assert_awaited_once_with(
@@ -276,4 +282,6 @@ def test_get_group_users_uses_authenticated_user_and_exposes_only_member_fields(
         "userId",
         "userName",
         "role",
+        "groupId",
+        "profileImageUri",
     }

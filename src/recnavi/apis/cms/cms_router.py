@@ -100,6 +100,8 @@ async def get_group_users_endpoint(
                 user_id=member.user_id,
                 user_name=member.user_name,
                 role=member.role,
+                group_id=member.group_id,
+                profile_image_uri=member.profile_image_uri,
             )
             for member in users
         ],

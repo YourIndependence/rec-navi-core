@@ -37,12 +37,16 @@ class UserSummary(BaseModel):
     user_id: str = Field(..., description="Identifier of the user")
     user_name: str = Field(..., description="Name shown to other members")
     role: UserRole = Field(..., description="What the user may do")
+    group_id: str = Field(..., description="Tenant the user belongs to")
+    profile_image_uri: str | None = Field(
+        default=None,
+        description="S3 URI of the user's profile image",
+    )
 
 
 class User(UserSummary):
     """User details and authorization context."""
 
-    group_id: str = Field(..., description="Tenant the user belongs to")
     email: str | None = Field(
         default=None,
         description="Email address of the user",
@@ -54,10 +58,6 @@ class User(UserSummary):
     birthday: str | None = Field(
         default=None,
         description="Birthday in YYYY-MM-DD format",
-    )
-    profile_image_uri: str | None = Field(
-        default=None,
-        description="S3 URI of the user's profile image",
     )
 
     def can_act_as(self, role: UserRole) -> bool:

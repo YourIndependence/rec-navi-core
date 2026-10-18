@@ -52,11 +52,15 @@ def test_user_summary_serializes_public_fields_with_camel_case() -> None:
         user_id="member",
         user_name="Member",
         role=UserRole.STAFF,
+        group_id="group",
+        profile_image_uri="s3://media/avatar.png",
     )
     assert summary.model_dump(by_alias=True, mode="json") == {
         "userId": "member",
         "userName": "Member",
         "role": "staff",
+        "groupId": "group",
+        "profileImageUri": "s3://media/avatar.png",
     }
 
 
@@ -76,3 +80,15 @@ def test_user_extends_summary_with_private_details_and_authorization() -> None:
     assert user.group_id == "group"
     assert user.can_act_as(UserRole.STAFF)
     assert user.model_dump(by_alias=True)["userId"] == "member"
+
+
+def test_user_summary_allows_missing_profile_image() -> None:
+    """Members without an avatar keep a nullable image URI."""
+    summary = UserSummary(
+        user_id="member",
+        user_name="Member",
+        role=UserRole.STAFF,
+        group_id="group",
+    )
+    assert summary.profile_image_uri is None
+    assert summary.model_dump(by_alias=True)["profileImageUri"] is None
