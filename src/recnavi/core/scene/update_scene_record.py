@@ -77,6 +77,9 @@ async def update_scene_record(
     previous_version = project.version
 
     scene.status = SceneStatus.PENDING
+    scene.reviewed_by = None
+    scene.reviewed_at = None
+    scene.review_comment = None
     scene.video_key = video_key
     scene.thumbnail_key = thumbnail_key
     scene.created_by = user.user_id

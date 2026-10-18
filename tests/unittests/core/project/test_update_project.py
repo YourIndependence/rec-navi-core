@@ -195,7 +195,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
                 scene_id="scene-1",
                 scene_principal="cooking",
                 assigned_user_ids=[],
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.APPROVED,
                 video_key="s3://bucket/video.mp4",
                 thumbnail_key="s3://bucket/thumb.jpg",
                 created_by="staff-1",
@@ -221,7 +221,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
                 scene_id="scene-1",
                 scene_principal="cooking-updated",
                 assigned_user_ids=["user-3"],
-                status=SceneStatus.APPROVE,
+                status=SceneStatus.APPROVED,
                 video_key="s3://bucket/video.mp4",
                 thumbnail_key="s3://bucket/thumb.jpg",
                 created_by="staff-1",
@@ -237,7 +237,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
     assert scene.scene_id == "scene-1"
     assert scene.scene_principal == "cooking-updated"
     assert scene.assigned_user_ids == ["user-3"]
-    assert scene.status == SceneStatus.APPROVE
+    assert scene.status == SceneStatus.APPROVED
     assert (
         scene.video_url == "mock://bucket/s3://bucket/video.mp4?expires=3600"
     )

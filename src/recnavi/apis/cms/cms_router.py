@@ -21,6 +21,8 @@ from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
+from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
+from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.application.project.create_project import create_project_usecase
@@ -30,6 +32,7 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
+from recnavi.application.scene.review_scene_usecase import review_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -96,6 +99,28 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post("/reviewScene")
+async def review_scene_endpoint(
+    request: Request,
+    item: ReviewSceneRequest,
+    user: User = Depends(verify_user),
+) -> ReviewSceneResponse:
+    """Review a scene recording (approved or rejected)."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+
+    updated_project = await review_scene_usecase(
+        projects_db=projects_db,
+        project_id=item.project_id,
+        scene_id=item.scene_id,
+        result=item.result,
+        review_comment=item.comment,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return ReviewSceneResponse(project=updated_project)
 
 
 @cms_router.post("/updateProject")

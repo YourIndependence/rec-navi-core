@@ -47,7 +47,7 @@ def _project_item(video_key: str | None = None) -> dict:
             {
                 "sceneId": "scene-1",
                 "scenePrincipal": "cooking",
-                "status": "reject" if video_key else "not_recorded",
+                "status": "rejected" if video_key else "not_recorded",
                 "videoKey": video_key,
                 "thumbnailKey": None,
                 "assignedUserIds": ["staff-789"],
@@ -382,3 +382,20 @@ async def test_update_scene_record_allows_higher_role_to_act_as_staff(role):
 
     assert project.scenes[0].status.value == "pending"
     assert storage.objects
+
+
+@pytest.mark.asyncio
+async def test_recording_clears_previous_review():
+    """A new recording must not inherit the review of the replaced shot."""
+    item = _project_item("old.mp4")
+    item["scenes"][0].update(
+        reviewedBy="owner-1",
+        reviewedAt="2026-01-01",
+        reviewComment="Redo",
+    )
+    db = MockDatabase([item])
+    result = await _update(db, MockObjectStorage(bucket_name=BUCKET))
+    saved = await db.get_item({"projectId": "proj-123"})
+    for field in ("reviewedBy", "reviewedAt", "reviewComment"):
+        assert saved["scenes"][0][field] is None
+    assert result.scenes[0].status == "pending"
