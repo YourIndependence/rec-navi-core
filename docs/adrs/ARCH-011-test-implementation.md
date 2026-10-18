@@ -74,9 +74,9 @@ Every `test_*` function or test method under `tests/integration/` must make
 an HTTP request in its own body and assign the result to `response`:
 
 ```python
-def test_update_scene_record(client, auth_headers):
+def test_update_scene(client, auth_headers):
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         headers=auth_headers,
         json=payload,
     )

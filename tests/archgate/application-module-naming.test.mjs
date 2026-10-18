@@ -52,6 +52,6 @@ test("reports every violating module", async () => {
   assert.equal((await check([
     "src/recnavi/application/user/get_group_users_usecase.py",
     "src/recnavi/application/scene/review_scene.py",
-    "src/recnavi/application/scene/update_scene_record_usecase.py",
+    "src/recnavi/application/scene/update_scene_usecase.py",
   ])).length, 2);
 });

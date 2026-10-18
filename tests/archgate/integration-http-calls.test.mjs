@@ -87,7 +87,7 @@ for (const [name, body] of [
   ["a string containing a request", 'example = \'response = client.get("/recording")\''],
   ["an unassigned request", 'client.post("/recording")'],
   ["a different assignment target", 'data = client.post("/recording")'],
-  ["an application call", 'response = update_scene_record_usecase()'],
+  ["an application call", 'response = update_scene_usecase()'],
   ["a dictionary get", 'response = data.get("project")'],
   ["an OpenAPI client method", 'response = client.openapi()'],
   ["a request inside an uncalled nested helper", 'def helper():\n        response = client.post("/recording")'],
