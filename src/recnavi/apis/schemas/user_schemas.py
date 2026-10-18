@@ -9,14 +9,11 @@
 
 """User API response schemas."""
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
 from pydantic import Field
-from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.user import User
-from recnavi.core.types.user import UserRole
+from recnavi.core.types.user import UserSummary
 
 
 class GetMeResponse(BaseApiResponseModel):
@@ -28,24 +25,10 @@ class GetMeResponse(BaseApiResponseModel):
     )
 
 
-class GroupUserView(BaseModel):
-    """Public member information for assignment selection."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-        from_attributes=True,
-    )
-
-    user_id: str
-    user_name: str
-    role: UserRole
-
-
 class GetGroupUsersResponse(BaseApiResponseModel):
     """Response schema for GET /getGroupUsers endpoint."""
 
-    users: list[GroupUserView] = Field(
+    users: list[UserSummary] = Field(
         ...,
         description="All users in the authenticated user's group",
     )

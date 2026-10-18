@@ -26,8 +26,8 @@ class UserRole(StrEnum):
     STAFF = "staff"
 
 
-class User(BaseModel):
-    """user"""
+class UserSummary(BaseModel):
+    """Public user information for member selection."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
@@ -37,6 +37,11 @@ class User(BaseModel):
     user_id: str = Field(..., description="Identifier of the user")
     user_name: str = Field(..., description="Name shown to other members")
     role: UserRole = Field(..., description="What the user may do")
+
+
+class User(UserSummary):
+    """User details and authorization context."""
+
     group_id: str = Field(..., description="Tenant the user belongs to")
     email: str | None = Field(
         default=None,

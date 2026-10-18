@@ -13,6 +13,7 @@ import pytest
 
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from recnavi.core.types.user import UserSummary
 
 
 @pytest.mark.parametrize(
@@ -43,3 +44,35 @@ def test_can_act_as_respects_role_hierarchy(
     )
 
     assert user.can_act_as(requested_role) is expected
+
+
+def test_user_summary_serializes_public_fields_with_camel_case() -> None:
+    """Public user information has the same identifiers and aliases as User."""
+    summary = UserSummary(
+        user_id="member",
+        user_name="Member",
+        role=UserRole.STAFF,
+    )
+    assert summary.model_dump(by_alias=True, mode="json") == {
+        "userId": "member",
+        "userName": "Member",
+        "role": "staff",
+    }
+
+
+def test_user_extends_summary_with_private_details_and_authorization() -> None:
+    """The full user retains shared fields, private data, and role behavior."""
+    user = User(
+        user_id="member",
+        user_name="Member",
+        role=UserRole.OWNER,
+        group_id="group",
+        email="private@example.com",
+        phone_number="123",
+    )
+    assert isinstance(user, UserSummary)
+    assert user.email == "private@example.com"
+    assert user.phone_number == "123"
+    assert user.group_id == "group"
+    assert user.can_act_as(UserRole.STAFF)
+    assert user.model_dump(by_alias=True)["userId"] == "member"

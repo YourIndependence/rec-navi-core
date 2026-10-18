@@ -271,7 +271,7 @@ def test_get_group_users_uses_authenticated_user_and_exposes_only_member_fields(
     operation = schema["paths"]["/getGroupUsers"]["get"]
     assert "parameters" not in operation
     assert set(
-        schema["components"]["schemas"]["GroupUserView"]["properties"],
+        schema["components"]["schemas"]["UserSummary"]["properties"],
     ) == {
         "userId",
         "userName",

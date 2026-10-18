@@ -24,7 +24,6 @@ from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
-from recnavi.apis.schemas.user_schemas import GroupUserView
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.delete_project import delete_project_usecase
 from recnavi.application.project.update_project import update_project_usecase
@@ -40,6 +39,7 @@ from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserSummary
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -95,7 +95,14 @@ async def get_group_users_endpoint(
         user=user,
     )
     return GetGroupUsersResponse(
-        users=[GroupUserView.model_validate(member) for member in users],
+        users=[
+            UserSummary(
+                user_id=member.user_id,
+                user_name=member.user_name,
+                role=member.role,
+            )
+            for member in users
+        ],
     )
 
 
