@@ -75,8 +75,8 @@ class ReviewSceneResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Updated project")
 
 
-class UpdateSceneRecordRequest(BaseItemModel):
-    """Request for POST /updateSceneRecord."""
+class UpdateSceneRequest(BaseItemModel):
+    """Request for POST /updateScene."""
 
     project_id: str = Field(..., description="Project ID")
     scene_id: str = Field(..., description="Scene ID")
@@ -84,8 +84,8 @@ class UpdateSceneRecordRequest(BaseItemModel):
     thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
 
 
-class UpdateSceneRecordResponse(BaseApiResponseModel):
-    """Response for POST /updateSceneRecord."""
+class UpdateSceneResponse(BaseApiResponseModel):
+    """Response for POST /updateScene."""
 
     model_config = ConfigDict(from_attributes=True)
 

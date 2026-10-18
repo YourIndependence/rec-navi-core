@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Unit tests for update_scene_record core logic."""
+"""Unit tests for update_scene core logic."""
 
 import base64
 from copy import deepcopy
@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
-from recnavi.core.scene.update_scene_record import update_scene_record
+from recnavi.core.scene.update_scene import update_scene
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -66,7 +66,7 @@ def _staff(user_id: str = "staff-789", group_id: str = "group-456") -> User:
 
 
 async def _update(database, storage, *, scene_id="scene-1", user=None):
-    return await update_scene_record(
+    return await update_scene(
         projects_db=database,
         storage=storage,
         project_id="proj-123",
@@ -163,7 +163,7 @@ async def test_concurrent_recording_rejects_stale_version_and_cleans_uploads(
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_uploads_and_marks_scene_pending():
+async def test_update_scene_uploads_and_marks_scene_pending():
     """Test video and thumbnail are stored and the scene becomes pending."""
     database = MockDatabase(initial_items=[_project_item()])
     storage = MockObjectStorage(bucket_name=BUCKET)
@@ -196,7 +196,7 @@ async def test_update_scene_record_uploads_and_marks_scene_pending():
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_deletes_the_previous_shot():
+async def test_update_scene_deletes_the_previous_shot():
     """Test re-recording replaces the old shot with a new one."""
     old_key = "projects/proj-123/scenes/scene-1/old-shot.mp4"
     database = MockDatabase(initial_items=[_project_item(video_key=old_key)])
@@ -314,7 +314,7 @@ async def test_database_conflict_cleans_new_objects_and_keeps_old_shot(
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_deletes_nothing_on_first_recording():
+async def test_update_scene_deletes_nothing_on_first_recording():
     """Test no deletion happens when the scene had no recording."""
     database = MockDatabase(initial_items=[_project_item()])
     storage = MockObjectStorage(bucket_name=BUCKET)
@@ -329,7 +329,7 @@ async def test_update_scene_record_deletes_nothing_on_first_recording():
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_raises_404_when_project_not_found():
+async def test_update_scene_raises_404_when_project_not_found():
     """Test an unknown project raises ClientNotFoundError."""
     storage = MockObjectStorage(bucket_name=BUCKET)
 
@@ -340,7 +340,7 @@ async def test_update_scene_record_raises_404_when_project_not_found():
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_raises_404_when_scene_not_found():
+async def test_update_scene_raises_404_when_scene_not_found():
     """Test an unknown scene raises ClientNotFoundError."""
     storage = MockObjectStorage(bucket_name=BUCKET)
     database = MockDatabase(initial_items=[_project_item()])
@@ -352,7 +352,7 @@ async def test_update_scene_record_raises_404_when_scene_not_found():
 
 
 @pytest.mark.asyncio
-async def test_update_scene_record_raises_403_when_not_assigned():
+async def test_update_scene_raises_403_when_not_assigned():
     """Test a staff member not assigned to the scene is forbidden."""
     storage = MockObjectStorage(bucket_name=BUCKET)
     item = _project_item()
@@ -367,7 +367,7 @@ async def test_update_scene_record_raises_403_when_not_assigned():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
-async def test_update_scene_record_allows_higher_role_to_act_as_staff(role):
+async def test_update_scene_allows_higher_role_to_act_as_staff(role):
     """Test higher-role users can record when assigned to the project."""
     storage = MockObjectStorage(bucket_name=BUCKET)
     database = MockDatabase(initial_items=[_project_item()])

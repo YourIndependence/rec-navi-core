@@ -29,7 +29,7 @@ from recnavi.exceptions.exceptions import ClientNotFoundError
 logger = logging.getLogger(__name__)
 
 
-async def update_scene_record(
+async def update_scene(
     *,
     projects_db: BaseDatabase,
     storage: BaseObjectStorage,

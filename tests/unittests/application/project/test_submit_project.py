@@ -14,9 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.project.submit_project_usecase import (
-    submit_project_usecase,
-)
+from recnavi.application.project.submit_project import submit_project_usecase
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.user import User
@@ -53,7 +51,7 @@ async def test_usecase_delegates_to_submit_project():
     expected_output = (mock_project, expected_missing)
 
     with patch(
-        "recnavi.application.project.submit_project_usecase.submit_project",
+        "recnavi.application.project.submit_project.submit_project",
         new=AsyncMock(return_value=expected_output),
     ) as mock_submit:
         result = await submit_project_usecase(

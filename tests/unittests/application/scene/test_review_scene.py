@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.scene.review_scene_usecase import review_scene_usecase
+from recnavi.application.scene.review_scene import review_scene_usecase
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.user import User
@@ -46,7 +46,7 @@ async def test_usecase_delegates_to_review_scene():
     mock_storage = AsyncMock()
 
     with patch(
-        "recnavi.application.scene.review_scene_usecase.review_scene",
+        "recnavi.application.scene.review_scene.review_scene",
         new=AsyncMock(return_value=expected_output),
     ) as mock_review_scene:
         result = await review_scene_usecase(

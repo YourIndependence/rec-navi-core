@@ -65,18 +65,31 @@ the complete mock placement policy.
 
 ### 2. Integration Collaborators
 
-Integration tests must not use `@patch` or `monkeypatch.setattr()` to replace
-services, agents, stores, or I/O collaborators. FastAPI dependency overrides
-and environment configuration through `monkeypatch.setenv()` or
-`monkeypatch.setitem()` are allowed.
+Integration files, including `conftest.py`, must not contain the text `patch`
+(case-insensitive). This deliberately conservative check includes imports,
+aliases, fixture parameters, comments, strings, and all `monkeypatch` methods.
+There are no exceptions for environment configuration, notification clients,
+model resolution, or HTTP PATCH calls. Prefer false positives over missed
+component replacements; any future exception requires an explicit ADR change.
+
+Authentication is the only dependency that tests may override. Use
+`app.dependency_overrides[verify_user]` directly and restore it in `finally`.
+Do not override other dependencies or clear the entire override mapping.
+The rule checks each occurrence, not whether a file mentions `verify_user`.
+
+The shared CI infrastructure setup remains in `tests/integration/conftest.py`.
+Individual tests must use that existing infrastructure, insert records through
+its public interface, and remove their records in `finally`. Do not replace
+`app.state.database` or storage objects per test. Configure environments outside
+the test body rather than modifying them with test substitution helpers.
 
 Every `test_*` function or test method under `tests/integration/` must make
 an HTTP request in its own body and assign the result to `response`:
 
 ```python
-def test_update_scene_record(client, auth_headers):
+def test_update_scene(client, auth_headers):
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         headers=auth_headers,
         json=payload,
     )
@@ -208,7 +221,6 @@ The following implementation rules are active:
 - `every-api-endpoint-has-integration-test`
 - `integration-test-must-call-http-client`
 - `no-patch-in-integration-tests`
-- `no-monkeypatch-setattr-component-in-integration`
 - `async-fixture-must-use-pytest-asyncio-fixture`
 - `mock-abc-class-must-be-in-mockups-dir`
 - `expensive-fixture-must-not-use-function-scope`
