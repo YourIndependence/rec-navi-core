@@ -71,28 +71,9 @@ Works at small scale but loses control of inter-component dependencies quickly. 
 - Registry-based DI is a lightweight DI mechanism for Python — no heavy DI framework required
 - Centralizing use cases in `application/` allows unit testing completely decoupled from FastAPI
 
-## Registry Pattern (DI Mechanism)
-
-Registries are defined in the core layer; concrete implementations are registered at startup.
-
-| Registry                         | Defined in                      | Registered by              |
-| -------------------------------- | ------------------------------- | -------------------------- |
-| `database_registry`              | `core/database/`                | `infrastructure/database/` |
-| `store_registry`                 | `core/store/`                   | startup script             |
-| `dataloader_registry`            | `core/dataloader/`              | startup script             |
-| `preprocessor_strategy_registry` | `core/preprocessor/strategies/` | startup script             |
-| `chunker_registry`               | `core/preprocessor/chunker/`    | startup script             |
-| `agent_registry`                 | `core/agents/agent_registry.py` | startup script             |
-| `tool_registry`                  | `core/tools/tool_registry.py`   | `core/tools/*_tool.py`, `core/tools/*_tools.py`, and `core/agents/*/tools.py` modules |
-
-Tool registration follows the dedicated Tool Registry initialization pattern defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md). Shared tool modules under `core/tools/` expose `initialize()` and register tools through `tool_registry` during startup. Agent-specific tool modules under `core/agents/*/tools.py` expose `initialize(prefix: str)` so tools can be registered with an agent-specific prefix.
-
 ## Known Deviations
 
 See [known-deviations.md](./known-deviations.md) for the full list of accepted compromises. Key items:
-
-- Several `core/agents/*/tools.py` files import `OpenAiLlmClient` directly from `infrastructure/`. The abstract `BaseLlmClient` in `core/external_clients_interface/` exists but is not yet applied. Gradual migration to Registry injection is planned (technical debt).
-- `apis/auth/auth.py` directly imports from `infrastructure/external_clients/ms_clients/`. To be resolved in an auth middleware refactor.
 
 ## Consequences
 
@@ -108,12 +89,6 @@ See [known-deviations.md](./known-deviations.md) for the full list of accepted c
 - Name application modules `<verb>_<noun>.py`, retaining `_usecase` on use-case functions
 - Update imports, mock patch targets, and mirrored unit tests when modules move
 
-- Add new external clients in `infrastructure/external_clients/` and implement the ABC from `core/external_clients_interface/`
-- Create new DB adapters in `infrastructure/database/*_database.py` with an `initialize()` function (auto-detected)
-- Resolve dependencies in `application/` through registry functions (`get_database()`, `get_store_instance_by_name()`, etc.)
-- Add shared tools in `core/tools/*_tool.py` or `core/tools/*_tools.py` with an `initialize()` function as defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md)
-- Add agent-specific tools in `core/agents/*/tools.py` with an `initialize(prefix: str)` function as defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md)
-
 **Don't:**
 
 - Add or retain application Python modules ending in `_usecase.py`
@@ -121,7 +96,6 @@ See [known-deviations.md](./known-deviations.md) for the full list of accepted c
 - Import from `application/` or `apis/` inside `infrastructure/`
 - Import `apis/` Pydantic schemas inside `application/` (use `core/types/` instead)
 - Import concrete `infrastructure/` implementations directly inside `core/` (inject via Registry)
-- Register tools at module import time; use the Tool Registry initialization lifecycle instead
 
 ## References
 
