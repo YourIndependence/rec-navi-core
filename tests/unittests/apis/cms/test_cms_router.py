@@ -12,6 +12,7 @@
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from recnavi.config.variables import PROJECTS_TABLE_NAME
@@ -19,6 +20,7 @@ from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene_master import SceneMaster
 from recnavi.core.types.scenes_template import ScenesTemplate
@@ -250,5 +252,26 @@ def test_review_scene_forwards_comment(
             },
         )
     assert response.status_code == 200
+    assert usecase.call_args.kwargs["result"] is ReviewSceneResult.APPROVE
     assert usecase.call_args.kwargs["review_comment"] == "Looks good"
     assert response.json()["project"]["projectId"] == "proj-123"
+
+
+@pytest.mark.parametrize("result", ["pending", "not_recorded", "invalid"])
+def test_review_scene_rejects_invalid_result(
+    cms_client: TestClient,
+    auth_headers: dict[str, str],
+    result: str,
+) -> None:
+    """Invalid review decisions are rejected before calling the use case."""
+    with patch(
+        "recnavi.apis.cms.cms_router.review_scene_usecase",
+        new=AsyncMock(return_value=_make_project()),
+    ) as usecase:
+        response = cms_client.post(
+            "/reviewScene",
+            headers=auth_headers,
+            json={"projectId": "p", "sceneId": "s", "result": result},
+        )
+    assert response.status_code == 422
+    usecase.assert_not_awaited()

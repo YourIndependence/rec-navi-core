@@ -17,12 +17,12 @@ from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientNotFoundError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
 async def review_scene(
@@ -30,17 +30,12 @@ async def review_scene(
     projects_db: BaseDatabase,
     project_id: str,
     scene_id: str,
-    result: str,
+    result: ReviewSceneResult,
     review_comment: str | None,
     user: User,
     storage: BaseObjectStorage,
 ) -> Project:
     """Review a scene recording and return the project with presigned URLs."""
-    if result not in ("approve", "reject"):
-        raise ClientUnprocessableEntityError(
-            f"Invalid result value: {result}. Must be 'approve' or 'reject'.",
-        )
-
     item = await projects_db.get_item(key={"projectId": project_id})
     if not item:
         raise ClientNotFoundError("Project not found")
@@ -62,7 +57,9 @@ async def review_scene(
 
     timestamp = datetime.now(UTC).isoformat()
     new_status = (
-        SceneStatus.APPROVE if result == "approve" else SceneStatus.REJECT
+        SceneStatus.APPROVE
+        if result == ReviewSceneResult.APPROVE
+        else SceneStatus.REJECT
     )
 
     scene = project.scenes[scene_index]
@@ -70,7 +67,10 @@ async def review_scene(
     scene.reviewed_by = user.user_id
     scene.reviewed_at = timestamp
     scene.review_comment = review_comment
-    if result == "reject" and project.status == ProjectStatus.SUBMITTED:
+    if (
+        result == ReviewSceneResult.REJECT
+        and project.status == ProjectStatus.SUBMITTED
+    ):
         project.status = ProjectStatus.IN_PROGRESS
     previous_version = project.version
     project.update_scene(scene)

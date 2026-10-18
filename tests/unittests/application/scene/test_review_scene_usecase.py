@@ -16,6 +16,7 @@ import pytest
 
 from recnavi.application.scene.review_scene_usecase import review_scene_usecase
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 
@@ -52,7 +53,7 @@ async def test_usecase_delegates_to_review_scene():
             projects_db=mock_db,
             project_id="proj-123",
             scene_id="scene-456",
-            result="approve",
+            result=ReviewSceneResult.APPROVE,
             review_comment="Looks great!",
             user=user,
             storage=mock_storage,
@@ -62,7 +63,7 @@ async def test_usecase_delegates_to_review_scene():
         projects_db=mock_db,
         project_id="proj-123",
         scene_id="scene-456",
-        result="approve",
+        result=ReviewSceneResult.APPROVE,
         review_comment="Looks great!",
         user=user,
         storage=mock_storage,

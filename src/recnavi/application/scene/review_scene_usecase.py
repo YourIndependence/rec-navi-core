@@ -13,6 +13,7 @@ from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.review_scene import review_scene
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.user import User
 
 
@@ -21,7 +22,7 @@ async def review_scene_usecase(
     projects_db: BaseDatabase,
     project_id: str,
     scene_id: str,
-    result: str,
+    result: ReviewSceneResult,
     review_comment: str | None,
     user: User,
     storage: BaseObjectStorage,

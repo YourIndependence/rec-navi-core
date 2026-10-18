@@ -17,6 +17,7 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import ReviewSceneResult
 
 
 class SceneMasterView(BaseModel):
@@ -62,7 +63,10 @@ class ReviewSceneRequest(BaseItemModel):
 
     project_id: str = Field(..., description="Project ID")
     scene_id: str = Field(..., description="Scene ID")
-    result: str = Field(..., description="Review result (approve or reject)")
+    result: ReviewSceneResult = Field(
+        ...,
+        description="Review result (approve or reject)",
+    )
     comment: str | None = Field(default=None, description="Review comment")
 
 

@@ -18,6 +18,13 @@ from pydantic import Field
 from pydantic import alias_generators
 
 
+class ReviewSceneResult(StrEnum):
+    """Decision made when reviewing a scene recording."""
+
+    APPROVE = "approve"
+    REJECT = "reject"
+
+
 class SceneStatus(StrEnum):
     """Scene recording status."""
 
