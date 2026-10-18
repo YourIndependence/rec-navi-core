@@ -25,6 +25,7 @@ from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.delete_project import delete_project_usecase
 from recnavi.application.project.update_project import update_project_usecase
@@ -32,11 +33,14 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
-from recnavi.application.scene.review_scene_usecase import review_scene_usecase
+from recnavi.application.scene.review_scene import review_scene_usecase
+from recnavi.application.user.get_group_users import get_group_users_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserSummary
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -78,6 +82,31 @@ async def get_templates_endpoint(
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
     templates = await get_templates_usecase(templates_db=templates_db)
     return GetTemplatesResponse(templates=templates)
+
+
+@cms_router.get("/getGroupUsers")
+async def get_group_users_endpoint(
+    request: Request,
+    user: User = Depends(verify_user),
+) -> GetGroupUsersResponse:
+    """List all users in the authenticated user's group."""
+    users_db = request.app.state.database[USERS_TABLE_NAME]
+    users = await get_group_users_usecase(
+        users_db=users_db,
+        user=user,
+    )
+    return GetGroupUsersResponse(
+        users=[
+            UserSummary(
+                user_id=member.user_id,
+                user_name=member.user_name,
+                role=member.role,
+                group_id=member.group_id,
+                profile_image_uri=member.profile_image_uri,
+            )
+            for member in users
+        ],
+    )
 
 
 @cms_router.post("/createProject")

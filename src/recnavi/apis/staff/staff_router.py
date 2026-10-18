@@ -18,13 +18,11 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
-from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordRequest
-from recnavi.apis.schemas.scene_schemas import UpdateSceneRecordResponse
+from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
+from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
-from recnavi.application.scene.update_scene_record_usecase import (
-    update_scene_record_usecase,
-)
+from recnavi.application.scene.update_scene import update_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.user import User
 
@@ -71,16 +69,16 @@ async def get_project_endpoint(
     return GetProjectResponse(project=project)
 
 
-@staff_router.post("/updateSceneRecord")
-async def update_scene_record_endpoint(
+@staff_router.post("/updateScene")
+async def update_scene_endpoint(
     request: Request,
-    payload: UpdateSceneRecordRequest,
+    payload: UpdateSceneRequest,
     user: User = Depends(verify_user),
-) -> UpdateSceneRecordResponse:
+) -> UpdateSceneResponse:
     """Upload scene recording (staff only)."""
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
 
-    updated_project = await update_scene_record_usecase(
+    updated_project = await update_scene_usecase(
         projects_db=projects_db,
         storage=request.app.state.object_storage,
         project_id=payload.project_id,
@@ -90,4 +88,4 @@ async def update_scene_record_endpoint(
         user=user,
     )
 
-    return UpdateSceneRecordResponse(project=updated_project)
+    return UpdateSceneResponse(project=updated_project)

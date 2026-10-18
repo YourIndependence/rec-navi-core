@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for POST /updateSceneRecord endpoint."""
+"""Integration tests for POST /updateScene endpoint."""
 
 import base64
 import time
@@ -33,10 +33,10 @@ from recnavi.core.types.scene import Scene
 from recnavi.main import app
 
 
-def test_update_scene_record_returns_400_when_no_token(client):
-    """Test POST /updateSceneRecord returns 400 when no authorization header."""
+def test_update_scene_returns_400_when_no_token(client):
+    """Test POST /updateScene returns 400 when no authorization header."""
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         json={
             "projectId": "proj-123",
             "sceneId": "scene-456",
@@ -90,7 +90,7 @@ async def recording_project(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("recording_project", [None, 0, 4], indirect=True)
-async def test_update_scene_record_persists_recording_through_http(
+async def test_update_scene_persists_recording_through_http(
     client: TestClient,
     auth_headers: dict[str, str],
     recording_project: Project,
@@ -98,7 +98,7 @@ async def test_update_scene_record_persists_recording_through_http(
     """Exercise HTTP, use case, domain logic, persistence, and URL serialization."""
     request_started_at = int(time.time())
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         headers=auth_headers,
         json={
             "projectId": recording_project.project_id,
@@ -189,7 +189,7 @@ async def test_rerecording_replaces_persisted_shot_through_http(
         "thumbnail": "b2xk",
     }
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         headers=auth_headers,
         json=payload,
     )
@@ -203,7 +203,7 @@ async def test_rerecording_replaces_persisted_shot_through_http(
     old_scene = first["scenes"][0]
     payload.update(video="bmV3", thumbnail="bmV3")
     response = client.post(
-        "/updateSceneRecord",
+        "/updateScene",
         headers=auth_headers,
         json=payload,
     )

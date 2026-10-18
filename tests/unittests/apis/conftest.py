@@ -25,6 +25,7 @@ from recnavi.apis.staff.staff_router import staff_router
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 from tests.mockups.mock_users import get_mock_x_user
@@ -36,6 +37,7 @@ def _client_for_router(router: APIRouter) -> Iterator[TestClient]:
     api_app.include_router(router)
     api_app.dependency_overrides[verify_user] = get_mock_x_user
     api_app.state.database = {
+        USERS_TABLE_NAME: MockDatabase(),
         PROJECTS_TABLE_NAME: MockDatabase(),
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),

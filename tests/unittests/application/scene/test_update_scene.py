@@ -7,22 +7,20 @@
 # For internal use only.
 # developer team.
 
-"""Tests for update_scene_record_usecase."""
+"""Tests for update_scene_usecase."""
 
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.scene.update_scene_record_usecase import (
-    update_scene_record_usecase,
-)
+from recnavi.application.scene.update_scene import update_scene_usecase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_update_scene_record():
+async def test_usecase_delegates_to_update_scene():
     """Test usecase delegates to core and returns its output unchanged."""
     projects_db = AsyncMock()
     storage = AsyncMock()
@@ -35,10 +33,10 @@ async def test_usecase_delegates_to_update_scene_record():
     expected_output = object()
 
     with patch(
-        "recnavi.application.scene.update_scene_record_usecase.update_scene_record",
+        "recnavi.application.scene.update_scene.update_scene",
         new=AsyncMock(return_value=expected_output),
     ) as mock_update:
-        result = await update_scene_record_usecase(
+        result = await update_scene_usecase(
             projects_db=projects_db,
             storage=storage,
             project_id="proj-123",

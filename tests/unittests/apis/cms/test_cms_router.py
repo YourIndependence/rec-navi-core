@@ -18,12 +18,15 @@ from fastapi.testclient import TestClient
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene_master import SceneMaster
 from recnavi.core.types.scenes_template import ScenesTemplate
+from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
 from tests.mockups.mock_users import get_mock_x_user
 
 
@@ -230,6 +233,60 @@ def test_delete_project_parses_request_and_serializes_response(
         user=get_mock_x_user(),
         storage=cms_client.app.state.object_storage,
     )
+
+
+def test_get_group_users_uses_authenticated_user_and_exposes_only_member_fields(
+    cms_client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    member = User(
+        user_id="member",
+        user_name="Member",
+        role=UserRole.STAFF,
+        group_id="it-group",
+        email="private@example.com",
+        phone_number="123",
+        birthday="2000-01-01",
+        profile_image_uri="s3://private/avatar.png",
+    )
+    with patch(
+        "recnavi.apis.cms.cms_router.get_group_users_usecase",
+        new=AsyncMock(return_value=[member]),
+    ) as usecase:
+        response = cms_client.get(
+            "/getGroupUsers?groupId=other-group",
+            headers=auth_headers,
+        )
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "message": None,
+        "users": [
+            {
+                "userId": "member",
+                "userName": "Member",
+                "role": "staff",
+                "groupId": "it-group",
+                "profileImageUri": "s3://private/avatar.png",
+            },
+        ],
+    }
+    usecase.assert_awaited_once_with(
+        users_db=cms_client.app.state.database[USERS_TABLE_NAME],
+        user=get_mock_x_user(),
+    )
+    schema = cms_client.get("/openapi.json").json()
+    operation = schema["paths"]["/getGroupUsers"]["get"]
+    assert "parameters" not in operation
+    assert set(
+        schema["components"]["schemas"]["UserSummary"]["properties"],
+    ) == {
+        "userId",
+        "userName",
+        "role",
+        "groupId",
+        "profileImageUri",
+    }
 
 
 def test_review_scene_forwards_comment(

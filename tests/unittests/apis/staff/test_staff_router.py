@@ -90,7 +90,7 @@ def test_get_project_parses_request_and_serializes_response(
     )
 
 
-def test_update_scene_record_parses_request_and_serializes_usecase_result(
+def test_update_scene_parses_request_and_serializes_usecase_result(
     staff_client: TestClient,
     auth_headers: dict[str, str],
 ) -> None:
@@ -113,11 +113,11 @@ def test_update_scene_record_parses_request_and_serializes_usecase_result(
         ],
     )
     with patch(
-        "recnavi.apis.staff.staff_router.update_scene_record_usecase",
+        "recnavi.apis.staff.staff_router.update_scene_usecase",
         new=AsyncMock(return_value=project),
     ) as usecase:
         response = staff_client.post(
-            "/updateSceneRecord",
+            "/updateScene",
             headers=auth_headers,
             json={
                 "projectId": "proj-123",
@@ -153,7 +153,7 @@ def test_update_scene_record_parses_request_and_serializes_usecase_result(
     "missing_field",
     ["projectId", "sceneId", "video", "thumbnail"],
 )
-def test_update_scene_record_rejects_missing_fields_without_calling_usecase(
+def test_update_scene_rejects_missing_fields_without_calling_usecase(
     staff_client: TestClient,
     missing_field: str,
 ) -> None:
@@ -166,9 +166,9 @@ def test_update_scene_record_rejects_missing_fields_without_calling_usecase(
     }
     del payload[missing_field]
     with patch(
-        "recnavi.apis.staff.staff_router.update_scene_record_usecase",
+        "recnavi.apis.staff.staff_router.update_scene_usecase",
         new=AsyncMock(),
     ) as usecase:
-        response = staff_client.post("/updateSceneRecord", json=payload)
+        response = staff_client.post("/updateScene", json=payload)
     assert response.status_code == 422
     usecase.assert_not_awaited()

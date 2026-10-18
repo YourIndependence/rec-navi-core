@@ -11,12 +11,15 @@
 
 from collections.abc import AsyncIterator
 from decimal import Decimal
+from unittest.mock import AsyncMock
+from unittest.mock import patch
 
 import aioboto3
 import pytest
 import pytest_asyncio
 from botocore.exceptions import ClientError
 
+from recnavi.core.user.users import get_group_users
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.infrastructure.database.dynamodb import DynamoDb
 from recnavi.infrastructure.database.dynamodb import (
@@ -535,3 +538,80 @@ def test_convert_roundtrip_preserves_data():
     assert converted_back["isActive"] == original["isActive"]
     assert converted_back["profile"]["level"] == original["profile"]["level"]
     assert converted_back["profile"]["score"] == original["profile"]["score"]
+
+
+@pytest_asyncio.fixture(scope="module")
+async def users_database(
+    mock_aws_session: aioboto3.Session,
+) -> AsyncIterator[DynamoDb]:
+    table_name = "it_group_users"
+    async with mock_aws_session.resource("dynamodb") as resource:
+        await resource.create_table(
+            TableName=table_name,
+            KeySchema=[{"AttributeName": "userId", "KeyType": "HASH"}],
+            AttributeDefinitions=[
+                {"AttributeName": name, "AttributeType": "S"}
+                for name in ("userId", "groupId")
+            ],
+            GlobalSecondaryIndexes=[
+                {
+                    "IndexName": "groupId-index",
+                    "KeySchema": [
+                        {"AttributeName": "groupId", "KeyType": "HASH"},
+                    ],
+                    "Projection": {"ProjectionType": "ALL"},
+                },
+            ],
+            BillingMode="PAY_PER_REQUEST",
+        )
+    database = DynamoDb(table_name=table_name)
+    database.session = mock_aws_session
+    try:
+        yield database
+    finally:
+        async with mock_aws_session.client("dynamodb") as client:
+            await client.delete_table(TableName=table_name)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("member_count", [0, 3, 8])
+async def test_group_users_queries_gsi_and_collects_all_pages(
+    users_database: DynamoDb,
+    member_count: int,
+) -> None:
+    group_id = f"target-group-{member_count}"
+    for index in range(member_count):
+        await users_database.put_item(
+            {
+                "userId": f"member-{index}",
+                "userName": f"Member {index}",
+                "role": "staff",
+                "groupId": group_id,
+                "padding": "x" * 200_000,
+            },
+        )
+    await users_database.put_item(
+        {
+            "userId": "outsider",
+            "userName": "Other group",
+            "role": "staff",
+            "groupId": "other-group",
+        },
+    )
+    with patch.object(
+        users_database,
+        "query",
+        new=AsyncMock(wraps=users_database.query),
+    ) as query:
+        users = await get_group_users(
+            users_db=users_database,
+            group_id=group_id,
+        )
+    assert {user.user_id for user in users} == {
+        f"member-{index}" for index in range(member_count)
+    }
+    assert all(user.group_id == group_id for user in users)
+    assert query.await_count >= (2 if member_count == 8 else 1)
+    for request in query.await_args_list:
+        assert request.kwargs["index"] == "groupId-index"
+        assert request.kwargs["key_condition"] == {"groupId": group_id}
