@@ -55,8 +55,8 @@ graph LR
 |       +-- apis/  # API presentation layer
 |       |   +-- auth/
 |       |   +-- root/
-|       |   +-- pub/
 |       |   +-- cms/
+|       |   +-- staff/
 |       |
 |       +-- application/  # application layer
 |       |   +-- analysis/
@@ -99,6 +99,15 @@ graph LR
 
 Tests follow the same boundary rule as production code: each layer should be verified at the cheapest layer that still proves the behavior.
 
+Unit test files mirror the implementation module tree. For example,
+`src/recnavi/apis/staff/staff_router.py` is tested in
+`tests/unittests/apis/staff/test_staff_router.py`. Keep additional tests for a
+module in that same mirrored directory. `__init__.py` files, tests of shared
+mockups, modules that only declare Pydantic schemas or core types, the modules
+`config/variables.py` and `exceptions/exceptions.py`, and modules named
+`base_*.py` are exempt. See
+[ARCH-011](adrs/ARCH-011-test-implementation.md) for the full rule and checks.
+
 | Test layer | Directory | External dependency policy |
 | ---------- | --------- | -------------------------- |
 | Unit tests | `tests/unittests/` | No LocalStack, real AWS, Microsoft 365, Box, Azure, Google APIs, or repository secrets. Use `tests/mockups/`, lightweight fakes, `botocore.stub.Stubber`, or `moto`. |
@@ -106,3 +115,13 @@ Tests follow the same boundary rule as production code: each layer should be ver
 | Real AWS tests | `tests/integration/` with markers | Use `pytest.mark.real_aws`; ECS dispatch tests also use `pytest.mark.ecs`. These tests are skipped automatically only when `AWS_ENDPOINT_URL` points to LocalStack. |
 
 This keeps the everyday development workflow fast and deterministic while preserving a place for real-cloud validation when it is intentionally requested.
+
+
+## Application module naming
+
+Application module filenames use `<verb>_<noun>.py` without `_usecase`.
+Use-case function names retain `_usecase`, for example
+`application/scene/review_scene.py` exports `review_scene_usecase`.
+Unit test filenames mirror the module: `test_review_scene.py`.
+See [ARCH-001](adrs/ARCH-001-clean-architecture.md#file-naming) for the decision
+and its automated enforcement.

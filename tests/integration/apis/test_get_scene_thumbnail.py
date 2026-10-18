@@ -2,39 +2,118 @@
 #
 # This software is the confidential and proprietary information of
 # YourIndependence. Unauthorized copying, distribution,
-# modification, or reproduction of this software is strictly prohibited.
+# modification, or use outside the organization is strictly prohibited.
 #
 # For internal use only.
 # developer team.
 
-"""Integration tests for GET /getSceneThumbnail endpoint."""
+"""Public scene images through the application HTTP boundary."""
+
+import base64
+from collections.abc import AsyncIterator
+from typing import cast
+from uuid import uuid4
+
+import pytest
+import pytest_asyncio
+
+from recnavi.config.variables import ENV
+from recnavi.config.variables import SCENES_TABLE_NAME
+from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.main import app
 
 
-def test_get_scene_thumbnail_returns_422_when_kind_is_invalid(client):
-    """Test GET /getSceneThumbnail returns 422 for an invalid kind (no auth required)."""
+@pytest_asyncio.fixture
+async def scene_images() -> AsyncIterator[str]:
+    """Seed shared CI infrastructure through public interfaces and clean it up."""
+    if ENV != "CI":
+        pytest.skip(
+            "Public image success tests use CI in-memory infrastructure",
+        )
+    database = cast(dict[str, BaseDatabase], app.state.database)[
+        SCENES_TABLE_NAME
+    ]
+    storage = cast(BaseObjectStorage, app.state.scene_images_storage)
+    principal = f"it_public_{uuid4().hex}"
+    example_key = f"scenes/{principal}/example.jpg"
+    guide_key = f"scenes/{principal}/guide.png"
+    try:
+        await database.put_item(
+            {
+                "scenePrincipal": principal,
+                "title": "Cooking",
+                "thumbnailUri": example_key,
+                "guideUri": guide_key,
+                "maxDurationSeconds": 60,
+            },
+        )
+        await storage.upload_base64(
+            object_key=example_key,
+            base64_data=base64.b64encode(b"jpeg-image").decode(),
+            content_type="image/jpeg",
+        )
+        await storage.upload_base64(
+            object_key=guide_key,
+            base64_data=base64.b64encode(b"png-image").decode(),
+            content_type="image/png",
+        )
+        yield principal
+    finally:
+        try:
+            await database.delete_item({"scenePrincipal": principal})
+        finally:
+            await storage.delete_objects_by_prefix(
+                prefix=f"scenes/{principal}/",
+            )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kind", "body", "mime"),
+    [
+        ("example", b"jpeg-image", "image/jpeg"),
+        ("guide", b"png-image", "image/png"),
+    ],
+)
+async def test_public_scene_image_bytes(
+    client,
+    scene_images: str,
+    kind,
+    body,
+    mime,
+):
     response = client.get(
-        "/getSceneThumbnail?scenePrincipal=cooking&kind=invalid",
+        "/getSceneThumbnail",
+        params={"scenePrincipal": scene_images, "kind": kind},
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.content == body
+    assert response.headers["content-type"] == mime
+    assert response.headers["cache-control"] == "public, max-age=86400"
 
 
-def test_get_scene_thumbnail_returns_422_for_snake_case_param(client):
-    """Test GET /getSceneThumbnail rejects the old snake_case scene_principal name."""
+@pytest.mark.asyncio
+async def test_unknown_scene_returns_404(client, scene_images: str):
     response = client.get(
-        "/getSceneThumbnail?scene_principal=cooking&kind=example",
+        "/getSceneThumbnail",
+        params={
+            "scenePrincipal": f"{scene_images}_unknown",
+            "kind": "example",
+        },
     )
-    assert response.status_code == 422
+    assert response.status_code == 404
 
 
-def test_get_scene_thumbnail_accepts_camel_case_param(client):
-    """Test GET /getSceneThumbnail accepts scenePrincipal (designed URL) and is not 422."""
-    response = client.get(
-        "/getSceneThumbnail?scenePrincipal=unknown-principal&kind=example",
-    )
-    assert response.status_code != 422
-
-
-def test_get_scene_thumbnail_returns_422_when_params_missing(client):
-    """Test GET /getSceneThumbnail returns 422 when required query params are missing."""
-    response = client.get("/getSceneThumbnail")
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"scenePrincipal": "public-cooking", "kind": "invalid"},
+        {"scenePrincipal": "", "kind": "example"},
+        {"scenePrincipal": "public-cooking"},
+        {},
+    ],
+)
+def test_invalid_scene_image_query_returns_422(client, params):
+    response = client.get("/getSceneThumbnail", params=params)
     assert response.status_code == 422

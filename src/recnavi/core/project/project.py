@@ -12,8 +12,8 @@
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import Project
 from recnavi.core.types.user import User
-from recnavi.exceptions.exceptions import ClientPermissionError
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 async def get_project(
@@ -26,13 +26,12 @@ async def get_project(
     item = await projects_db.get_item(key={"projectId": project_id})
 
     if not item:
-        raise ClientResourcesNotFoundError("Project not found")
+        raise ClientNotFoundError("Project not found")
 
     project = Project.model_validate(item)
 
-    if project.is_accessible(user=user):
-        return project
-
-    raise ClientPermissionError(
-        "User does not have access permission to this project",
-    )
+    if not project.validate_permission(user=user, as_role=user.role):
+        raise ClientAuthorizationError(
+            "User does not have access permission to this project",
+        )
+    return project
