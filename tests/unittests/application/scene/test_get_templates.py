@@ -14,31 +14,54 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
-async def test_get_templates_attaches_urls_and_returns_core_views():
+async def test_get_templates_attaches_urls_in_order():
     database = MockDatabase()
     storage = MockObjectStorage(bucket_name="media")
-    templates = [ScenesTemplate(template_id="cafe", title="Cafe")]
-    expected_output = [
+    storage.generate_presigned_url = AsyncMock(
+        side_effect=["https://signed/first", "https://signed/second"],
+    )
+    templates = [
         ScenesTemplate(
-            template_id="cafe",
-            title="Cafe",
-            thumbnail_url="https://signed/image",
+            template_id="first",
+            title="First",
+            thumbnail_uri="first.jpg",
+        ),
+        ScenesTemplate(
+            template_id="second",
+            title="Second",
+            thumbnail_uri="second.png",
         ),
     ]
-    with (
-        patch(
-            "recnavi.application.scene.get_templates.get_templates",
-            new=AsyncMock(return_value=templates),
-        ) as get_metadata,
-        patch(
-            "recnavi.application.scene.get_templates.attach_template_urls",
-            new=AsyncMock(return_value=expected_output),
-        ) as attach_urls,
-    ):
+    with patch(
+        "recnavi.application.scene.get_templates.get_templates",
+        new=AsyncMock(return_value=templates),
+    ) as get_metadata:
         result = await get_templates_usecase(
             templates_db=database,
             storage=storage,
         )
     get_metadata.assert_awaited_once_with(templates_db=database)
-    attach_urls.assert_awaited_once_with(templates=templates, storage=storage)
-    assert result is expected_output
+    assert result == templates
+    assert [template.template_id for template in result] == ["first", "second"]
+    assert all(
+        actual is original
+        for actual, original in zip(result, templates, strict=True)
+    )
+    assert [template.thumbnail_url for template in result] == [
+        "https://signed/first",
+        "https://signed/second",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_get_templates_returns_empty_list():
+    storage = MockObjectStorage(bucket_name="media")
+    storage.generate_presigned_url = AsyncMock()
+    assert (
+        await get_templates_usecase(
+            templates_db=MockDatabase(),
+            storage=storage,
+        )
+        == []
+    )
+    storage.generate_presigned_url.assert_not_awaited()
