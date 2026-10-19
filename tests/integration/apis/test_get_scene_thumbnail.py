@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Public scene images through the application HTTP boundary."""
+"""Staff scene images through the application HTTP boundary."""
 
 import base64
 from collections.abc import AsyncIterator
@@ -29,13 +29,13 @@ async def scene_images() -> AsyncIterator[str]:
     """Seed shared CI infrastructure through public interfaces and clean it up."""
     if ENV != "CI":
         pytest.skip(
-            "Public image success tests use CI in-memory infrastructure",
+            "Staff image success tests use CI in-memory infrastructure",
         )
     database = cast(dict[str, BaseDatabase], app.state.database)[
         SCENES_TABLE_NAME
     ]
-    storage = cast(BaseObjectStorage, app.state.scene_images_storage)
-    principal = f"it_public_{uuid4().hex}"
+    storage = cast(BaseObjectStorage, app.state.object_storage)
+    principal = f"it_staff_{uuid4().hex}"
     example_key = f"scenes/{principal}/example.jpg"
     guide_key = f"scenes/{principal}/guide.png"
     try:
@@ -76,8 +76,9 @@ async def scene_images() -> AsyncIterator[str]:
         ("guide", b"png-image", "image/png"),
     ],
 )
-async def test_public_scene_image_bytes(
+async def test_staff_scene_image_bytes(
     client,
+    auth_headers,
     scene_images: str,
     kind,
     body,
@@ -85,18 +86,24 @@ async def test_public_scene_image_bytes(
 ):
     response = client.get(
         "/getSceneThumbnail",
+        headers=auth_headers,
         params={"scenePrincipal": scene_images, "kind": kind},
     )
     assert response.status_code == 200
     assert response.content == body
     assert response.headers["content-type"] == mime
-    assert response.headers["cache-control"] == "public, max-age=86400"
+    assert response.headers["cache-control"] == "private, max-age=86400"
 
 
 @pytest.mark.asyncio
-async def test_unknown_scene_returns_404(client, scene_images: str):
+async def test_unknown_scene_returns_404(
+    client,
+    auth_headers,
+    scene_images: str,
+):
     response = client.get(
         "/getSceneThumbnail",
+        headers=auth_headers,
         params={
             "scenePrincipal": f"{scene_images}_unknown",
             "kind": "example",
@@ -114,6 +121,19 @@ async def test_unknown_scene_returns_404(client, scene_images: str):
         {},
     ],
 )
-def test_invalid_scene_image_query_returns_422(client, params):
-    response = client.get("/getSceneThumbnail", params=params)
+def test_invalid_scene_image_query_returns_422(client, auth_headers, params):
+    response = client.get(
+        "/getSceneThumbnail",
+        headers=auth_headers,
+        params=params,
+    )
     assert response.status_code == 422
+
+
+def test_scene_image_requires_authentication(client):
+    response = client.get(
+        "/getSceneThumbnail",
+        params={"scenePrincipal": "cooking", "kind": "example"},
+    )
+    assert response.status_code == 400
+    assert response.json()["message"] == "Authorization header is required."

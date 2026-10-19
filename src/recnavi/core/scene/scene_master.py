@@ -11,7 +11,7 @@
 
 from urllib.parse import urlsplit
 
-from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
@@ -32,15 +32,13 @@ async def get_scene_master_by_principal(
     scene_principal: str,
 ) -> SceneMaster | None:
     """Get a single scene master by principal."""
-    cursor = None
-    while True:
-        result = await scenes_db.scan(exclusive_start_key=cursor)
-        for item in result.items:
-            if item.get("scenePrincipal") == scene_principal:
-                return SceneMaster.model_validate(item)
-        cursor = result.last_evaluated_key
-        if not cursor:
-            return None
+    result = await scenes_db.query(
+        key_condition={"scenePrincipal": scene_principal},
+        limit=1,
+    )
+    return (
+        SceneMaster.model_validate(result.items[0]) if result.items else None
+    )
 
 
 async def get_scene_thumbnail(
@@ -75,7 +73,7 @@ async def get_scene_thumbnail(
         uri = urlsplit(object_key)
         if (
             uri.scheme != "s3"
-            or uri.netloc != SCENE_IMAGES_BUCKET_NAME
+            or uri.netloc != MEDIA_BUCKET_NAME
             or uri.query
             or uri.fragment
         ):

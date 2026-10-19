@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.core.scene.scene_master import get_scene_masters
 from recnavi.core.scene.scene_master import get_scene_thumbnail
 from recnavi.core.types.database import DatabaseQueryResult
@@ -156,14 +156,10 @@ async def test_get_scene_thumbnail_raises_422_for_invalid_kind():
 
 
 @pytest.mark.asyncio
-async def test_thumbnail_finds_scene_after_empty_paginated_page():
+async def test_thumbnail_queries_scene_by_principal():
     database = AsyncMock()
     item = (await _thumbnail_db().scan()).items[0]
-    cursor = {"scenePrincipal": "previous"}
-    database.scan.side_effect = [
-        DatabaseQueryResult(items=[], last_evaluated_key=cursor),
-        DatabaseQueryResult(items=[item]),
-    ]
+    database.query.return_value = DatabaseQueryResult(items=[item])
     storage = MockObjectStorage(bucket_name="test-bucket")
     storage.objects[("test-bucket", "scenes/cooking/example.jpg")] = (
         b"image",
@@ -175,21 +171,24 @@ async def test_thumbnail_finds_scene_after_empty_paginated_page():
         kind="example",
         storage=storage,
     ) == (b"image", "image/jpeg")
-    assert database.scan.await_args_list[1].kwargs == {
-        "exclusive_start_key": cursor,
-    }
+    database.query.assert_awaited_once_with(
+        key_condition={"scenePrincipal": "cooking"},
+        limit=1,
+    )
+    database.scan.assert_not_awaited()
 
 
 @pytest.mark.asyncio
 async def test_thumbnail_resolves_configured_bucket_uri():
     item = (await _thumbnail_db().scan()).items[0]
     item["thumbnailUri"] = (
-        f"s3://{SCENE_IMAGES_BUCKET_NAME}/scenes/cooking/example.jpg"
+        f"s3://{MEDIA_BUCKET_NAME}/scenes/cooking/example.jpg"
     )
-    storage = MockObjectStorage(bucket_name=SCENE_IMAGES_BUCKET_NAME)
-    storage.objects[
-        (SCENE_IMAGES_BUCKET_NAME, "scenes/cooking/example.jpg")
-    ] = (b"image", "image/jpeg")
+    storage = MockObjectStorage(bucket_name=MEDIA_BUCKET_NAME)
+    storage.objects[(MEDIA_BUCKET_NAME, "scenes/cooking/example.jpg")] = (
+        b"image",
+        "image/jpeg",
+    )
     assert await get_scene_thumbnail(
         scenes_db=MockDatabase(initial_items=[item]),
         scene_principal="cooking",

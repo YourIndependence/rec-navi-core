@@ -42,7 +42,6 @@ async def test_lifespan_injects_database_and_object_storage():
                 main.TEMPLATES_TABLE_NAME: database_instances[3],
             }
             assert app.state.object_storage is object_storage
-            assert app.state.scene_images_storage is object_storage
 
     assert dynamo_db.call_args_list == [
         ((), {"table_name": main.USERS_TABLE_NAME}),
@@ -52,5 +51,4 @@ async def test_lifespan_injects_database_and_object_storage():
     ]
     assert s3_client.call_args_list == [
         ((), {"bucket_name": main.MEDIA_BUCKET_NAME}),
-        ((), {"bucket_name": main.SCENE_IMAGES_BUCKET_NAME}),
     ]

@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
@@ -172,3 +173,39 @@ def test_update_scene_rejects_missing_fields_without_calling_usecase(
         response = staff_client.post("/updateScene", json=payload)
     assert response.status_code == 422
     usecase.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    ("kind", "mime"),
+    [("example", "image/jpeg"), ("guide", "image/png")],
+)
+def test_staff_image_uses_media_storage(
+    staff_client,
+    auth_headers,
+    kind,
+    mime,
+):
+    app = staff_client.app
+    scenes_db = object()
+    storage = object()
+    app.state.database = {SCENES_TABLE_NAME: scenes_db}
+    app.state.object_storage = storage
+    with patch(
+        "recnavi.apis.staff.staff_router.get_scene_thumbnail_usecase",
+        new=AsyncMock(return_value=(b"image", mime)),
+    ) as usecase:
+        response = staff_client.get(
+            "/getSceneThumbnail",
+            headers=auth_headers,
+            params={"scenePrincipal": "cooking", "kind": kind},
+        )
+    assert response.status_code == 200
+    assert response.content == b"image"
+    assert response.headers["content-type"] == mime
+    assert response.headers["cache-control"] == "private, max-age=86400"
+    usecase.assert_awaited_once_with(
+        scenes_db=scenes_db,
+        scene_principal="cooking",
+        kind=kind,
+        storage=storage,
+    )

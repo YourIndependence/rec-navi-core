@@ -9,10 +9,13 @@
 
 """Staff router for staff-facing endpoints."""
 
+from typing import Literal
+
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Query
 from fastapi import Request
+from fastapi.responses import Response
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
@@ -22,8 +25,12 @@ from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.scene.get_scene_thumbnail import (
+    get_scene_thumbnail_usecase,
+)
 from recnavi.application.scene.update_scene import update_scene_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -89,3 +96,27 @@ async def update_scene_endpoint(
     )
 
     return UpdateSceneResponse(project=updated_project)
+
+
+@staff_router.get(
+    "/getSceneThumbnail",
+    response_class=Response,
+    dependencies=[Depends(verify_user)],
+)
+async def get_scene_thumbnail_endpoint(
+    request: Request,
+    scene_principal: str = Query(..., alias="scenePrincipal", min_length=1),
+    kind: Literal["example", "guide"] = Query(...),
+) -> Response:
+    """Serve scene example or guide images for image elements."""
+    content, content_type = await get_scene_thumbnail_usecase(
+        scenes_db=request.app.state.database[SCENES_TABLE_NAME],
+        scene_principal=scene_principal,
+        kind=kind,
+        storage=request.app.state.object_storage,
+    )
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
