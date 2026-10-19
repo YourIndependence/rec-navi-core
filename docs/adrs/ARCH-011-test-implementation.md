@@ -3,9 +3,10 @@ id: ARCH-011
 title: Test Implementation Rules
 domain: testing
 status: active
-date: 2026-09-20
+date: 2026-10-16
 rules: true
 files:
+  - 'src/recnavi/**/*.py'
   - 'tests/**/*.py'
 ---
 
@@ -21,10 +22,40 @@ test suite misleading or nondeterministic.
 Tests must preserve the distinction between integration and unit behavior.
 Reusable abstract-class mocks belong in `tests/mockups/`; integration tests
 must keep real component wiring; and unit tests must use in-process doubles for
-external boundaries. Every API endpoint must have a corresponding test in
-`tests/integration/`. In CI, where `ENV=CI` is injected, integration tests use
+external boundaries. Every API endpoint must have at least one HTTP-boundary
+test in both `tests/unittests/apis/<router>/` and `tests/integration/`. Unit
+tests must be in the matching router directory so identical method/path pairs
+in different routers are checked independently. In CI, where `ENV=CI` is
+injected, integration tests use
 the `mock_infrastracture_injection_when_ci` fixture to replace external
 infrastructure with in-memory doubles while preserving the application wiring.
+
+Unit test paths mirror implementation module paths under `src/recnavi/`.
+For `src/recnavi/<path>/<module>.py`, the corresponding test is
+`tests/unittests/<path>/test_<module>.py`. The mapping is required in both
+directions: implementation modules require a mirrored test, and unit test
+modules must identify the implementation module they test. Package marker
+`__init__.py` files and tests of shared test doubles under `tests/unittests/mockups/`
+are excluded. Modules that only declare Pydantic models or types, including
+`apis/schemas/` and `core/types/`, are exempt until they contain behavior that
+needs testing; tests under `core/types/` are exempt as well. The modules
+`config/variables.py`, `exceptions/exceptions.py`, and any module named
+`base_*.py` are also exempt because they do not need unit tests.
+
+```text
+src/recnavi/apis/staff/staff_router.py
+tests/unittests/apis/staff/test_staff_router.py
+```
+
+The mirror check reports missing implementation or test mirrors as errors.
+
+Every API endpoint must be exercised at least once through an HTTP client in
+the unit test directory matching its router under
+`tests/unittests/apis/<router>/`, and at least once in `tests/integration/`.
+The `every-api-endpoint-has-unittest` and
+`every-api-endpoint-has-integration-test` rules enforce these requirements.
+Unit coverage is scoped to the router directory because separate routers may
+expose the same HTTP method and path.
 
 ### 1. Shared Mock Implementations
 
@@ -34,10 +65,48 @@ the complete mock placement policy.
 
 ### 2. Integration Collaborators
 
-Integration tests must not use `@patch` or `monkeypatch.setattr()` to replace
-services, agents, stores, or I/O collaborators. FastAPI dependency overrides
-and environment configuration through `monkeypatch.setenv()` or
-`monkeypatch.setitem()` are allowed.
+Integration files, including `conftest.py`, must not contain the text `patch`
+(case-insensitive). This deliberately conservative check includes imports,
+aliases, fixture parameters, comments, strings, and all `monkeypatch` methods.
+There are no exceptions for environment configuration, notification clients,
+model resolution, or HTTP PATCH calls. Prefer false positives over missed
+component replacements; any future exception requires an explicit ADR change.
+
+Authentication is the only dependency that tests may override. Use
+`app.dependency_overrides[verify_user]` directly and restore it in `finally`.
+Do not override other dependencies or clear the entire override mapping.
+The rule checks each occurrence, not whether a file mentions `verify_user`.
+
+The shared CI infrastructure setup remains in `tests/integration/conftest.py`.
+Individual tests must use that existing infrastructure, insert records through
+its public interface, and remove their records in `finally`. Do not replace
+`app.state.database` or storage objects per test. Configure environments outside
+the test body rather than modifying them with test substitution helpers.
+
+Every `test_*` function or test method under `tests/integration/` must make
+an HTTP request in its own body and assign the result to `response`:
+
+```python
+def test_update_scene(client, auth_headers):
+    response = client.post(
+        "/updateScene",
+        headers=auth_headers,
+        json=payload,
+    )
+    assert response.status_code == 200
+```
+
+Use `response = client.get(...)`, `response = client.post(...)`, or the
+corresponding `put`, `patch`, `delete`, `options`, `head`, or `trace` method.
+Awaited calls and annotated response assignments are also supported.
+Model construction, `model_dump()`, direct application/core calls, and
+`app.openapi()` alone belong in unit tests and do not satisfy this requirement.
+
+The `integration-test-must-call-http-client` rule checks each test's Python
+AST independently, including methods in `Test*` classes. Fixtures, helpers,
+comments, string literals, and nested function/class/lambda bodies do not
+count as HTTP calls in the test. This is a structural check; reviewers must
+still verify that requests execute and assertions cover the intended behavior.
 
 ### 3. Fixture Scope
 
@@ -143,12 +212,15 @@ source inspection.
 
 The following implementation rules are active:
 
+- `src-module-must-have-mirrored-unittest`
+- `unittest-must-mirror-src-module`
 - `every-application-usecase-has-unit-test`
 - `application-usecase-must-patch-core-collaborator`
 - `application-usecase-must-propagate-mock-output`
+- `every-api-endpoint-has-unittest`
 - `every-api-endpoint-has-integration-test`
+- `integration-test-must-call-http-client`
 - `no-patch-in-integration-tests`
-- `no-monkeypatch-setattr-component-in-integration`
 - `async-fixture-must-use-pytest-asyncio-fixture`
 - `mock-abc-class-must-be-in-mockups-dir`
 - `expensive-fixture-must-not-use-function-scope`
@@ -162,8 +234,11 @@ violated.
 
 **Do:**
 
+- Put unit tests at `tests/unittests/<src-relative-path>/test_<module>.py`
+- Keep additional tests for one implementation module in its mirrored directory
 - Put reusable `Base*` mock implementations in `tests/mockups/`
 - Keep integration tests connected to real collaborators
+- Assign `response` from an HTTP `client` call in every integration test
 - Use `@pytest_asyncio.fixture` for asynchronous fixtures
 - Use `module` or `session` scope for expensive shared fixtures
 - Mock outbound HTTP in unit tests
@@ -176,7 +251,9 @@ violated.
 
 **Don't:**
 
+- Put a unit test in a path or filename that cannot be mapped to its implementation module
 - Patch services, agents, stores, or I/O in integration tests
+- Put model-only or direct-function tests in `tests/integration/`
 - Define reusable `Base*` mock classes inside test files
 - Recreate database tables, HTTP clients, or indexes per test unnecessarily
 - Make unit tests call real external URLs

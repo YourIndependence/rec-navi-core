@@ -9,7 +9,9 @@ files:
   - 'src/recnavi/main.py'
   - 'src/recnavi/core/database/**/*.py'
   - 'src/recnavi/infrastructure/database/**/*.py'
+  - 'src/recnavi/infrastructure/s3/**/*.py'
   - 'src/recnavi/apis/**/*.py'
+  - 'tests/unittests/**/*.py'
 ---
 
 ## Context
@@ -57,6 +59,36 @@ async def get_me(user: User = Depends(verify_user)) -> GetMeResponse:
 - **Core**: `BaseDatabase` (ABC) defines common operations (`get_item`, `put_item`, `query`, `delete_item`)
 - **Infrastructure**: Concrete implementation `DynamoDb` with automatic Decimal conversion for all DynamoDB tables
 - **API**: Endpoints and dependencies receive `BaseDatabase` instances from `request.app.state.database`
+
+### AWS Adapter Unit Tests
+
+Application and core unit tests use the shared `BaseDatabase` and
+`BaseObjectStorage` mock implementations. Infrastructure unit tests exercise
+the concrete `DynamoDb` and `S3Client` adapters against Moto instead.
+
+Every concrete AWS adapter constructed in a unit test must receive the
+`mock_aws_session` fixture through its public `session` attribute before it is
+used, returned, or yielded. The fixture runs an aioboto3 session under
+`mock_aws`, with dummy credentials and the shared async transport adapter.
+
+```python
+@pytest.fixture
+def storage(mock_aws_session):
+    storage = S3Client(bucket_name="it-media")
+    storage.session = mock_aws_session
+    return storage
+```
+
+The `no-database-in-test-without-mock` and `no-s3-in-test-without-mock`
+rules both have `error` severity. They inspect Python AST nodes and require
+the constructing function or fixture to accept `mock_aws_session` and assign
+it to that same instance in the same statement block before use. Comments,
+string literals, assignments in another function or conditional branch, and
+injection into a different instance do not satisfy the rules. Direct
+constructor calls without an assigned local variable are rejected.
+
+These checks enforce the explicit fixture injection pattern, not arbitrary
+Python data flow or the behavior of custom session factories.
 
 ## Rationale
 
@@ -162,6 +194,8 @@ async def get_me(request: Request):
 - Access databases via `request.app.state.database[TABLE_NAME]` in API dependencies (e.g., `verify_user`)
 - Pass `BaseDatabase` instances to Core layer functions
 - Use fakes or mocks implementing `BaseDatabase` in unit tests
+- In infrastructure unit tests, inject `mock_aws_session` into every
+  `DynamoDb` and `S3Client` instance before use
 
 **Don't:**
 - Create database instances inside endpoint functions
