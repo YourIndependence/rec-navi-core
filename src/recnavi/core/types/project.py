@@ -13,12 +13,14 @@
 from datetime import UTC
 from datetime import datetime
 from enum import StrEnum
+from typing import Self
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -117,6 +119,18 @@ class Project(BaseModel):
         """Advance the version and record the update time."""
         self.version += 1
         self.updated_at = datetime.now(UTC).isoformat()
+
+    async def attach_presigned_url(
+        self,
+        *,
+        storage: BaseObjectStorage,
+    ) -> Self:
+        """Return a copy with fresh playback URLs for every child scene."""
+        scenes = [
+            await scene.attach_presigned_url(storage=storage)
+            for scene in self.scenes
+        ]
+        return self.model_copy(update={"scenes": scenes}, deep=True)
 
     def to_storage_item(self) -> dict[str, object]:
         """Serialize the project and its scenes without temporary URLs."""

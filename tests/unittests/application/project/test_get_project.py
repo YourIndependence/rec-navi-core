@@ -63,7 +63,8 @@ async def test_get_project_returns_playback_urls_without_changing_database():
 async def test_get_project_orchestrates_authorized_read_and_url_attachment():
     database = MockDatabase()
     storage = MockObjectStorage(bucket_name="media")
-    expected_output = object()
+    expected_output = AsyncMock(spec=Project)
+    expected_output.attach_presigned_url.return_value = expected_output
     user = User(
         user_id="owner",
         user_name="Owner",
@@ -75,10 +76,6 @@ async def test_get_project_orchestrates_authorized_read_and_url_attachment():
             "recnavi.application.project.get_project.get_project",
             new=AsyncMock(return_value=expected_output),
         ) as get_project,
-        patch(
-            "recnavi.application.project.get_project.attach_scene_urls",
-            new=AsyncMock(return_value=expected_output),
-        ) as attach_urls,
     ):
         result = await get_project_usecase(
             projects_db=database,
@@ -91,8 +88,7 @@ async def test_get_project_orchestrates_authorized_read_and_url_attachment():
         project_id="project",
         user=user,
     )
-    attach_urls.assert_awaited_once_with(
+    expected_output.attach_presigned_url.assert_awaited_once_with(
         storage=storage,
-        project=expected_output,
     )
     assert result is expected_output

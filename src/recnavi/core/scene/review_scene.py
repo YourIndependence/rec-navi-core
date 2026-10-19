@@ -13,7 +13,6 @@ from datetime import UTC
 from datetime import datetime
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
@@ -77,7 +76,4 @@ async def review_scene(
         ),
         expression_attribute_values={":previous_version": previous_version},
     )
-    return await attach_scene_urls(
-        storage=storage,
-        project=project,
-    )
+    return await project.attach_presigned_url(storage=storage)

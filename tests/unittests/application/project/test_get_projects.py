@@ -59,17 +59,14 @@ async def test_get_projects_returns_playback_urls_without_changing_database():
 async def test_get_projects_preserves_filtered_results_and_cursor():
     database = MockDatabase()
     storage = MockObjectStorage(bucket_name="media")
-    project = object()
+    project = AsyncMock(spec=Project)
+    project.attach_presigned_url.return_value = project
     expected_output = ([project], "next-page")
     with (
         patch(
             "recnavi.application.project.get_projects.get_projects",
             new=AsyncMock(return_value=expected_output),
         ) as get_projects,
-        patch(
-            "recnavi.application.project.get_projects.attach_scene_urls",
-            new=AsyncMock(return_value=project),
-        ) as attach_urls,
     ):
         result = await get_projects_usecase(
             projects_db=database,
@@ -86,5 +83,5 @@ async def test_get_projects_preserves_filtered_results_and_cursor():
         limit=12,
         cursor="previous-page",
     )
-    attach_urls.assert_awaited_once_with(storage=storage, project=project)
+    project.attach_presigned_url.assert_awaited_once_with(storage=storage)
     assert result == expected_output

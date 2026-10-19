@@ -11,7 +11,6 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.projects import get_projects
-from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 
@@ -40,7 +39,7 @@ async def get_projects_usecase(
     )
     return (
         [
-            await attach_scene_urls(storage=storage, project=project)
+            await project.attach_presigned_url(storage=storage)
             for project in projects
         ],
         next_cursor,

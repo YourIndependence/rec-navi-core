@@ -31,18 +31,21 @@ A concrete example: a `ResponseSchema(BaseModel)` was defined inside `applicatio
 ### Media models and temporary URLs
 
 Use one canonical domain model when a response differs only by presigned URLs.
-`SceneMaster` and `Scene` own an async
+`SceneMaster`, `Scene`, and `Project` own an async
 `attach_presigned_url(*, storage: BaseObjectStorage) -> Self` method. It returns
 a deep copy, retains durable references, and regenerates URLs on every call.
 It does not mutate the source or check object existence. Concrete storage
 clients remain in infrastructure. Application use cases orchestrate reads and
-URL attachment after authorization and filtering.
+URL attachment after authorization and filtering. `Project.attach_presigned_url()`
+recursively delegates to every child scene and preserves scene order. Callers
+use this aggregate method rather than iterating over its scenes themselves.
 
 ```python
 master = SceneMaster.model_validate(item)
 public_master = await master.attach_presigned_url(storage=storage)
 response = public_master.model_dump(by_alias=True)
 item = public_master.to_storage_item()
+public_project = await project.attach_presigned_url(storage=storage)
 ```
 
 Storage-only URI/key fields use `Field(exclude=True)`. Normal serialization and
