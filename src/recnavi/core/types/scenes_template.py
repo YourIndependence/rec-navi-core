@@ -10,10 +10,15 @@
 
 """ScenesTemplate"""
 
+from typing import Self
+
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.storage.image_urls import generate_image_url
 
 
 class ScenesTemplate(BaseModel):
@@ -33,7 +38,31 @@ class ScenesTemplate(BaseModel):
         default_factory=list,
         description="Scene masters to lay out, in shooting order",
     )
-    thumbnail_uri: str = Field(
-        ...,
+    thumbnail_uri: str | None = Field(
+        default=None,
+        exclude=True,
         description="Location of the image shown on the template tile",
     )
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the template thumbnail",
+    )
+
+    async def attach_presigned_url(
+        self,
+        *,
+        storage: BaseObjectStorage,
+    ) -> Self:
+        """Refresh the thumbnail URL on this template and return self."""
+        self.thumbnail_url = await generate_image_url(
+            storage=storage,
+            image_uri=self.thumbnail_uri,
+        )
+        return self
+
+    def to_storage_item(self) -> dict[str, object]:
+        """Serialize durable references without temporary image URLs."""
+        return {
+            **self.model_dump(by_alias=True, exclude={"thumbnail_url"}),
+            "thumbnailUri": self.thumbnail_uri,
+        }

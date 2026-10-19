@@ -111,7 +111,7 @@ async def test_update_project_usecase_returns_updated_project():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    await database.put_item(existing_project.model_dump(by_alias=True))
+    await database.put_item(existing_project.to_storage_item())
 
     updated_project = await update_project_usecase(
         projects_db=database,

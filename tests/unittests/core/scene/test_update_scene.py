@@ -17,9 +17,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.scene.update_scene import update_scene
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
@@ -97,13 +97,13 @@ async def test_recording_persists_keys_metadata_and_preserves_other_scenes(
     assert saved is not None
     scene = saved["scenes"][1]
     assert saved == {
-        **original.model_dump(by_alias=True),
+        **original.to_storage_item(),
         "version": (version or 0) + 1,
         "updatedAt": result.updated_at,
         "scenes": [
-            original.scenes[0].model_dump(by_alias=True),
+            original.scenes[0].to_storage_item(),
             {
-                **original.scenes[1].model_dump(by_alias=True),
+                **original.scenes[1].to_storage_item(),
                 "status": "pending",
                 "videoKey": scene["videoKey"],
                 "thumbnailKey": scene["thumbnailKey"],

@@ -12,6 +12,7 @@
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Request
+from fastapi import Response
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import CreateProjectRequest
@@ -25,7 +26,6 @@ from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
-from recnavi.apis.schemas.scene_schemas import SceneMasterView
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
@@ -57,35 +57,35 @@ cms_router = APIRouter(tags=["CMS"])
 )
 async def get_scene_masters_endpoint(
     request: Request,
+    response: Response,
     _user: User = Depends(verify_user),
 ) -> GetSceneMastersResponse:
     """List all scene masters."""
     scenes_db = request.app.state.database[SCENES_TABLE_NAME]
-    scene_masters = await get_scene_masters_usecase(scenes_db=scenes_db)
-
-    scene_views = [
-        SceneMasterView(
-            scene_principal=sm.scene_principal,
-            title=sm.title,
-            max_duration_seconds=sm.max_duration_seconds,
-        )
-        for sm in scene_masters
-    ]
-
-    return GetSceneMastersResponse(scenes=scene_views)
+    scene_masters = await get_scene_masters_usecase(
+        scenes_db=scenes_db,
+        storage=request.app.state.object_storage,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return GetSceneMastersResponse(scenes=scene_masters)
 
 
 @cms_router.get(
     "/getTemplates",
-    response_model_exclude={"templates": {"__all__": {"thumbnail_uri"}}},
+    response_model=GetTemplatesResponse,
 )
 async def get_templates_endpoint(
     request: Request,
+    response: Response,
     _user: User = Depends(verify_user),
 ) -> GetTemplatesResponse:
     """List all scenes templates."""
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
-    templates = await get_templates_usecase(templates_db=templates_db)
+    templates = await get_templates_usecase(
+        templates_db=templates_db,
+        storage=request.app.state.object_storage,
+    )
+    response.headers["Cache-Control"] = "no-store"
     return GetTemplatesResponse(templates=templates)
 
 

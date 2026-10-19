@@ -63,7 +63,7 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
     app.state.database = {
         USERS_TABLE_NAME: MockDatabase(),
         PROJECTS_TABLE_NAME: MockDatabase(),
-        SCENES_TABLE_NAME: MockDatabase(),
+        SCENES_TABLE_NAME: MockDatabase(key_names=("scenePrincipal",)),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
     app.state.object_storage = MockObjectStorage(

@@ -15,6 +15,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -51,15 +52,27 @@ def _make_project() -> Project:
     )
 
 
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
 def test_get_scene_masters_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
     scene_master = SceneMaster(
         scene_principal="cooking",
         title="Cooking",
-        thumbnail_uri="s3://bucket/thumbnail.jpg",
-        guide_uri="s3://bucket/guide.png",
+        thumbnail_url="https://signed/thumbnail",
+        guide_url="https://signed/guide",
         max_duration_seconds=60,
     )
     with patch(
@@ -76,23 +89,39 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
                 "scenePrincipal": "cooking",
                 "title": "Cooking",
                 "maxDurationSeconds": 60,
+                "thumbnailUrl": "https://signed/thumbnail",
+                "guideUrl": "https://signed/guide",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         scenes_db=cms_client.app.state.database[SCENES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
 
 
-def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
+def test_get_templates_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
     template = ScenesTemplate(
         template_id="template-123",
         title="Starter",
         scene_principals=["cooking"],
-        thumbnail_uri="s3://bucket/template.jpg",
+        thumbnail_url="https://signed/template",
     )
     with patch(
         "recnavi.apis.cms.cms_router.get_templates_usecase",
@@ -108,12 +137,21 @@ def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
                 "templateId": "template-123",
                 "title": "Starter",
                 "scenePrincipals": ["cooking"],
+                "thumbnailUrl": "https://signed/template",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         templates_db=cms_client.app.state.database[TEMPLATES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
+    schema = cms_client.get("/openapi.json").json()
+    properties = schema["components"]["schemas"]["ScenesTemplate"][
+        "properties"
+    ]
+    assert "thumbnailUri" not in properties
+    assert "thumbnailUrl" in properties
 
 
 def test_create_project_parses_request_and_serializes_response(

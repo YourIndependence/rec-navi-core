@@ -41,6 +41,7 @@ async def get_projects_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
         user_id=user.user_id,
         group_id=user.group_id,
         limit=limit,
@@ -63,6 +64,7 @@ async def get_project_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     project = await get_project_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
         project_id=item.project_id,
         user=user,
     )
