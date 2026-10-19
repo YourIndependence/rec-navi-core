@@ -4,6 +4,9 @@ Authenticated `GET /getSceneMasters` returns `thumbnailUrl` and `guideUrl`
 alongside scene metadata. Staff, admins and owners use the same authenticated
 endpoint. Raw `thumbnailUri` and `guideUri` values are not exposed.
 
+Authenticated `GET /getTemplates` likewise returns `thumbnailUrl` alongside
+template metadata. Its typed response excludes the stored `thumbnailUri`.
+
 Master image URLs use the same presigned download mechanism as recorded media.
 URLs expire after 3600 seconds. Metadata responses use `Cache-Control: no-store`.
 Clients can put the returned URLs in image elements and refresh the metadata

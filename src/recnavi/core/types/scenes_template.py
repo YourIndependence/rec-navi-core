@@ -33,7 +33,21 @@ class ScenesTemplate(BaseModel):
         default_factory=list,
         description="Scene masters to lay out, in shooting order",
     )
-    thumbnail_uri: str = Field(
-        ...,
+    thumbnail_uri: str | None = Field(
+        default=None,
         description="Location of the image shown on the template tile",
     )
+
+
+class ScenesTemplateView(BaseModel):
+    """Template metadata with a temporary thumbnail URL."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    template_id: str
+    title: str
+    scene_principals: list[str] = Field(default_factory=list)
+    thumbnail_url: str | None = None

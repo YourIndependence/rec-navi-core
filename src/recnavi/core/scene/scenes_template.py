@@ -9,14 +9,11 @@
 
 """Scenes template domain logic."""
 
-from urllib.parse import urlsplit
-
-from recnavi.config.variables import SCENE_IMAGES_BUCKET_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.storage.image_urls import generate_image_url
 from recnavi.core.types.scenes_template import ScenesTemplate
-from recnavi.exceptions.exceptions import ClientNotFoundError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+from recnavi.core.types.scenes_template import ScenesTemplateView
 
 
 async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
@@ -25,62 +22,21 @@ async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
     return [ScenesTemplate.model_validate(item) for item in result.items]
 
 
-async def get_template_by_id(
+async def attach_template_urls(
     *,
-    templates_db: BaseDatabase,
-    template_id: str,
-) -> ScenesTemplate | None:
-    """Get a single template by ID."""
-    item = await templates_db.get_item({"templateId": template_id})
-    if item is None:
-        return None
-    return ScenesTemplate.model_validate(item)
-
-
-async def get_template_thumbnail(
-    *,
-    templates_db: BaseDatabase,
-    template_id: str,
+    templates: list[ScenesTemplate],
     storage: BaseObjectStorage,
-) -> tuple[bytes, str]:
-    """Get template thumbnail image bytes."""
-    template = await get_template_by_id(
-        templates_db=templates_db,
-        template_id=template_id,
-    )
-
-    if template is None:
-        raise ClientNotFoundError(
-            f"Template '{template_id}' not found.",
+) -> list[ScenesTemplateView]:
+    """Replace template image references with temporary URLs."""
+    return [
+        ScenesTemplateView(
+            template_id=template.template_id,
+            title=template.title,
+            scene_principals=template.scene_principals,
+            thumbnail_url=await generate_image_url(
+                storage=storage,
+                image_uri=template.thumbnail_uri,
+            ),
         )
-
-    object_key = template.thumbnail_uri
-    if not object_key:
-        raise ClientNotFoundError(
-            f"Template '{template_id}' has no thumbnail.",
-        )
-    if "://" in object_key:
-        uri = urlsplit(object_key)
-        if (
-            uri.scheme != "s3"
-            or uri.netloc != SCENE_IMAGES_BUCKET_NAME
-            or uri.query
-            or uri.fragment
-        ):
-            raise ClientUnprocessableEntityError("Invalid template image URI.")
-        object_key = uri.path.removeprefix("/")
-    content_type = _infer_content_type(object_key)
-    content = await storage.download_object(object_key=object_key)
-    return content, content_type
-
-
-def _infer_content_type(object_key: str) -> str:
-    """Infer MIME type from file extension."""
-    lower_key = object_key.lower()
-
-    if lower_key.endswith((".jpg", ".jpeg")):
-        return "image/jpeg"
-    if lower_key.endswith(".png"):
-        return "image/png"
-
-    raise ClientUnprocessableEntityError("Unsupported template image format.")
+        for template in templates
+    ]

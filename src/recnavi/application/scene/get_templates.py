@@ -10,13 +10,17 @@
 """List the scenes templates available to the CMS."""
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.scene.scenes_template import attach_template_urls
 from recnavi.core.scene.scenes_template import get_templates
-from recnavi.core.types.scenes_template import ScenesTemplate
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.scenes_template import ScenesTemplateView
 
 
 async def get_templates_usecase(
     *,
     templates_db: BaseDatabase,
-) -> list[ScenesTemplate]:
-    """List every scenes template."""
-    return await get_templates(templates_db=templates_db)
+    storage: BaseObjectStorage,
+) -> list[ScenesTemplateView]:
+    """List templates with temporary thumbnail URLs."""
+    templates = await get_templates(templates_db=templates_db)
+    return await attach_template_urls(templates=templates, storage=storage)

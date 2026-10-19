@@ -36,11 +36,6 @@ MEDIA_BUCKET_NAME = os.environ.get(
     "rec-navi-dev-media",
 )
 
-SCENE_IMAGES_BUCKET_NAME = os.environ.get(
-    "SCENE_IMAGES_BUCKET_NAME",
-    "rec-navi-dev-scene-images",
-)
-
 APP_DOMAINS = "rec-navi.com"
 
 

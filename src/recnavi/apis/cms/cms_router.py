@@ -67,15 +67,20 @@ async def get_scene_masters_endpoint(
 
 @cms_router.get(
     "/getTemplates",
-    response_model_exclude={"templates": {"__all__": {"thumbnail_uri"}}},
+    response_model=GetTemplatesResponse,
 )
 async def get_templates_endpoint(
     request: Request,
+    response: Response,
     _user: User = Depends(verify_user),
 ) -> GetTemplatesResponse:
     """List all scenes templates."""
     templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
-    templates = await get_templates_usecase(templates_db=templates_db)
+    templates = await get_templates_usecase(
+        templates_db=templates_db,
+        storage=request.app.state.object_storage,
+    )
+    response.headers["Cache-Control"] = "no-store"
     return GetTemplatesResponse(templates=templates)
 
 

@@ -25,7 +25,7 @@ from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene_master import SceneMasterView
-from recnavi.core.types.scenes_template import ScenesTemplate
+from recnavi.core.types.scenes_template import ScenesTemplateView
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_users import get_mock_x_user
@@ -101,15 +101,27 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
+def test_get_templates_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
-    template = ScenesTemplate(
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
+    template = ScenesTemplateView(
         template_id="template-123",
         title="Starter",
         scene_principals=["cooking"],
-        thumbnail_uri="s3://bucket/template.jpg",
+        thumbnail_url="https://signed/template",
     )
     with patch(
         "recnavi.apis.cms.cms_router.get_templates_usecase",
@@ -125,12 +137,15 @@ def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
                 "templateId": "template-123",
                 "title": "Starter",
                 "scenePrincipals": ["cooking"],
+                "thumbnailUrl": "https://signed/template",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         templates_db=cms_client.app.state.database[TEMPLATES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_create_project_parses_request_and_serializes_response(
