@@ -60,7 +60,7 @@ def project() -> Project:
 @pytest.mark.parametrize(
     ("role", "user_id", "group_id"),
     [
-        (UserRole.ADMIN, "owner", "group"),
+        (UserRole.ADMIN, "other", "group"),
         (UserRole.STAFF, "owner", "group"),
         (UserRole.OWNER, "other", "group"),
         (UserRole.OWNER, "owner", "other"),
@@ -176,3 +176,19 @@ async def test_archive_sanitizes_scene_principal_paths():
         assert all(
             "/" not in name and "\\" not in name for name in archive.namelist()
         )
+
+
+@pytest.mark.asyncio
+async def test_download_allows_admin_who_owns_project():
+    value = project()
+    storage = MockObjectStorage(bucket_name="media")
+    for scene in value.scenes:
+        storage.objects[("media", scene.video_key)] = (b"video", "video/mp4")
+    user = owner().model_copy(update={"role": UserRole.ADMIN})
+    result = await create_project_archive(
+        user=user,
+        project=value,
+        storage=storage,
+    )
+    assert result is value
+    assert result.download_url

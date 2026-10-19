@@ -172,14 +172,43 @@ async def test_download_enforces_project_policy(
 
 
 @pytest.mark.asyncio
-async def test_download_rejects_admin_role(
+async def test_download_rejects_admin_who_does_not_own_project(
     client,
     auth_headers,
     downloadable_project: Project,
 ):
+    downloadable_project.owner_user_id = "another-owner"
+    await app.state.database[PROJECTS_TABLE_NAME].put_item(
+        downloadable_project.to_storage_item(),
+    )
     response = client.post(
         "/downloadProject",
         headers=auth_headers,
         json={"projectId": downloadable_project.project_id},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_download_allows_admin_who_owns_project(
+    client,
+    auth_headers,
+    downloadable_project: Project,
+):
+    previous = app.dependency_overrides[verify_user]
+    app.dependency_overrides[verify_user] = lambda: User(
+        user_id=downloadable_project.owner_user_id,
+        user_name="Admin owner",
+        role=UserRole.ADMIN,
+        group_id=downloadable_project.group_id,
+    )
+    try:
+        response = client.post(
+            "/downloadProject",
+            headers=auth_headers,
+            json={"projectId": downloadable_project.project_id},
+        )
+        assert response.status_code == 200
+        assert response.json()["downloadUrl"]
+    finally:
+        app.dependency_overrides[verify_user] = previous
