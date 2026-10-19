@@ -12,11 +12,13 @@
 from collections.abc import AsyncIterator
 from contextlib import suppress
 from typing import cast
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import pytest
 import pytest_asyncio
 
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.main import app
@@ -32,8 +34,8 @@ async def scene_master_data() -> AsyncIterator[dict[str, object]]:
     item = {
         "scenePrincipal": f"it_{uuid4()}",
         "title": "Integration Test Scene",
-        "thumbnailUri": "s3://it-test/thumbnail.jpg",
-        "guideUri": "s3://it-test/guide.png",
+        "thumbnailUri": f"s3://{MEDIA_BUCKET_NAME}/masters/thumbnail.jpg",
+        "guideUri": "masters/guide.png",
         "maxDurationSeconds": 30,
     }
     await database.put_item(item)
@@ -68,8 +70,47 @@ async def test_get_scene_masters_returns_injected_scene(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+    scene = next(
+        scene
+        for scene in data["scenes"]
+        if scene["scenePrincipal"] == scene_master_data["scenePrincipal"]
+    )
     assert {
+        key: value
+        for key, value in scene.items()
+        if key not in {"thumbnailUrl", "guideUrl"}
+    } == {
         "scenePrincipal": scene_master_data["scenePrincipal"],
         "title": scene_master_data["title"],
         "maxDurationSeconds": scene_master_data["maxDurationSeconds"],
-    } in data["scenes"]
+    }
+    assert urlsplit(scene["thumbnailUrl"]).path.endswith(
+        "/masters/thumbnail.jpg",
+    )
+    assert urlsplit(scene["guideUrl"]).path.endswith("/masters/guide.png")
+    assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", ["", None])
+async def test_missing_master_images_return_null(
+    client,
+    auth_headers,
+    scene_master_data,
+    value,
+):
+    database = cast(dict[str, BaseDatabase], app.state.database)[
+        SCENES_TABLE_NAME
+    ]
+    await database.put_item(
+        {**scene_master_data, "thumbnailUri": value, "guideUri": value},
+    )
+    response = client.get("/getSceneMasters", headers=auth_headers)
+    assert response.status_code == 200
+    scene = next(
+        scene
+        for scene in response.json()["scenes"]
+        if scene["scenePrincipal"] == scene_master_data["scenePrincipal"]
+    )
+    assert scene["thumbnailUrl"] is None
+    assert scene["guideUrl"] is None

@@ -10,7 +10,6 @@
 """Update project with optimistic locking."""
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import Scene
@@ -58,12 +57,9 @@ async def update_project(
     project.increment_version()
 
     await projects_db.put_item(
-        item=project.model_dump(by_alias=True),
+        item=project.to_storage_item(),
         condition_expression="version = :expected_version",
         expression_attribute_values={":expected_version": expected_version},
     )
 
-    return await attach_scene_urls(
-        storage=storage,
-        project=project,
-    )
+    return await project.attach_presigned_url(storage=storage)

@@ -30,6 +30,7 @@ Flag any design decision NOT covered by an existing ADR as a **New Design Decisi
 
 # Focus Areas
 
+- **Media Models**: Follow ARCH-002: one canonical media type, async in-place URL attachment returning `self`, and explicit `to_storage_item()` persistence for models and aggregates.
 - **Layer Ownership**: Decide which of `apis/`, `application/`, `core/`, `infrastructure/` owns new logic.
 - **Agent Design**: When adding a new ADK agent or tool, define the agent package structure and registry key.
 - **Registry Integration**: Decide which registry a new component belongs to and what string key it uses.

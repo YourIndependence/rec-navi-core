@@ -75,7 +75,7 @@ async def test_update_project_increments_version():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    await database.put_item(existing_project.model_dump(by_alias=True))
+    await database.put_item(existing_project.to_storage_item())
 
     updated_project = await update_project(
         storage=MockObjectStorage(bucket_name="bucket"),
@@ -116,7 +116,7 @@ async def test_update_project_raises_conflict_on_version_mismatch():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    await database.put_item(existing_project.model_dump(by_alias=True))
+    await database.put_item(existing_project.to_storage_item())
 
     with pytest.raises(ClientConflictError) as exc_info:
         await update_project(
@@ -157,7 +157,7 @@ async def test_update_project_raises_authorization_error_for_non_owner():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    await database.put_item(existing_project.model_dump(by_alias=True))
+    await database.put_item(existing_project.to_storage_item())
 
     with pytest.raises(ClientAuthorizationError):
         await update_project(
@@ -207,7 +207,7 @@ async def test_update_project_preserves_video_key_and_recording_state():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    await database.put_item(existing_project.model_dump(by_alias=True))
+    await database.put_item(existing_project.to_storage_item())
 
     updated_project = await update_project(
         storage=MockObjectStorage(bucket_name="bucket"),
@@ -288,7 +288,7 @@ async def test_update_project_raises_not_found_for_missing_project():
 async def test_update_project_owner_can_assign_users_without_group_lookup():
     """Project ownership is sufficient regardless of group or assignee records."""
     database = MockDatabase()
-    await database.put_item(make_project().model_dump(by_alias=True))
+    await database.put_item(make_project().to_storage_item())
     updated = await update_project(
         projects_db=database,
         project_id="proj-123",
@@ -316,7 +316,7 @@ async def test_update_project_rejects_other_project_owner():
     """Another project owner cannot update this project, even in the same group."""
     database = MockDatabase()
     original = make_project()
-    await database.put_item(original.model_dump(by_alias=True))
+    await database.put_item(original.to_storage_item())
     user = make_owner().model_copy(update={"user_id": "another-owner"})
     with pytest.raises(ClientAuthorizationError):
         await update_project(
@@ -330,14 +330,14 @@ async def test_update_project_rejects_other_project_owner():
             user=user,
             storage=MockObjectStorage(bucket_name="bucket"),
         )
-    assert database.items == [original.model_dump(by_alias=True)]
+    assert database.items == [original.to_storage_item()]
 
 
 @pytest.mark.asyncio
 async def test_update_project_returns_null_urls_for_unrecorded_scene():
     """Test update_project returns null urls for scenes without keys."""
     database = MockDatabase()
-    await database.put_item(make_project().model_dump(by_alias=True))
+    await database.put_item(make_project().to_storage_item())
 
     updated_project = await update_project(
         projects_db=database,
@@ -371,7 +371,7 @@ async def test_update_project_replaces_all_scenes_in_one_revision(empty):
         Scene(scene_id="removed", scene_principal="opening"),
         Scene(scene_id="existing", scene_principal="cooking"),
     ]
-    await database.put_item(original.model_dump(by_alias=True))
+    await database.put_item(original.to_storage_item())
     scenes = (
         []
         if empty

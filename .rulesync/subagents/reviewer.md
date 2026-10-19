@@ -31,6 +31,7 @@ Only report issues with confidence >= 80. Do NOT flag pre-existing issues not in
 
 ## 1. Architecture Violations (threshold: 80)
 
+- Media-only View duplication, media DB writes through ordinary `model_dump()`, or temporary URLs in stored aggregates -- violates ARCH-002.
 - `core/` importing from `infrastructure/` (dependency inversion violated)
 - `apis/` calling `core/` directly without going through `application/`
 - Concrete DB/external client instantiated inside `core/` or `application/`

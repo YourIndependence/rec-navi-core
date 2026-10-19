@@ -49,4 +49,6 @@ async def test_lifespan_injects_database_and_object_storage():
         ((), {"table_name": main.SCENES_TABLE_NAME}),
         ((), {"table_name": main.TEMPLATES_TABLE_NAME}),
     ]
-    s3_client.assert_called_once_with(bucket_name=main.MEDIA_BUCKET_NAME)
+    assert s3_client.call_args_list == [
+        ((), {"bucket_name": main.MEDIA_BUCKET_NAME}),
+    ]

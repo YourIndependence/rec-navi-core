@@ -42,6 +42,16 @@ infrastructure/  <- External I/O: DB sessions, boto3 clients, third-party APIs
 - Tool sub-module (`core/tools/`) contains all tool implementations. Tool modules must follow [ARCH-013 Tool Registry and Initialization Pattern](../../docs/adrs/ARCH-013-tool-registry-pattern.md): each `*_tool.py` or `*_tools.py` module exposes a synchronous `initialize()` function and registers tools with `tool_registry` during startup. `core/tools/tool_registry.py` provides runtime tool lookup for dynamic agent construction.
 - `core/agent_runner/` wraps `google.adk.runners.Runner` and is the only place an ADK `Runner` is instantiated.
 
+## Media model serialization
+
+Follow [ARCH-002](docs/adrs/ARCH-002-pydantic-first-type-system.md#media-models-and-temporary-urls).
+Use one domain type when the only response difference is temporary media URLs.
+Core models expose async `attach_presigned_url(*, storage)` updating the model and returning `self`;
+application use cases attach URLs after authorization and filtering. Exclude
+storage references with `Field(exclude=True)`. Persist media models and aggregates
+only through `to_storage_item()`, never ordinary `model_dump()`.
+Distinct contracts such as privacy-limited `UserSummary` remain separate.
+
 ## Google ADK Agent Pattern
 
 TRUST supports two agent creation patterns:

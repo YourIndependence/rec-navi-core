@@ -26,9 +26,9 @@ from recnavi.config.variables import ENV
 from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.types.scene import Scene
 from recnavi.main import app
 
@@ -73,7 +73,7 @@ async def recording_project(
             Scene(scene_id="untouched", scene_principal="opening"),
         ],
     )
-    item = project.model_dump(by_alias=True)
+    item = project.to_storage_item()
     if request.param is None:
         item.pop("version")
     await database.put_item(item)
@@ -125,9 +125,7 @@ async def test_update_scene_persists_recording_through_http(
     )
     assert stored["updatedAt"] == project["updatedAt"]
     assert stored["updatedAt"] != recording_project.updated_at
-    assert stored["scenes"][1] == recording_project.scenes[1].model_dump(
-        by_alias=True,
-    )
+    assert stored["scenes"][1] == recording_project.scenes[1].to_storage_item()
     scene = stored["scenes"][0]
     public_scene = project["scenes"][0]
     assert scene["status"] == public_scene["status"] == "pending"
