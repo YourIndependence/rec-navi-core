@@ -9,8 +9,11 @@
 
 """Tests for scene master core logic."""
 
+from unittest.mock import AsyncMock
+
 import pytest
 
+from recnavi.core.scene.scene_master import attach_scene_master_urls
 from recnavi.core.scene.scene_master import get_scene_masters
 from tests.mockups.mock_database import MockDatabase
 
@@ -79,3 +82,65 @@ async def test_get_scene_masters_handles_many_scenes():
     assert result[0].scene_principal == "scene_0"
     assert result[49].scene_principal == "scene_49"
     assert result[49].max_duration_seconds == 59
+
+
+@pytest.mark.asyncio
+async def test_scene_master_images_are_presigned_without_storage_uris():
+    database = MockDatabase(
+        initial_items=[
+            {
+                "scenePrincipal": "cooking",
+                "title": "Cooking",
+                "thumbnailUri": "masters/cooking.jpg",
+                "guideUri": "masters/cooking.png",
+                "maxDurationSeconds": 60,
+            },
+        ],
+    )
+    storage = AsyncMock()
+    storage.generate_presigned_url.side_effect = [
+        "https://signed/example",
+        "https://signed/guide",
+    ]
+    result = await attach_scene_master_urls(
+        scenes=await get_scene_masters(scenes_db=database),
+        storage=storage,
+    )
+    assert result[0].model_dump(by_alias=True) == {
+        "scenePrincipal": "cooking",
+        "title": "Cooking",
+        "maxDurationSeconds": 60,
+        "thumbnailUrl": "https://signed/example",
+        "guideUrl": "https://signed/guide",
+    }
+    assert [
+        call.kwargs for call in storage.generate_presigned_url.await_args_list
+    ] == [
+        {"object_key": "masters/cooking.jpg", "expiration": 3600},
+        {"object_key": "masters/cooking.png", "expiration": 3600},
+    ]
+    storage.download_object.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", ["", None])
+async def test_missing_images_are_null_and_do_not_get_presigned(value):
+    database = MockDatabase(
+        initial_items=[
+            {
+                "scenePrincipal": "empty",
+                "title": "Empty",
+                "maxDurationSeconds": 30,
+                "thumbnailUri": value,
+                "guideUri": value,
+            },
+        ],
+    )
+    storage = AsyncMock()
+    result = await attach_scene_master_urls(
+        scenes=await get_scene_masters(scenes_db=database),
+        storage=storage,
+    )
+    assert result[0].thumbnail_url is None
+    assert result[0].guide_url is None
+    storage.generate_presigned_url.assert_not_awaited()
