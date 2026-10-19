@@ -13,14 +13,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.config.variables import MEDIA_BUCKET_NAME
+from recnavi.core.scene.scene_master import attach_scene_master_urls
 from recnavi.core.scene.scene_master import get_scene_masters
-from recnavi.core.scene.scene_master import get_scene_thumbnail
-from recnavi.core.types.database import DatabaseQueryResult
-from recnavi.exceptions.exceptions import ClientNotFoundError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
-from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
@@ -89,130 +84,63 @@ async def test_get_scene_masters_handles_many_scenes():
     assert result[49].max_duration_seconds == 59
 
 
-def _thumbnail_db() -> MockDatabase:
-    return MockDatabase(
+@pytest.mark.asyncio
+async def test_scene_master_images_are_presigned_without_storage_uris():
+    database = MockDatabase(
         initial_items=[
             {
                 "scenePrincipal": "cooking",
-                "title": "Cooking Scene",
-                "thumbnailUri": "scenes/cooking/example.jpg",
-                "guideUri": "scenes/cooking/guide.png",
+                "title": "Cooking",
+                "thumbnailUri": "masters/cooking.jpg",
+                "guideUri": "masters/cooking.png",
                 "maxDurationSeconds": 60,
             },
         ],
     )
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("kind", "object_key", "content_type"),
-    [
-        ("example", "scenes/cooking/example.jpg", "image/jpeg"),
-        ("guide", "scenes/cooking/guide.png", "image/png"),
-    ],
-)
-async def test_get_scene_thumbnail_downloads_object(
-    kind,
-    object_key,
-    content_type,
-):
-    """Test core downloads the stored object with inferred content type."""
-    storage = MockObjectStorage(bucket_name="test-bucket")
-    storage.objects[("test-bucket", object_key)] = (b"bytes", content_type)
-
-    stream, actual_type = await get_scene_thumbnail(
-        scenes_db=_thumbnail_db(),
-        scene_principal="cooking",
-        kind=kind,
+    storage = AsyncMock()
+    storage.generate_presigned_url.side_effect = [
+        "https://signed/example",
+        "https://signed/guide",
+    ]
+    result = await attach_scene_master_urls(
+        scenes=await get_scene_masters(scenes_db=database),
         storage=storage,
     )
-
-    assert stream == b"bytes"
-    assert actual_type == content_type
-
-
-@pytest.mark.asyncio
-async def test_get_scene_thumbnail_raises_404_when_scene_not_found():
-    """Test core raises ClientNotFoundError for unknown scene."""
-    with pytest.raises(ClientNotFoundError):
-        await get_scene_thumbnail(
-            scenes_db=MockDatabase(initial_items=[]),
-            scene_principal="nonexistent",
-            kind="example",
-            storage=MockObjectStorage(bucket_name="test-bucket"),
-        )
-
-
-@pytest.mark.asyncio
-async def test_get_scene_thumbnail_raises_422_for_invalid_kind():
-    """Test core raises ClientUnprocessableEntityError for invalid kind."""
-    with pytest.raises(ClientUnprocessableEntityError):
-        await get_scene_thumbnail(
-            scenes_db=_thumbnail_db(),
-            scene_principal="cooking",
-            kind="invalid_kind",
-            storage=MockObjectStorage(bucket_name="test-bucket"),
-        )
+    assert result[0].model_dump(by_alias=True) == {
+        "scenePrincipal": "cooking",
+        "title": "Cooking",
+        "maxDurationSeconds": 60,
+        "thumbnailUrl": "https://signed/example",
+        "guideUrl": "https://signed/guide",
+    }
+    assert [
+        call.kwargs for call in storage.generate_presigned_url.await_args_list
+    ] == [
+        {"object_key": "masters/cooking.jpg", "expiration": 3600},
+        {"object_key": "masters/cooking.png", "expiration": 3600},
+    ]
+    storage.download_object.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_thumbnail_queries_scene_by_principal():
-    database = AsyncMock()
-    item = (await _thumbnail_db().scan()).items[0]
-    database.query.return_value = DatabaseQueryResult(items=[item])
-    storage = MockObjectStorage(bucket_name="test-bucket")
-    storage.objects[("test-bucket", "scenes/cooking/example.jpg")] = (
-        b"image",
-        "image/jpeg",
+@pytest.mark.parametrize("value", ["", None])
+async def test_missing_images_are_null_and_do_not_get_presigned(value):
+    database = MockDatabase(
+        initial_items=[
+            {
+                "scenePrincipal": "empty",
+                "title": "Empty",
+                "maxDurationSeconds": 30,
+                "thumbnailUri": value,
+                "guideUri": value,
+            },
+        ],
     )
-    assert await get_scene_thumbnail(
-        scenes_db=database,
-        scene_principal="cooking",
-        kind="example",
+    storage = AsyncMock()
+    result = await attach_scene_master_urls(
+        scenes=await get_scene_masters(scenes_db=database),
         storage=storage,
-    ) == (b"image", "image/jpeg")
-    database.query.assert_awaited_once_with(
-        key_condition={"scenePrincipal": "cooking"},
-        limit=1,
     )
-    database.scan.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_thumbnail_resolves_configured_bucket_uri():
-    item = (await _thumbnail_db().scan()).items[0]
-    item["thumbnailUri"] = (
-        f"s3://{MEDIA_BUCKET_NAME}/scenes/cooking/example.jpg"
-    )
-    storage = MockObjectStorage(bucket_name=MEDIA_BUCKET_NAME)
-    storage.objects[(MEDIA_BUCKET_NAME, "scenes/cooking/example.jpg")] = (
-        b"image",
-        "image/jpeg",
-    )
-    assert await get_scene_thumbnail(
-        scenes_db=MockDatabase(initial_items=[item]),
-        scene_principal="cooking",
-        kind="example",
-        storage=storage,
-    ) == (b"image", "image/jpeg")
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "s3://other-bucket/image.jpg",
-        "https://example.org/image.jpg",
-        "image.svg",
-    ],
-)
-async def test_thumbnail_rejects_external_bucket_and_unsupported_images(uri):
-    item = (await _thumbnail_db().scan()).items[0]
-    item["thumbnailUri"] = uri
-    with pytest.raises(ClientUnprocessableEntityError):
-        await get_scene_thumbnail(
-            scenes_db=MockDatabase(initial_items=[item]),
-            scene_principal="cooking",
-            kind="example",
-            storage=MockObjectStorage(bucket_name="test-bucket"),
-        )
+    assert result[0].thumbnail_url is None
+    assert result[0].guide_url is None
+    storage.generate_presigned_url.assert_not_awaited()

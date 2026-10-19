@@ -18,29 +18,7 @@ from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import ReviewSceneResult
-
-
-class SceneMasterView(BaseModel):
-    """Scene master view for API responses.
-
-    This schema excludes S3 object keys (thumbnailUri, guideUri) from the
-    response. Clients request these via separate endpoints using scenePrincipal.
-    """
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
-    )
-
-    scene_principal: str = Field(
-        ...,
-        description="Identifier of the scene master",
-    )
-    title: str = Field(..., description="Name shown to the staff")
-    max_duration_seconds: int = Field(
-        ...,
-        description="How long the staff may record",
-    )
+from recnavi.core.types.scene_master import SceneMasterView
 
 
 class GetSceneMastersResponse(BaseModel):

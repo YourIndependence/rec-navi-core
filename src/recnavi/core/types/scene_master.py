@@ -29,15 +29,30 @@ class SceneMaster(BaseModel):
         description="Identifier of the scene master",
     )
     title: str = Field(..., description="Name shown to the staff")
-    thumbnail_uri: str = Field(
-        ...,
+    thumbnail_uri: str | None = Field(
+        default=None,
         description="Location of the example photo to imitate",
     )
-    guide_uri: str = Field(
-        ...,
+    guide_uri: str | None = Field(
+        default=None,
         description="Location of the framing guide laid over the camera",
     )
     max_duration_seconds: int = Field(
         ...,
         description="How long the staff may record",
     )
+
+
+class SceneMasterView(BaseModel):
+    """Scene master metadata with temporary image URLs."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    scene_principal: str
+    title: str
+    max_duration_seconds: int
+    thumbnail_url: str | None = None
+    guide_url: str | None = None

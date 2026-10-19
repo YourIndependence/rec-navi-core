@@ -15,6 +15,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -23,7 +24,7 @@ from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.scene_master import SceneMasterView
 from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -51,15 +52,27 @@ def _make_project() -> Project:
     )
 
 
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
 def test_get_scene_masters_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
-    scene_master = SceneMaster(
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
+    scene_master = SceneMasterView(
         scene_principal="cooking",
         title="Cooking",
-        thumbnail_uri="s3://bucket/thumbnail.jpg",
-        guide_uri="s3://bucket/guide.png",
+        thumbnail_url="https://signed/thumbnail",
+        guide_url="https://signed/guide",
         max_duration_seconds=60,
     )
     with patch(
@@ -76,12 +89,16 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
                 "scenePrincipal": "cooking",
                 "title": "Cooking",
                 "maxDurationSeconds": 60,
+                "thumbnailUrl": "https://signed/thumbnail",
+                "guideUrl": "https://signed/guide",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         scenes_db=cms_client.app.state.database[SCENES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
 
 
 def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
