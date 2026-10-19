@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.types.project import Project
+from recnavi.core.types.scene import SCENE_URL_EXPIRATION_SECONDS
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
@@ -53,12 +53,13 @@ async def test_mixed_scenes_preserve_order_metadata_and_original_keys():
         },
     ]
     project = build_project(scenes=scenes)
-    original = project.model_dump()
+    original = project.to_storage_item()
     storage = MockObjectStorage(bucket_name="bucket")
     presign = AsyncMock(wraps=storage.generate_presigned_url)
     storage.generate_presigned_url = presign
     view = await attach_scene_urls(storage=storage, project=project)
-    assert project.model_dump() == original
+    assert project.to_storage_item() == original
+    assert view.to_storage_item() == original
     assert [scene.scene_id for scene in view.scenes] == [
         scene.scene_id for scene in project.scenes
     ]

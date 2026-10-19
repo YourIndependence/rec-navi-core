@@ -71,7 +71,7 @@ async def review_scene(
     previous_version = project.version
     project.update_scene(scene)
     await projects_db.put_item(
-        item=project.model_dump(by_alias=True),
+        item=project.to_storage_item(),
         condition_expression=(
             "attribute_not_exists(version) OR version = :previous_version"
         ),

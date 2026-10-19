@@ -24,7 +24,7 @@ from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene_master import SceneMasterView
+from recnavi.core.types.scene_master import SceneMaster
 from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
@@ -68,7 +68,7 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
         verify_user,
         lambda: user,
     )
-    scene_master = SceneMasterView(
+    scene_master = SceneMaster(
         scene_principal="cooking",
         title="Cooking",
         thumbnail_url="https://signed/thumbnail",

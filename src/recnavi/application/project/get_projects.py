@@ -11,12 +11,15 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.project.projects import get_projects
+from recnavi.core.project.scene_urls import attach_scene_urls
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 
 
 async def get_projects_usecase(
     *,
     projects_db: BaseDatabase,
+    storage: BaseObjectStorage,
     user_id: str,
     group_id: str,
     limit: int = 64,
@@ -28,10 +31,17 @@ async def get_projects_usecase(
         Tuple of (projects, next_cursor). next_cursor is None on the last page.
 
     """
-    return await get_projects(
+    projects, next_cursor = await get_projects(
         projects_db=projects_db,
         user_id=user_id,
         group_id=group_id,
         limit=limit,
         cursor=cursor,
+    )
+    return (
+        [
+            await attach_scene_urls(storage=storage, project=project)
+            for project in projects
+        ],
+        next_cursor,
     )

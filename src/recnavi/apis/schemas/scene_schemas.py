@@ -18,7 +18,7 @@ from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import ReviewSceneResult
-from recnavi.core.types.scene_master import SceneMasterView
+from recnavi.core.types.scene_master import SceneMaster
 
 
 class GetSceneMastersResponse(BaseModel):
@@ -30,7 +30,7 @@ class GetSceneMastersResponse(BaseModel):
     )
 
     status: str = Field(default="ok", description="Response status")
-    scenes: list[SceneMasterView] = Field(
+    scenes: list[SceneMaster] = Field(
         ...,
         description="List of all scene masters",
     )

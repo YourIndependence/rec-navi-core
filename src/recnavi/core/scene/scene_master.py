@@ -11,9 +11,7 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
-from recnavi.core.storage.image_urls import generate_image_url
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.core.types.scene_master import SceneMasterView
 
 
 async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
@@ -27,21 +25,8 @@ async def attach_scene_master_urls(
     *,
     scenes: list[SceneMaster],
     storage: BaseObjectStorage,
-) -> list[SceneMasterView]:
+) -> list[SceneMaster]:
     """Replace master image references with temporary URLs."""
     return [
-        SceneMasterView(
-            scene_principal=scene.scene_principal,
-            title=scene.title,
-            max_duration_seconds=scene.max_duration_seconds,
-            thumbnail_url=await generate_image_url(
-                storage=storage,
-                image_uri=scene.thumbnail_uri,
-            ),
-            guide_url=await generate_image_url(
-                storage=storage,
-                image_uri=scene.guide_uri,
-            ),
-        )
-        for scene in scenes
+        await scene.attach_presigned_url(storage=storage) for scene in scenes
     ]

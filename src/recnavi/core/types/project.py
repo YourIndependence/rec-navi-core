@@ -20,7 +20,6 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene import SceneView
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientNotFoundError
@@ -51,7 +50,7 @@ class Project(BaseModel):
         default=ProjectStatus.IN_PROGRESS,
         description="How far the project has progressed",
     )
-    scenes: list[Scene | SceneView] = Field(
+    scenes: list[Scene] = Field(
         default_factory=list,
         description="Scenes to record in the project",
     )
@@ -118,3 +117,10 @@ class Project(BaseModel):
         """Advance the version and record the update time."""
         self.version += 1
         self.updated_at = datetime.now(UTC).isoformat()
+
+    def to_storage_item(self) -> dict[str, object]:
+        """Serialize the project and its scenes without temporary URLs."""
+        return {
+            **self.model_dump(by_alias=True, exclude={"scenes"}),
+            "scenes": [scene.to_storage_item() for scene in self.scenes],
+        }

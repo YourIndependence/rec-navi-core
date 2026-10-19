@@ -58,7 +58,7 @@ async def update_project(
     project.increment_version()
 
     await projects_db.put_item(
-        item=project.model_dump(by_alias=True),
+        item=project.to_storage_item(),
         condition_expression="version = :expected_version",
         expression_attribute_values={":expected_version": expected_version},
     )
