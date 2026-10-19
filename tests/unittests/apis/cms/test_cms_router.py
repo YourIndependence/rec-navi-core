@@ -376,12 +376,8 @@ def test_review_scene_rejects_invalid_result(
 
 
 def test_download_project_delegates_to_usecase(cms_client, auth_headers):
-    from recnavi.core.types.project_archive import ProjectArchive
-
-    archive = ProjectArchive(
-        download_url="https://example.org/archive",
-        expires_in_seconds=3600,
-    )
+    archive = _make_project()
+    archive.download_url = "https://example.org/archive"
     with patch(
         "recnavi.apis.cms.cms_router.download_project_usecase",
         new=AsyncMock(return_value=archive),

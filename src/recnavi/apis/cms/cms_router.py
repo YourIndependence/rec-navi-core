@@ -44,6 +44,7 @@ from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
+from recnavi.core.types.project import DOWNLOAD_URL_EXPIRATION_SECONDS
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserSummary
 
@@ -215,5 +216,5 @@ async def download_project_endpoint(
     )
     return DownloadProjectResponse(
         download_url=archive.download_url,
-        expires_in_seconds=archive.expires_in_seconds,
+        expires_in_seconds=DOWNLOAD_URL_EXPIRATION_SECONDS,
     )

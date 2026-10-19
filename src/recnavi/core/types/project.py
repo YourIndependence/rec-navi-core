@@ -10,10 +10,13 @@
 
 """Project"""
 
+import json
+import re
 from datetime import UTC
 from datetime import datetime
 from enum import StrEnum
 from typing import Self
+from uuid import uuid4
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -21,10 +24,16 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.archive_entry import ArchiveEntry
 from recnavi.core.types.scene import Scene
+from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientNotFoundError
+from recnavi.exceptions.exceptions import ClientValueError
+
+
+DOWNLOAD_URL_EXPIRATION_SECONDS = 3600
 
 
 class ProjectStatus(StrEnum):
@@ -81,6 +90,81 @@ class Project(BaseModel):
         description="Optimistic lock version (incremented on each update)",
     )
 
+    download_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the project archive",
+    )
+
+    async def create_download_url(self, *, storage: BaseObjectStorage) -> Self:
+        """Create a fresh archive and attach its temporary download URL."""
+        archive_key = await self._create_download_object(storage=storage)
+        self.download_url = await storage.generate_presigned_url(
+            object_key=archive_key,
+            expiration=DOWNLOAD_URL_EXPIRATION_SECONDS,
+        )
+        return self
+
+    async def _create_download_object(
+        self,
+        *,
+        storage: BaseObjectStorage,
+    ) -> str:
+        """Archive approved recordings in shooting order with their metadata."""
+        if not self.scenes or any(
+            scene.status != SceneStatus.APPROVED or not scene.video_key
+            for scene in self.scenes
+        ):
+            raise ClientValueError(
+                "All project scenes must have approved videos.",
+            )
+        if any(
+            not scene.video_key.startswith(
+                f"projects/{self.project_id}/scenes/{scene.scene_id}/",
+            )
+            or not scene.video_key.endswith(".mp4")
+            for scene in self.scenes
+            if scene.video_key
+        ):
+            raise ClientValueError("Scene video must belong to this project.")
+        entries: list[ArchiveEntry] = []
+        scene_metadata: list[dict[str, str | None]] = []
+        for position, scene in enumerate(self.scenes, start=1):
+            principal = (
+                re.sub(r"[^\w-]", "_", scene.scene_principal)[:100] or "scene"
+            )
+            filename = f"{position:02d}_{principal}.mp4"
+            entries.append(
+                ArchiveEntry(filename=filename, object_key=scene.video_key),
+            )
+            scene_metadata.append(
+                {
+                    "sceneId": scene.scene_id,
+                    "scenePrincipal": scene.scene_principal,
+                    "createdBy": scene.created_by,
+                    "createdAt": scene.created_at,
+                    "fileName": filename,
+                },
+            )
+        metadata = {
+            "projectId": self.project_id,
+            "projectName": self.project_name,
+            "description": self.description,
+            "scenes": scene_metadata,
+        }
+        entries.append(
+            ArchiveEntry(
+                filename="metadata.json",
+                content=json.dumps(
+                    metadata,
+                    ensure_ascii=False,
+                    indent=2,
+                ).encode(),
+            ),
+        )
+        archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
+        await storage.create_archive(object_key=archive_key, entries=entries)
+        return archive_key
+
     def validate_permission(
         self,
         *,
@@ -135,6 +219,9 @@ class Project(BaseModel):
     def to_storage_item(self) -> dict[str, object]:
         """Serialize the project and its scenes without temporary URLs."""
         return {
-            **self.model_dump(by_alias=True, exclude={"scenes"}),
+            **self.model_dump(
+                by_alias=True,
+                exclude={"scenes", "download_url"},
+            ),
             "scenes": [scene.to_storage_item() for scene in self.scenes],
         }

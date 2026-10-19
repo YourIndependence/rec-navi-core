@@ -14,6 +14,7 @@ import binascii
 import io
 import zipfile
 from collections.abc import AsyncIterator
+from collections.abc import Sequence
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.archive_entry import ArchiveEntry
@@ -93,7 +94,7 @@ class MockObjectStorage(BaseObjectStorage):
         self,
         *,
         object_key: str,
-        entries: list[ArchiveEntry],
+        entries: Sequence[ArchiveEntry],
     ) -> None:
         """Build a small in-memory archive for isolated tests."""
         buffer = io.BytesIO()

@@ -9,12 +9,14 @@
 
 """Object-storage archive entry descriptions."""
 
-from dataclasses import dataclass
+from pydantic import BaseModel
+from pydantic import ConfigDict
 
 
-@dataclass(frozen=True)
-class ArchiveEntry:
+class ArchiveEntry(BaseModel):
     """A named source object or inline metadata entry in an archive."""
+
+    model_config = ConfigDict(frozen=True)
 
     filename: str
     object_key: str | None = None

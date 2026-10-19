@@ -56,6 +56,16 @@ storage method. All database writers use this explicit persistence boundary.
 Preserve existing aliases, metadata, URI validation, missing-media behavior,
 authorization, and the 3600-second signing lifetime.
 
+Project archive downloads follow the same model ownership and persistence
+boundary: `Project.create_download_url(*, storage: BaseObjectStorage) -> Self`
+creates a fresh archive through its private `_create_download_object()` method,
+updates `download_url`, and returns `self`. Authorization precedes this call;
+recording eligibility and source-key validation precede any storage access.
+Unlike playback URL attachment, archive creation is explicit and must not run
+as a side effect of project listing or scene URL attachment. Download URLs are
+excluded from `to_storage_item()`. Archive entries shared with storage adapters
+use a frozen Pydantic model in `core/types/`.
+
 Do not introduce a second `HogeView` solely to add temporary media URLs.
 Distinct contracts still warrant separate types: `UserSummary` deliberately
 omits personal information and remains separate. Template images in dependent

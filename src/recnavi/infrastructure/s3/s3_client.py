@@ -15,6 +15,7 @@ import binascii
 import tempfile
 import zipfile
 from collections.abc import AsyncIterator
+from collections.abc import Sequence
 from contextlib import aclosing
 
 import aioboto3
@@ -138,7 +139,7 @@ class S3Client(BaseObjectStorage):
         self,
         *,
         object_key: str,
-        entries: list[ArchiveEntry],
+        entries: Sequence[ArchiveEntry],
     ) -> None:
         """Build a disk-backed ZIP and upload fixed-size multipart chunks."""
         archive_file = await asyncio.to_thread(tempfile.TemporaryFile)

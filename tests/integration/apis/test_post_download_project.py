@@ -80,7 +80,7 @@ async def downloadable_project() -> AsyncIterator[Project]:
         ],
     )
     try:
-        await database.put_item(project.model_dump(by_alias=True))
+        await database.put_item(project.to_storage_item())
         for index, scene in enumerate(project.scenes):
             await storage.upload_base64(
                 object_key=cast(str, scene.video_key),
@@ -161,7 +161,7 @@ async def test_download_enforces_project_policy(
     else:
         project.group_id = "other-group"
     await app.state.database[PROJECTS_TABLE_NAME].put_item(
-        project.model_dump(by_alias=True),
+        project.to_storage_item(),
     )
     response = client.post(
         "/downloadProject",

@@ -18,7 +18,6 @@ from recnavi.application.project.download_project import (
     download_project_usecase,
 )
 from recnavi.core.types.project import Project
-from recnavi.core.types.project_archive import ProjectArchive
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientNotFoundError
@@ -43,9 +42,8 @@ async def test_download_loads_project_and_delegates():
         role=UserRole.OWNER,
         group_id="group",
     )
-    expected_output = ProjectArchive(
-        download_url="https://example.org/archive",
-        expires_in_seconds=3600,
+    expected_output = value.model_copy(
+        update={"download_url": "https://example.org/archive"},
     )
     with patch(
         "recnavi.application.project.download_project.create_project_archive",

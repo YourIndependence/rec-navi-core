@@ -16,7 +16,6 @@ import zipfile
 import pytest
 
 from recnavi.core.project.download_project import create_project_archive
-from recnavi.core.project.download_project import validate_project_for_download
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
@@ -67,7 +66,12 @@ def project() -> Project:
         (UserRole.OWNER, "owner", "other"),
     ],
 )
-def test_download_requires_matching_owner_and_group(role, user_id, group_id):
+@pytest.mark.asyncio
+async def test_download_requires_matching_owner_and_group(
+    role,
+    user_id,
+    group_id,
+):
     user = User(
         user_id=user_id,
         user_name="User",
@@ -75,14 +79,19 @@ def test_download_requires_matching_owner_and_group(role, user_id, group_id):
         group_id=group_id,
     )
     with pytest.raises(ClientAuthorizationError):
-        validate_project_for_download(user=user, project=project())
+        await create_project_archive(
+            user=user,
+            project=project(),
+            storage=MockObjectStorage(bucket_name="media"),
+        )
 
 
 @pytest.mark.parametrize(
     "state",
     ["empty", "pending", "missing", "other-project", "other-scene"],
 )
-def test_download_rejects_incomplete_or_foreign_recordings(state):
+@pytest.mark.asyncio
+async def test_download_rejects_incomplete_or_foreign_recordings(state):
     value = project()
     if state == "empty":
         value.scenes = []
@@ -97,7 +106,11 @@ def test_download_rejects_incomplete_or_foreign_recordings(state):
             else "projects/p/scenes/other/video.mp4"
         )
     with pytest.raises(ClientValueError):
-        validate_project_for_download(user=owner(), project=value)
+        await create_project_archive(
+            user=owner(),
+            project=value,
+            storage=MockObjectStorage(bucket_name="media"),
+        )
 
 
 @pytest.mark.asyncio
@@ -114,13 +127,13 @@ async def test_archive_preserves_order_metadata_and_unique_download_keys():
         project=value,
         storage=storage,
     )
+    first_url = first.download_url
     second = await create_project_archive(
         user=owner(),
         project=value,
         storage=storage,
     )
-    assert first.expires_in_seconds == 3600
-    assert first.download_url != second.download_url
+    assert first_url != second.download_url
     archives = [key for bucket, key in storage.objects if "/archives/" in key]
     assert len(archives) == 2
     assert all(key.startswith("projects/p/archives/") for key in archives)
