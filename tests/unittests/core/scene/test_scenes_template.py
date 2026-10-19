@@ -15,6 +15,7 @@ import pytest
 
 from recnavi.core.scene.scenes_template import attach_template_urls
 from recnavi.core.scene.scenes_template import get_templates
+from recnavi.core.types.scenes_template import ScenesTemplate
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -134,6 +135,23 @@ async def test_templates_return_presigned_images_without_storage_uri():
         expiration=3600,
     )
     storage.download_object.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_template_url_attachment_preserves_model_and_source():
+    template = ScenesTemplate(
+        template_id="cafe",
+        title="Cafe",
+        thumbnail_uri="templates/cafe.jpg",
+    )
+    storage = AsyncMock()
+    storage.generate_presigned_url.return_value = "https://signed/template"
+    result = await attach_template_urls(templates=[template], storage=storage)
+    assert isinstance(result[0], ScenesTemplate)
+    assert result[0].thumbnail_uri == "templates/cafe.jpg"
+    assert result[0].thumbnail_url == "https://signed/template"
+    assert template.thumbnail_url is None
+    assert "thumbnailUri" not in result[0].model_dump(by_alias=True)
 
 
 @pytest.mark.asyncio

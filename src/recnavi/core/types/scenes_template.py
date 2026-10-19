@@ -35,19 +35,10 @@ class ScenesTemplate(BaseModel):
     )
     thumbnail_uri: str | None = Field(
         default=None,
+        exclude=True,
         description="Location of the image shown on the template tile",
     )
-
-
-class ScenesTemplateView(BaseModel):
-    """Template metadata with a temporary thumbnail URL."""
-
-    model_config = ConfigDict(
-        alias_generator=alias_generators.to_camel,
-        populate_by_name=True,
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the template thumbnail",
     )
-
-    template_id: str
-    title: str
-    scene_principals: list[str] = Field(default_factory=list)
-    thumbnail_url: str | None = None

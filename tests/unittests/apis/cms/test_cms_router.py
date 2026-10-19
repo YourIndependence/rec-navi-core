@@ -25,7 +25,7 @@ from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene_master import SceneMasterView
-from recnavi.core.types.scenes_template import ScenesTemplateView
+from recnavi.core.types.scenes_template import ScenesTemplate
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from tests.mockups.mock_users import get_mock_x_user
@@ -117,7 +117,7 @@ def test_get_templates_calls_usecase_and_serializes_response(
         verify_user,
         lambda: user,
     )
-    template = ScenesTemplateView(
+    template = ScenesTemplate(
         template_id="template-123",
         title="Starter",
         scene_principals=["cooking"],
@@ -146,6 +146,12 @@ def test_get_templates_calls_usecase_and_serializes_response(
         storage=cms_client.app.state.object_storage,
     )
     assert response.headers["cache-control"] == "no-store"
+    schema = cms_client.get("/openapi.json").json()
+    properties = schema["components"]["schemas"]["ScenesTemplate"][
+        "properties"
+    ]
+    assert "thumbnailUri" not in properties
+    assert "thumbnailUrl" in properties
 
 
 def test_create_project_parses_request_and_serializes_response(

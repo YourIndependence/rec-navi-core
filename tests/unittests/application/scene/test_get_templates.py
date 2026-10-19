@@ -9,7 +9,6 @@ import pytest
 
 from recnavi.application.scene.get_templates import get_templates_usecase
 from recnavi.core.types.scenes_template import ScenesTemplate
-from recnavi.core.types.scenes_template import ScenesTemplateView
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
@@ -20,7 +19,7 @@ async def test_get_templates_attaches_urls_and_returns_core_views():
     storage = MockObjectStorage(bucket_name="media")
     templates = [ScenesTemplate(template_id="cafe", title="Cafe")]
     expected_output = [
-        ScenesTemplateView(
+        ScenesTemplate(
             template_id="cafe",
             title="Cafe",
             thumbnail_url="https://signed/image",

@@ -14,7 +14,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
-from recnavi.core.types.scenes_template import ScenesTemplateView
+from recnavi.core.types.scenes_template import ScenesTemplate
 
 
 class GetTemplatesResponse(BaseModel):
@@ -26,7 +26,7 @@ class GetTemplatesResponse(BaseModel):
     )
 
     status: str = Field(default="ok", description="Response status")
-    templates: list[ScenesTemplateView] = Field(
+    templates: list[ScenesTemplate] = Field(
         ...,
         description="List of all scenes templates",
     )

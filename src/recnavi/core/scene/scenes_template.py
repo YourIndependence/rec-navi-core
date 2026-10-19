@@ -13,7 +13,6 @@ from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.storage.image_urls import generate_image_url
 from recnavi.core.types.scenes_template import ScenesTemplate
-from recnavi.core.types.scenes_template import ScenesTemplateView
 
 
 async def get_templates(templates_db: BaseDatabase) -> list[ScenesTemplate]:
@@ -26,17 +25,16 @@ async def attach_template_urls(
     *,
     templates: list[ScenesTemplate],
     storage: BaseObjectStorage,
-) -> list[ScenesTemplateView]:
+) -> list[ScenesTemplate]:
     """Replace template image references with temporary URLs."""
     return [
-        ScenesTemplateView(
-            template_id=template.template_id,
-            title=template.title,
-            scene_principals=template.scene_principals,
-            thumbnail_url=await generate_image_url(
-                storage=storage,
-                image_uri=template.thumbnail_uri,
-            ),
+        template.model_copy(
+            update={
+                "thumbnail_url": await generate_image_url(
+                    storage=storage,
+                    image_uri=template.thumbnail_uri,
+                ),
+            },
         )
         for template in templates
     ]
