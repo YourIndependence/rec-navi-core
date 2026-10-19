@@ -75,8 +75,10 @@ async def test_create_project_returns_good(
         assert isinstance(scene["sceneId"], str)
         assert scene["scenePrincipal"] == "cooking"
         assert scene["status"] == "not_recorded"
-        assert scene["videoKey"] is None
-        assert scene["thumbnailKey"] is None
+        assert scene["videoUrl"] is None
+        assert scene["thumbnailUrl"] is None
+        assert "videoKey" not in scene
+        assert "thumbnailKey" not in scene
         assert scene["createdBy"] is None
         assert scene["createdAt"] is None
         assert scene["assignedAt"] is None

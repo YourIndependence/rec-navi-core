@@ -11,7 +11,6 @@ from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
 )
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.core.types.scene_master import SceneMasterView
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 
@@ -28,7 +27,7 @@ async def test_get_scene_masters_attaches_urls_and_returns_core_views():
         ),
     ]
     expected_output = [
-        SceneMasterView(
+        SceneMaster(
             scene_principal="cooking",
             title="Cooking",
             max_duration_seconds=60,
