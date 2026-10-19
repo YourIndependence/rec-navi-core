@@ -302,6 +302,7 @@ async def test_mixed_scenes_preserve_order_metadata_and_original_keys():
     ]
     project = build_project(scenes=scenes)
     original = project.to_storage_item()
+    original_scenes = list(project.scenes)
     storage = MockObjectStorage(bucket_name="bucket")
     presign = AsyncMock(wraps=storage.generate_presigned_url)
     storage.generate_presigned_url = presign
@@ -324,10 +325,15 @@ async def test_mixed_scenes_preserve_order_metadata_and_original_keys():
             )
         assert public.model_dump() == expected
     assert presign.await_count == 4
-    assert view is not project
-    assert view.scenes is not project.scenes
-    view.assigned_user_ids.append("another")
-    view.scenes[0].assigned_user_ids.append("another")
+    assert view is project
+    assert all(
+        current is original_scene
+        for current, original_scene in zip(
+            project.scenes,
+            original_scenes,
+            strict=True,
+        )
+    )
     assert project.to_storage_item() == original
 
 

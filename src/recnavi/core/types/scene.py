@@ -110,28 +110,24 @@ class Scene(BaseModel):
         *,
         storage: BaseObjectStorage,
     ) -> Self:
-        """Return a copy with fresh playback URLs and unchanged storage keys."""
-        return self.model_copy(
-            update={
-                "video_url": (
-                    await storage.generate_presigned_url(
-                        object_key=self.video_key,
-                        expiration=SCENE_URL_EXPIRATION_SECONDS,
-                    )
-                    if self.video_key is not None
-                    else None
-                ),
-                "thumbnail_url": (
-                    await storage.generate_presigned_url(
-                        object_key=self.thumbnail_key,
-                        expiration=SCENE_URL_EXPIRATION_SECONDS,
-                    )
-                    if self.thumbnail_key is not None
-                    else None
-                ),
-            },
-            deep=True,
+        """Refresh playback URLs on this scene and return self."""
+        self.video_url = (
+            await storage.generate_presigned_url(
+                object_key=self.video_key,
+                expiration=SCENE_URL_EXPIRATION_SECONDS,
+            )
+            if self.video_key is not None
+            else None
         )
+        self.thumbnail_url = (
+            await storage.generate_presigned_url(
+                object_key=self.thumbnail_key,
+                expiration=SCENE_URL_EXPIRATION_SECONDS,
+            )
+            if self.thumbnail_key is not None
+            else None
+        )
+        return self
 
     def to_storage_item(self) -> dict[str, object]:
         """Serialize durable keys without temporary playback URLs."""

@@ -32,9 +32,9 @@ A concrete example: a `ResponseSchema(BaseModel)` was defined inside `applicatio
 
 Use one canonical domain model when a response differs only by presigned URLs.
 `SceneMaster`, `Scene`, and `Project` own an async
-`attach_presigned_url(*, storage: BaseObjectStorage) -> Self` method. It returns
-a deep copy, retains durable references, and regenerates URLs on every call.
-It does not mutate the source or check object existence. Concrete storage
+`attach_presigned_url(*, storage: BaseObjectStorage) -> Self` method. It updates
+its own URL fields, returns `self`, retains durable references, and regenerates
+URLs on every call. It does not check object existence. Concrete storage
 clients remain in infrastructure. Application use cases orchestrate reads and
 URL attachment after authorization and filtering. `Project.attach_presigned_url()`
 recursively delegates to every child scene and preserves scene order. Callers
@@ -68,11 +68,14 @@ does not change the template endpoint in #59.
 Duplicates domain fields or requires unions for nested aggregates. A difference
 limited to temporary URLs does not justify a second domain type.
 
-**Alternative: Mutate the source or select persistence by JSON mode**
-Mutation can overwrite another caller's response. Mode-dependent persistence
-relies on an implicit caller option. Copies and an explicit storage method keep
-both boundaries visible. Every writer, including aggregate writers, must use
-the storage method; round-trip tests enforce that contract.
+**Alternative: Return deep copies or select persistence by JSON mode**
+Copying every aggregate and child adds allocation and changes object identity.
+URL attachment consistently updates the current model and returns `self`, so
+callers retaining the same instance also observe refreshed URLs. Callers needing
+independent state must copy explicitly before attachment. Mode-dependent
+persistence relies on an implicit caller option; an explicit storage method
+keeps the persistence boundary visible. Every writer, including aggregate
+writers, must use it. Round-trip tests enforce that contract.
 
 **Alternative: Each layer defines its own Pydantic models**
 Allows slim, layer-specific models but introduces DRY violations. The same fields appear in multiple places and changes in one location are not reflected in another, creating a breeding ground for runtime errors.
@@ -105,7 +108,7 @@ Abandons type strictness. Loses the benefits of Pydantic validation and IDE auto
 
 **Do:**
 
-- Inject `BaseObjectStorage` into the async model method and return a deep copy.
+- Inject `BaseObjectStorage` into the async model method and return `self` after updating its URL fields.
 - Use `to_storage_item()` for media and aggregate database writes.
 - Test that storage round trips retain references and omit URLs after signing.
 - Verify responses and serialization schemas omit storage-only fields.

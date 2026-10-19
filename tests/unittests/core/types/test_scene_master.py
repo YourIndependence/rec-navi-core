@@ -30,9 +30,10 @@ async def test_master_urls_are_refreshed_without_losing_durable_references():
         ],
     )
     first = await master.attach_presigned_url(storage=storage)
-    second = await first.attach_presigned_url(storage=storage)
-    assert master.thumbnail_url is None
-    assert first.thumbnail_url == "https://signed/example-1"
+    assert first is master
+    assert master.thumbnail_url == "https://signed/example-1"
+    second = await master.attach_presigned_url(storage=storage)
+    assert second is master
     assert second.thumbnail_url == "https://signed/example-2"
     assert second.guide_url == "https://signed/guide-2"
     assert first.to_storage_item() == second.to_storage_item() == original

@@ -46,7 +46,7 @@ infrastructure/  <- External I/O: DB sessions, boto3 clients, third-party APIs
 
 Follow [ARCH-002](docs/adrs/ARCH-002-pydantic-first-type-system.md#media-models-and-temporary-urls).
 Use one domain type when the only response difference is temporary media URLs.
-Core models expose async `attach_presigned_url(*, storage)` returning a deep copy;
+Core models expose async `attach_presigned_url(*, storage)` updating the model and returning `self`;
 application use cases attach URLs after authorization and filtering. Exclude
 storage references with `Field(exclude=True)`. Persist media models and aggregates
 only through `to_storage_item()`, never ordinary `model_dump()`.

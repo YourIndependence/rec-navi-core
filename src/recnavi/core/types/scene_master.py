@@ -57,20 +57,16 @@ class SceneMaster(BaseModel):
         *,
         storage: BaseObjectStorage,
     ) -> Self:
-        """Return a copy with fresh image URLs and unchanged storage references."""
-        return self.model_copy(
-            update={
-                "thumbnail_url": await generate_image_url(
-                    storage=storage,
-                    image_uri=self.thumbnail_uri,
-                ),
-                "guide_url": await generate_image_url(
-                    storage=storage,
-                    image_uri=self.guide_uri,
-                ),
-            },
-            deep=True,
+        """Refresh image URLs on this master and return self."""
+        self.thumbnail_url = await generate_image_url(
+            storage=storage,
+            image_uri=self.thumbnail_uri,
         )
+        self.guide_url = await generate_image_url(
+            storage=storage,
+            image_uri=self.guide_uri,
+        )
+        return self
 
     def to_storage_item(self) -> dict[str, object]:
         """Serialize durable references without temporary image URLs."""

@@ -121,7 +121,7 @@ This keeps the everyday development workflow fast and deterministic while preser
 
 Follow [ARCH-002](adrs/ARCH-002-pydantic-first-type-system.md#media-models-and-temporary-urls).
 Use one domain type when the response differs only by temporary media URLs.
-Core models own async `attach_presigned_url()` methods returning deep copies;
+Core models own async `attach_presigned_url()` methods updating themselves and returning `self`;
 application use cases call them after authorization and filtering.
 Normal serialization excludes durable URI/key fields. Database writes use
 `to_storage_item()`, including nested media in `Project`, and exclude URLs.

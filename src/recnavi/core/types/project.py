@@ -125,12 +125,12 @@ class Project(BaseModel):
         *,
         storage: BaseObjectStorage,
     ) -> Self:
-        """Return a copy with fresh playback URLs for every child scene."""
-        scenes = [
+        """Refresh playback URLs on every child scene and return self."""
+        self.scenes = [
             await scene.attach_presigned_url(storage=storage)
             for scene in self.scenes
         ]
-        return self.model_copy(update={"scenes": scenes}, deep=True)
+        return self
 
     def to_storage_item(self) -> dict[str, object]:
         """Serialize the project and its scenes without temporary URLs."""
