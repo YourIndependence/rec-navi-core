@@ -145,7 +145,7 @@ async def test_download_archive_content_and_expiry(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "violation",
-    ["pending", "different-owner", "different-group"],
+    ["pending", "different-owner"],
 )
 async def test_download_enforces_project_policy(
     client,
@@ -156,10 +156,8 @@ async def test_download_enforces_project_policy(
     project = downloadable_project
     if violation == "pending":
         project.scenes[0].status = SceneStatus.PENDING
-    elif violation == "different-owner":
-        project.owner_user_id = "other-owner"
     else:
-        project.group_id = "other-group"
+        project.owner_user_id = "other-owner"
     await app.state.database[PROJECTS_TABLE_NAME].put_item(
         project.to_storage_item(),
     )
@@ -190,7 +188,11 @@ async def test_download_rejects_admin_who_does_not_own_project(
 
 
 @pytest.mark.asyncio
-async def test_download_allows_admin_who_owns_project(
+@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.ADMIN])
+@pytest.mark.parametrize("group_id", ["it-group", "other-group"])
+async def test_download_allows_owner_permission(
+    role,
+    group_id,
     client,
     auth_headers,
     downloadable_project: Project,
@@ -199,8 +201,8 @@ async def test_download_allows_admin_who_owns_project(
     app.dependency_overrides[verify_user] = lambda: User(
         user_id=downloadable_project.owner_user_id,
         user_name="Admin owner",
-        role=UserRole.ADMIN,
-        group_id=downloadable_project.group_id,
+        role=role,
+        group_id=group_id,
     )
     try:
         response = client.post(

@@ -22,12 +22,9 @@ async def create_project_archive(
     project: Project,
     storage: BaseObjectStorage,
 ) -> Project:
-    """Authorize the same-group owner before generating a download URL."""
-    if user.group_id != project.group_id or not project.validate_permission(
-        user=user,
-        as_role=UserRole.OWNER,
-    ):
+    """Authorize the project owner before generating a download URL."""
+    if not project.validate_permission(user=user, as_role=UserRole.OWNER):
         raise ClientAuthorizationError(
-            "Only the project owner can download it.",
+            "User does not have access permission to this project",
         )
     return await project.create_download_url(storage=storage)
