@@ -242,15 +242,15 @@ async def update_scene_master_endpoint(
     """Create or update scene master."""
     scenes_db = request.app.state.database[SCENES_TABLE_NAME]
 
-    scenes = await update_scene_master_usecase(
+    scene_masters = await update_scene_master_usecase(
         scenes_db=scenes_db,
-        scene_principal=item.scene.scene_principal,
-        title=item.scene.title,
-        max_duration_seconds=item.scene.max_duration_seconds,
+        scene_principal=item.scene_principal,
+        title=item.title,
+        max_duration_seconds=item.max_duration_seconds,
         example_image=item.example_image,
         guide_image=item.guide_image,
         bucket_name=MEDIA_BUCKET_NAME,
         storage=request.app.state.object_storage,
     )
 
-    return UpdateSceneMasterResponse(scenes=scenes)
+    return UpdateSceneMasterResponse(scene_masters=scene_masters)

@@ -70,10 +70,11 @@ class UpdateSceneResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Updated project")
 
 
-class SceneMasterInput(BaseItemModel):
-    """Scene master fields sent by the client (mirrors SceneMaster).
+class UpdateSceneMasterRequest(BaseItemModel):
+    """Request for POST /updateSceneMaster.
 
-    URIs are excluded; images are sent separately on the request.
+    Creates a new scene master when scenePrincipal is null,
+    otherwise upserts the scene master with the given scenePrincipal.
     """
 
     scene_principal: str | None = Field(
@@ -86,15 +87,6 @@ class SceneMasterInput(BaseItemModel):
         description="How long the staff may record (1-10 seconds)",
     )
 
-
-class UpdateSceneMasterRequest(BaseItemModel):
-    """Request for POST /updateSceneMaster.
-
-    Creates a new scene master when scene.scenePrincipal is null,
-    otherwise upserts the scene master with the given scenePrincipal.
-    """
-
-    scene: SceneMasterInput = Field(..., description="Scene master to save")
     example_image: str | None = Field(
         None,
         description=(
@@ -114,7 +106,7 @@ class UpdateSceneMasterRequest(BaseItemModel):
 class UpdateSceneMasterResponse(BaseApiResponseModel):
     """Response for POST /updateSceneMaster."""
 
-    scenes: list[SceneMaster] = Field(
+    scene_masters: list[SceneMaster] = Field(
         ...,
         description="List of all scene masters after update",
     )
