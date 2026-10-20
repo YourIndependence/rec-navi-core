@@ -12,9 +12,12 @@
 import base64
 import io
 import json
+import time
 import zipfile
 from collections.abc import AsyncIterator
 from typing import cast
+from urllib.parse import parse_qs
+from urllib.parse import unquote
 from urllib.parse import urlsplit
 from uuid import uuid4
 
@@ -23,6 +26,7 @@ import pytest_asyncio
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import ENV
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
@@ -52,9 +56,7 @@ def owner_auth():
 
 @pytest_asyncio.fixture
 async def downloadable_project() -> AsyncIterator[Project]:
-    """Seed public interfaces of shared CI infrastructure and clean every object."""
-    if ENV != "CI":
-        pytest.skip("Archive integration uses CI in-memory infrastructure")
+    """Seed project media through shared infrastructure and clean every object."""
     database = cast(dict[str, BaseDatabase], app.state.database)[
         PROJECTS_TABLE_NAME
     ]
@@ -109,16 +111,40 @@ async def test_download_archive_content_and_expiry(
     downloadable_project: Project,
     owner_auth,
 ):
+    request_started_at = int(time.time())
     response = client.post(
         "/downloadProject",
         headers={"Authorization": "Bearer owner_token"},
         json={"projectId": downloadable_project.project_id},
     )
+    request_finished_at = int(time.time())
     assert response.status_code == 200
     data = response.json()
     assert data["expiresInSeconds"] == 3600
-    assert "expires=3600" in data["downloadUrl"]
-    archive_key = urlsplit(data["downloadUrl"]).path.removeprefix("/")
+    url = urlsplit(data["downloadUrl"])
+    path = unquote(url.path)
+    query = parse_qs(url.query)
+    if ENV == "CI":
+        assert url.scheme == "mock"
+        assert url.hostname == MEDIA_BUCKET_NAME
+        assert query["expires"] == [str(data["expiresInSeconds"])]
+    else:
+        assert url.scheme in ("https", "http")
+        assert url.hostname is not None
+        assert url.hostname.startswith(
+            f"{MEDIA_BUCKET_NAME}.",
+        ) or path.startswith(f"/{MEDIA_BUCKET_NAME}/")
+        if "X-Amz-Expires" in query:
+            assert query["X-Amz-Expires"] == [str(data["expiresInSeconds"])]
+            assert query["X-Amz-Signature"][0]
+        else:
+            assert (
+                request_started_at + data["expiresInSeconds"]
+                <= int(query["Expires"][0])
+                <= request_finished_at + data["expiresInSeconds"]
+            )
+            assert query["Signature"][0]
+    archive_key = path.removeprefix(f"/{MEDIA_BUCKET_NAME}/").removeprefix("/")
     assert archive_key.startswith(
         f"projects/{downloadable_project.project_id}/archives/",
     )
