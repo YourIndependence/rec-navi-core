@@ -12,7 +12,11 @@
 
 import base64
 import binascii
+from collections.abc import AsyncIterator
+from collections.abc import Sequence
+from contextlib import asynccontextmanager
 from typing import Self
+from uuid import uuid4
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -75,35 +79,47 @@ class SceneMaster(BaseModel):
                 raise ValueError("Image must not be empty")
         return value
 
-    async def upload_images(
+    @asynccontextmanager
+    async def update_images(
         self,
         *,
         storage: BaseObjectStorage,
         bucket_name: str,
-        image_prefix: str,
         example_image: str | None,
         guide_image: str | None,
-    ) -> Self:
-        """Replace provided images, preserve omitted images, and return self."""
+    ) -> AsyncIterator[Self]:
+        """Stage images and finalize them when the caller's persistence succeeds."""
         example_image = self.validate_image(example_image)
         guide_image = self.validate_image(guide_image)
-        if example_image is not None:
-            object_key = f"{image_prefix}example.jpg"
-            await storage.upload_base64(
-                object_key=object_key,
-                base64_data=example_image,
-                content_type="image/jpeg",
+        if example_image is None and guide_image is None:
+            yield self
+            return
+
+        image_prefix = f"scenes/{self.scene_principal}/{uuid4().hex}/"
+        previous_images = (self.thumbnail_uri, self.guide_uri)
+        committed = False
+        try:
+            await self._upload_images(
+                storage=storage,
+                bucket_name=bucket_name,
+                image_prefix=image_prefix,
+                example_image=example_image,
+                guide_image=guide_image,
             )
-            self.thumbnail_uri = f"s3://{bucket_name}/{object_key}"
-        if guide_image is not None:
-            object_key = f"{image_prefix}guide.jpg"
-            await storage.upload_base64(
-                object_key=object_key,
-                base64_data=guide_image,
-                content_type="image/jpeg",
-            )
-            self.guide_uri = f"s3://{bucket_name}/{object_key}"
-        return self
+            yield self
+            committed = True
+        finally:
+            if committed:
+                await self._delete_replaced_images(
+                    storage=storage,
+                    bucket_name=bucket_name,
+                    previous_images=previous_images,
+                )
+            else:
+                try:
+                    await storage.delete_objects_by_prefix(prefix=image_prefix)
+                finally:
+                    self.thumbnail_uri, self.guide_uri = previous_images
 
     async def attach_presigned_url(
         self,
@@ -131,3 +147,57 @@ class SceneMaster(BaseModel):
             "thumbnailUri": self.thumbnail_uri,
             "guideUri": self.guide_uri,
         }
+
+    async def _upload_images(
+        self,
+        *,
+        storage: BaseObjectStorage,
+        bucket_name: str,
+        image_prefix: str,
+        example_image: str | None,
+        guide_image: str | None,
+    ) -> None:
+        if example_image is not None:
+            self.thumbnail_uri = await self._upload_image(
+                storage=storage,
+                bucket_name=bucket_name,
+                object_key=f"{image_prefix}example.jpg",
+                image=example_image,
+            )
+        if guide_image is not None:
+            self.guide_uri = await self._upload_image(
+                storage=storage,
+                bucket_name=bucket_name,
+                object_key=f"{image_prefix}guide.jpg",
+                image=guide_image,
+            )
+
+    @staticmethod
+    async def _upload_image(
+        *,
+        storage: BaseObjectStorage,
+        bucket_name: str,
+        object_key: str,
+        image: str,
+    ) -> str:
+        await storage.upload_base64(
+            object_key=object_key,
+            base64_data=image,
+            content_type="image/jpeg",
+        )
+        return f"s3://{bucket_name}/{object_key}"
+
+    async def _delete_replaced_images(
+        self,
+        *,
+        storage: BaseObjectStorage,
+        bucket_name: str,
+        previous_images: Sequence[str | None],
+    ) -> None:
+        current_images = {self.thumbnail_uri, self.guide_uri}
+        owned_prefix = f"s3://{bucket_name}/scenes/{self.scene_principal}/"
+        for image_uri in set(previous_images) - current_images:
+            if image_uri is not None and image_uri.startswith(owned_prefix):
+                await storage.delete_object_by_key(
+                    object_key=image_uri.removeprefix(f"s3://{bucket_name}/"),
+                )

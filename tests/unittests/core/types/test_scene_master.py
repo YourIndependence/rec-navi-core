@@ -94,25 +94,49 @@ def test_master_rejects_invalid_principal(principal):
 
 
 @pytest.mark.asyncio
-async def test_master_uploads_images_and_returns_self_without_persisting_payloads():
+async def test_master_updates_images_without_persisting_payloads():
     master = SceneMaster(
         scene_principal="shop",
         title="Shop",
         max_duration_seconds=5,
     )
     storage = MockObjectStorage(bucket_name="media")
-    result = await master.upload_images(
+    async with master.update_images(
         storage=storage,
         bucket_name="media",
-        image_prefix="scenes/shop/revision/",
         example_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
-    )
-    assert result is master
-    assert (
-        master.thumbnail_uri == "s3://media/scenes/shop/revision/example.jpg"
-    )
-    assert master.guide_uri == "s3://media/scenes/shop/revision/guide.jpg"
+    ) as result:
+        assert result is master
+        assert master.thumbnail_uri.startswith("s3://media/scenes/shop/")
+        assert master.thumbnail_uri.endswith("/example.jpg")
+        assert (
+            master.guide_uri
+            == master.thumbnail_uri.removesuffix("example.jpg") + "guide.jpg"
+        )
     assert len(storage.objects) == 2
     assert "exampleImage" not in master.to_storage_item()
     assert "guideImage" not in master.to_storage_item()
+
+
+@pytest.mark.asyncio
+async def test_master_restores_references_when_persistence_fails():
+    master = SceneMaster(
+        scene_principal="shop",
+        title="Shop",
+        max_duration_seconds=5,
+        thumbnail_uri="s3://media/scenes/shop/old/example.jpg",
+        guide_uri="s3://media/scenes/shop/old/guide.jpg",
+    )
+    previous = master.to_storage_item()
+    storage = MockObjectStorage(bucket_name="media")
+    with pytest.raises(OSError, match="persistence failed"):
+        async with master.update_images(
+            storage=storage,
+            bucket_name="media",
+            example_image="ZXhhbXBsZQ==",
+            guide_image="Z3VpZGU=",
+        ):
+            raise OSError("persistence failed")
+    assert master.to_storage_item() == previous
+    assert storage.objects == {}

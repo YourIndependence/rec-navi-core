@@ -9,8 +9,6 @@
 
 """Scene master updates and persistence."""
 
-from uuid import uuid4
-
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
@@ -62,34 +60,15 @@ async def update_scene_master(
             )
         scene_master = update
 
-    previous_images = {scene_master.thumbnail_uri, scene_master.guide_uri}
     scene_master.title = update.title
     scene_master.max_duration_seconds = update.max_duration_seconds
-    image_prefix = f"scenes/{update.scene_principal}/{uuid4().hex}/"
-    committed = False
-    try:
-        await scene_master.upload_images(
-            storage=storage,
-            bucket_name=bucket_name,
-            image_prefix=image_prefix,
-            example_image=example_image,
-            guide_image=guide_image,
-        )
-        result = await upsert_scene_master(
+    async with scene_master.update_images(
+        storage=storage,
+        bucket_name=bucket_name,
+        example_image=example_image,
+        guide_image=guide_image,
+    ):
+        return await upsert_scene_master(
             scenes_db=scenes_db,
             scene_master=scene_master,
         )
-        committed = True
-        current_images = {scene_master.thumbnail_uri, scene_master.guide_uri}
-        owned_prefix = f"s3://{bucket_name}/scenes/{update.scene_principal}/"
-        for image_uri in previous_images - current_images:
-            if image_uri is not None and image_uri.startswith(owned_prefix):
-                await storage.delete_object_by_key(
-                    object_key=image_uri.removeprefix(f"s3://{bucket_name}/"),
-                )
-        return result
-    finally:
-        if not committed and (
-            example_image is not None or guide_image is not None
-        ):
-            await storage.delete_objects_by_prefix(prefix=image_prefix)
