@@ -10,6 +10,8 @@
 
 """SceneMaster"""
 
+import base64
+import binascii
 from typing import Self
 
 from pydantic import BaseModel
@@ -31,9 +33,14 @@ class SceneMaster(BaseModel):
 
     scene_principal: str = Field(
         ...,
-        description="Identifier of the scene master",
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+        description="Human-readable master key supplied by the client",
     )
-    title: str = Field(..., description="Name shown to the staff")
+    title: str = Field(
+        ...,
+        min_length=1,
+        description="Name shown to the staff",
+    )
     thumbnail_uri: str | None = Field(
         default=None,
         exclude=True,
@@ -53,6 +60,50 @@ class SceneMaster(BaseModel):
 
     thumbnail_url: str | None = None
     guide_url: str | None = None
+
+    @staticmethod
+    def validate_image(value: str | None) -> str | None:
+        """Validate optional image data before any uploads."""
+        if value is not None:
+            try:
+                decoded = base64.b64decode(value, validate=True)
+            except (ValueError, binascii.Error) as error:
+                raise ValueError(
+                    "Image must contain valid base64 data",
+                ) from error
+            if not decoded:
+                raise ValueError("Image must not be empty")
+        return value
+
+    async def upload_images(
+        self,
+        *,
+        storage: BaseObjectStorage,
+        bucket_name: str,
+        image_prefix: str,
+        example_image: str | None,
+        guide_image: str | None,
+    ) -> Self:
+        """Replace provided images, preserve omitted images, and return self."""
+        example_image = self.validate_image(example_image)
+        guide_image = self.validate_image(guide_image)
+        if example_image is not None:
+            object_key = f"{image_prefix}example.jpg"
+            await storage.upload_base64(
+                object_key=object_key,
+                base64_data=example_image,
+                content_type="image/jpeg",
+            )
+            self.thumbnail_uri = f"s3://{bucket_name}/{object_key}"
+        if guide_image is not None:
+            object_key = f"{image_prefix}guide.jpg"
+            await storage.upload_base64(
+                object_key=object_key,
+                base64_data=guide_image,
+                content_type="image/jpeg",
+            )
+            self.guide_uri = f"s3://{bucket_name}/{object_key}"
+        return self
 
     async def attach_presigned_url(
         self,

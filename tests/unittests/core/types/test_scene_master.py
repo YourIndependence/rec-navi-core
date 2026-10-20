@@ -81,3 +81,38 @@ def test_master_accepts_duration_boundaries(duration):
         max_duration_seconds=duration,
     )
     assert master.max_duration_seconds == duration
+
+
+@pytest.mark.parametrize("principal", ["", "../other", "nested/key"])
+def test_master_rejects_invalid_principal(principal):
+    with pytest.raises(ValidationError):
+        SceneMaster(
+            scene_principal=principal,
+            title="Shop",
+            max_duration_seconds=5,
+        )
+
+
+@pytest.mark.asyncio
+async def test_master_uploads_images_and_returns_self_without_persisting_payloads():
+    master = SceneMaster(
+        scene_principal="shop",
+        title="Shop",
+        max_duration_seconds=5,
+    )
+    storage = MockObjectStorage(bucket_name="media")
+    result = await master.upload_images(
+        storage=storage,
+        bucket_name="media",
+        image_prefix="scenes/shop/revision/",
+        example_image="ZXhhbXBsZQ==",
+        guide_image="Z3VpZGU=",
+    )
+    assert result is master
+    assert (
+        master.thumbnail_uri == "s3://media/scenes/shop/revision/example.jpg"
+    )
+    assert master.guide_uri == "s3://media/scenes/shop/revision/guide.jpg"
+    assert len(storage.objects) == 2
+    assert "exampleImage" not in master.to_storage_item()
+    assert "guideImage" not in master.to_storage_item()

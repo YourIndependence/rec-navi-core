@@ -17,7 +17,7 @@ from pydantic import ValidationError
 from recnavi.core.scene.upsert_scene_master import update_scene_master
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+from recnavi.exceptions.exceptions import ClientValueError
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
 from tests.mockups.mock_users import get_mock_x_user
@@ -116,7 +116,7 @@ async def test_create_and_metadata_update_preserve_durable_references():
 async def test_creation_requires_both_images_before_upload(images):
     database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
-    with pytest.raises(ClientUnprocessableEntityError):
+    with pytest.raises(ClientValueError):
         await update_scene_master(
             scenes_db=database,
             storage=storage,
@@ -214,7 +214,7 @@ async def test_failed_write_preserves_previous_images_and_database(failure):
 async def test_invalid_second_image_does_not_upload_first_image(image):
     database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
-    with pytest.raises(ValidationError):
+    with pytest.raises(ValueError):
         await update_scene_master(
             scenes_db=database,
             storage=storage,

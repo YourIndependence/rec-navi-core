@@ -13,13 +13,13 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+from pydantic import field_validator
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.core.types.scene_master_update import SceneMasterUpdate
 
 
 class GetSceneMastersResponse(BaseModel):
@@ -71,8 +71,17 @@ class UpdateSceneResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Updated project")
 
 
-class UpdateSceneMasterRequest(SceneMasterUpdate):
+class UpdateSceneMasterRequest(SceneMaster):
     """Create or update the master identified by the required client key."""
+
+    example_image: str | None = None
+    guide_image: str | None = None
+
+    @field_validator("example_image", "guide_image")
+    @classmethod
+    def validate_image(cls, value: str | None) -> str | None:
+        """Validate transport payloads with the domain image rule."""
+        return SceneMaster.validate_image(value)
 
 
 class UpdateSceneMasterResponse(BaseApiResponseModel):

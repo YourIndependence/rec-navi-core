@@ -11,17 +11,13 @@
 
 from uuid import uuid4
 
-from pydantic import ValidationError
-
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
-from recnavi.core.types.scene_master_update import SceneMasterCreate
-from recnavi.core.types.scene_master_update import SceneMasterUpdate
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+from recnavi.exceptions.exceptions import ClientValueError
 
 
 async def upsert_scene_master(
@@ -50,28 +46,21 @@ async def update_scene_master(
     if not user.can_act_as(UserRole.ADMIN):
         raise ClientAuthorizationError("Only admins can update scene masters")
 
-    update = SceneMasterUpdate(
+    update = SceneMaster(
         scene_principal=scene_principal,
         title=title,
         max_duration_seconds=max_duration_seconds,
-        example_image=example_image,
-        guide_image=guide_image,
     )
     item = await scenes_db.get_item({"scenePrincipal": update.scene_principal})
+
     if item:
         scene_master = SceneMaster.model_validate(item)
     else:
-        try:
-            SceneMasterCreate.model_validate(update.model_dump())
-        except ValidationError as error:
-            raise ClientUnprocessableEntityError(
+        if example_image is None or guide_image is None:
+            raise ClientValueError(
                 "exampleImage and guideImage are required when creating a new scene",
-            ) from error
-        scene_master = SceneMaster(
-            scene_principal=update.scene_principal,
-            title=update.title,
-            max_duration_seconds=update.max_duration_seconds,
-        )
+            )
+        scene_master = update
 
     previous_images = {scene_master.thumbnail_uri, scene_master.guide_uri}
     scene_master.title = update.title
@@ -79,22 +68,13 @@ async def update_scene_master(
     image_prefix = f"scenes/{update.scene_principal}/{uuid4().hex}/"
     committed = False
     try:
-        if update.example_image is not None:
-            object_key = f"{image_prefix}example.jpg"
-            await storage.upload_base64(
-                object_key=object_key,
-                base64_data=update.example_image,
-                content_type="image/jpeg",
-            )
-            scene_master.thumbnail_uri = f"s3://{bucket_name}/{object_key}"
-        if update.guide_image is not None:
-            object_key = f"{image_prefix}guide.jpg"
-            await storage.upload_base64(
-                object_key=object_key,
-                base64_data=update.guide_image,
-                content_type="image/jpeg",
-            )
-            scene_master.guide_uri = f"s3://{bucket_name}/{object_key}"
+        await scene_master.upload_images(
+            storage=storage,
+            bucket_name=bucket_name,
+            image_prefix=image_prefix,
+            example_image=example_image,
+            guide_image=guide_image,
+        )
         result = await upsert_scene_master(
             scenes_db=scenes_db,
             scene_master=scene_master,
@@ -110,6 +90,6 @@ async def update_scene_master(
         return result
     finally:
         if not committed and (
-            update.example_image is not None or update.guide_image is not None
+            example_image is not None or guide_image is not None
         ):
             await storage.delete_objects_by_prefix(prefix=image_prefix)

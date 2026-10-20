@@ -203,3 +203,22 @@ def test_update_scene_master_validates_all_images_before_upload(
         },
     )
     assert response.status_code == 422
+
+
+def test_update_scene_master_rejects_creation_without_images(
+    client,
+    auth_headers,
+):
+    response = client.post(
+        "/updateSceneMaster",
+        headers=auth_headers,
+        json={
+            "scenePrincipal": "it_missing_images",
+            "title": "Missing images",
+            "maxDurationSeconds": 5,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["message"] == (
+        "exampleImage and guideImage are required when creating a new scene"
+    )
