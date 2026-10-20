@@ -13,6 +13,7 @@ import base64
 import re
 
 import pytest
+from pydantic import ValidationError
 
 from recnavi.core.scene.upsert_scene_master import update_scene_master
 from recnavi.core.scene.upsert_scene_master import upsert_scene_master
@@ -87,12 +88,12 @@ async def test_upsert_scene_master_updates_existing_scene():
 
 @pytest.mark.asyncio
 async def test_upsert_scene_master_validates_max_duration_min():
-    """Test upsert raises 422 when maxDurationSeconds < 1."""
+    """Test model validation rejects maxDurationSeconds < 1."""
     scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     with pytest.raises(
-        ClientUnprocessableEntityError,
-        match="maxDurationSeconds must be between 1 and 10 seconds",
+        ValidationError,
+        match="max_duration_seconds",
     ):
         await upsert_scene_master(
             scenes_db=scenes_db,
@@ -106,12 +107,12 @@ async def test_upsert_scene_master_validates_max_duration_min():
 
 @pytest.mark.asyncio
 async def test_upsert_scene_master_validates_max_duration_max():
-    """Test upsert raises 422 when maxDurationSeconds > 10."""
+    """Test model validation rejects maxDurationSeconds > 10."""
     scenes_db = MockDatabase(key_names=("scenePrincipal",))
 
     with pytest.raises(
-        ClientUnprocessableEntityError,
-        match="maxDurationSeconds must be between 1 and 10 seconds",
+        ValidationError,
+        match="max_duration_seconds",
     ):
         await upsert_scene_master(
             scenes_db=scenes_db,
@@ -162,7 +163,7 @@ async def test_update_scene_master_creates_scene_with_images():
     scenes_db = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
 
-    scenes = await update_scene_master(
+    scene_master = await update_scene_master(
         scenes_db=scenes_db,
         scene_principal="new_scene",
         title="New Scene",
@@ -173,10 +174,10 @@ async def test_update_scene_master_creates_scene_with_images():
         storage=storage,
     )
 
-    assert len(scenes) == 1
-    assert scenes[0].scene_principal == "new_scene"
-    assert scenes[0].title == "New Scene"
-    assert scenes[0].max_duration_seconds == 5
+    assert isinstance(scene_master, SceneMaster)
+    assert scene_master.scene_principal == "new_scene"
+    assert scene_master.title == "New Scene"
+    assert scene_master.max_duration_seconds == 5
     assert storage.objects == {
         ("test-bucket", "scenes/new_scene/example.jpg"): (
             b"example",
@@ -196,7 +197,7 @@ async def test_update_scene_master_updates_scene_without_images():
     await _seed_existing(scenes_db)
     storage = MockObjectStorage(bucket_name="test-bucket")
 
-    scenes = await update_scene_master(
+    scene_master = await update_scene_master(
         scenes_db=scenes_db,
         scene_principal="existing_scene",
         title="Updated Title",
@@ -207,15 +208,15 @@ async def test_update_scene_master_updates_scene_without_images():
         storage=storage,
     )
 
-    assert len(scenes) == 1
-    assert scenes[0].title == "Updated Title"
-    assert scenes[0].max_duration_seconds == 7
+    assert isinstance(scene_master, SceneMaster)
+    assert scene_master.title == "Updated Title"
+    assert scene_master.max_duration_seconds == 7
     assert (
-        scenes[0].thumbnail_uri
+        scene_master.thumbnail_uri
         == "s3://test-bucket/scenes/existing_scene/example.jpg"
     )
     assert (
-        scenes[0].guide_uri
+        scene_master.guide_uri
         == "s3://test-bucket/scenes/existing_scene/guide.jpg"
     )
     assert storage.objects == {}
@@ -252,7 +253,7 @@ async def test_update_scene_master_updates_only_example_image():
     await _seed_existing(scenes_db)
     storage = MockObjectStorage(bucket_name="test-bucket")
 
-    scenes = await update_scene_master(
+    scene_master = await update_scene_master(
         scenes_db=scenes_db,
         scene_principal="existing_scene",
         title="Title",
@@ -263,7 +264,7 @@ async def test_update_scene_master_updates_only_example_image():
         storage=storage,
     )
 
-    assert len(scenes) == 1
+    assert isinstance(scene_master, SceneMaster)
     assert storage.objects == {
         ("test-bucket", "scenes/existing_scene/example.jpg"): (
             b"new_example",
@@ -304,7 +305,7 @@ async def test_update_scene_master_issues_new_id_when_principal_is_null():
     scenes_db = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
 
-    scenes = await update_scene_master(
+    scene_master = await update_scene_master(
         scenes_db=scenes_db,
         scene_principal=None,
         title="New Scene",
@@ -315,11 +316,11 @@ async def test_update_scene_master_issues_new_id_when_principal_is_null():
         storage=storage,
     )
 
-    assert len(scenes) == 1
-    issued_id = scenes[0].scene_principal
+    assert isinstance(scene_master, SceneMaster)
+    issued_id = scene_master.scene_principal
     assert re.fullmatch(r"[0-9a-f]{32}", issued_id)
     assert (
-        scenes[0].thumbnail_uri
+        scene_master.thumbnail_uri
         == f"s3://test-bucket/scenes/{issued_id}/example.jpg"
     )
     assert ("test-bucket", f"scenes/{issued_id}/guide.jpg") in storage.objects

@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Update scene use case."""
+"""Update scene master use case."""
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.upsert_scene_master import update_scene_master
@@ -25,9 +25,9 @@ async def update_scene_master_usecase(
     guide_image: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
-) -> list[SceneMaster]:
+) -> SceneMaster:
     """Create or update scene master with image upload."""
-    return await update_scene_master(
+    scene_master = await update_scene_master(
         scenes_db=scenes_db,
         scene_principal=scene_principal,
         title=title,
@@ -37,3 +37,5 @@ async def update_scene_master_usecase(
         bucket_name=bucket_name,
         storage=storage,
     )
+
+    return await scene_master.attach_presigned_url(storage=storage)

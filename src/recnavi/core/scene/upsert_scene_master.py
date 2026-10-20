@@ -27,11 +27,6 @@ async def upsert_scene_master(
     guide_uri: str,
 ) -> SceneMaster:
     """Create or update scene master."""
-    if not (1 <= max_duration_seconds <= 10):
-        raise ClientUnprocessableEntityError(
-            "maxDurationSeconds must be between 1 and 10 seconds",
-        )
-
     scene_master = SceneMaster(
         scene_principal=scene_principal,
         title=title,
@@ -55,7 +50,7 @@ async def update_scene_master(
     guide_image: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
-) -> list[SceneMaster]:
+) -> SceneMaster:
     """Create or update scene master with image upload.
 
     A null scene_principal means create: a new id is issued.
@@ -114,7 +109,7 @@ async def update_scene_master(
                 f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
             )
 
-    await upsert_scene_master(
+    return await upsert_scene_master(
         scenes_db=scenes_db,
         scene_principal=scene_principal,
         title=title,
@@ -122,6 +117,3 @@ async def update_scene_master(
         thumbnail_uri=thumbnail_uri,
         guide_uri=guide_uri,
     )
-
-    result = await scenes_db.scan()
-    return [SceneMaster.model_validate(item) for item in result.items]

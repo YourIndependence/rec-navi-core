@@ -46,6 +46,8 @@ class SceneMaster(BaseModel):
     )
     max_duration_seconds: int = Field(
         ...,
+        ge=1,
+        le=10,
         description="How long the staff may record",
     )
 

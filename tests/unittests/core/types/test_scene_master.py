@@ -5,6 +5,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 
 from recnavi.core.types.scene_master import SceneMaster
 from tests.mockups.mock_object_storage import MockObjectStorage
@@ -15,7 +16,7 @@ async def test_master_urls_are_refreshed_without_losing_durable_references():
     master = SceneMaster(
         scene_principal="opening",
         title="Opening",
-        max_duration_seconds=30,
+        max_duration_seconds=5,
         thumbnail_uri="masters/example.jpg",
         guide_uri="masters/guide.png",
     )
@@ -44,7 +45,7 @@ async def test_master_urls_are_refreshed_without_losing_durable_references():
     assert second.model_dump(by_alias=True) == {
         "scenePrincipal": "opening",
         "title": "Opening",
-        "maxDurationSeconds": 30,
+        "maxDurationSeconds": 5,
         "thumbnailUrl": "https://signed/example-2",
         "guideUrl": "https://signed/guide-2",
     }
@@ -58,3 +59,25 @@ def test_master_response_schema_excludes_storage_references():
     assert "guideUri" not in properties
     assert "thumbnailUrl" in properties
     assert "guideUrl" in properties
+
+
+@pytest.mark.parametrize("duration", [0, 11])
+def test_master_rejects_duration_outside_bounds(duration):
+    """Enforce the recording duration invariant in the domain model."""
+    with pytest.raises(ValidationError):
+        SceneMaster(
+            scene_principal="opening",
+            title="Opening",
+            max_duration_seconds=duration,
+        )
+
+
+@pytest.mark.parametrize("duration", [1, 10])
+def test_master_accepts_duration_boundaries(duration):
+    """Accept both ends of the supported recording duration range."""
+    master = SceneMaster(
+        scene_principal="opening",
+        title="Opening",
+        max_duration_seconds=duration,
+    )
+    assert master.max_duration_seconds == duration

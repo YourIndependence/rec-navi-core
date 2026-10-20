@@ -14,7 +14,9 @@ from uuid import uuid4
 import pytest
 
 from recnavi.config.variables import ENV
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
+from recnavi.core.storage.image_urls import MEDIA_URL_EXPIRATION_SECONDS
 from recnavi.main import app
 
 
@@ -56,7 +58,10 @@ def test_update_scene_master_returns_422_for_wrapped_payload(
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(ENV != "CI", reason="Requires CI in-memory infrastructure")
-async def test_update_scene_master_returns_scene_masters(client, auth_headers):
+async def test_update_scene_master_returns_updated_scene_master(
+    client,
+    auth_headers,
+):
     """Verify the master API accepts and returns explicit master fields."""
     principal = f"it_master_{uuid4().hex}"
     database = app.state.database[SCENES_TABLE_NAME]
@@ -76,17 +81,61 @@ async def test_update_scene_master_returns_scene_masters(client, auth_headers):
         assert response.status_code == 200, response.text
         data = response.json()
         assert "scenes" not in data
-        master = next(
-            item
-            for item in data["sceneMasters"]
-            if item["scenePrincipal"] == principal
-        )
+        assert "sceneMasters" not in data
+        master = data["sceneMaster"]
+        assert master["scenePrincipal"] == principal
         assert master["title"] == "Cooking Master"
         assert master["maxDurationSeconds"] == 5
         assert "thumbnailUri" not in master
         assert "guideUri" not in master
+        for field, filename in (
+            ("thumbnailUrl", "example.jpg"),
+            ("guideUrl", "guide.jpg"),
+        ):
+            assert master[field] == (
+                f"mock://{MEDIA_BUCKET_NAME}/scenes/{principal}/{filename}"
+                f"?expires={MEDIA_URL_EXPIRATION_SECONDS}"
+            )
         stored = await database.get_item({"scenePrincipal": principal})
         assert stored["title"] == "Cooking Master"
+        assert "thumbnailUrl" not in stored
+        assert "guideUrl" not in stored
+        response = client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={
+                "scenePrincipal": principal,
+                "title": "Updated Master",
+                "maxDurationSeconds": 7,
+            },
+        )
+        assert response.status_code == 200, response.text
+        updated_master = response.json()["sceneMaster"]
+        assert updated_master["title"] == "Updated Master"
+        assert updated_master["maxDurationSeconds"] == 7
+        assert updated_master["thumbnailUrl"] == master["thumbnailUrl"]
+        assert updated_master["guideUrl"] == master["guideUrl"]
     finally:
         await storage.delete_objects_by_prefix(prefix=f"scenes/{principal}/")
         await database.delete_item(key={"scenePrincipal": principal})
+
+
+@pytest.mark.parametrize("duration", [0, 11])
+def test_update_scene_master_rejects_duration_outside_bounds(
+    client,
+    auth_headers,
+    duration,
+):
+    """Reject invalid recording durations at the HTTP boundary."""
+    response = client.post(
+        "/updateSceneMaster",
+        headers=auth_headers,
+        json={
+            "scenePrincipal": None,
+            "title": "Invalid Duration",
+            "maxDurationSeconds": duration,
+            "exampleImage": "ZXhhbXBsZQ==",
+            "guideImage": "Z3VpZGU=",
+        },
+    )
+    assert response.status_code == 422

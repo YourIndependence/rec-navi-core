@@ -73,7 +73,7 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
         title="Cooking",
         thumbnail_url="https://signed/thumbnail",
         guide_url="https://signed/guide",
-        max_duration_seconds=60,
+        max_duration_seconds=5,
     )
     with patch(
         "recnavi.apis.cms.cms_router.get_scene_masters_usecase",
@@ -88,7 +88,7 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
             {
                 "scenePrincipal": "cooking",
                 "title": "Cooking",
-                "maxDurationSeconds": 60,
+                "maxDurationSeconds": 5,
                 "thumbnailUrl": "https://signed/thumbnail",
                 "guideUrl": "https://signed/guide",
             },

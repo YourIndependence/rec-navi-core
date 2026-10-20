@@ -84,6 +84,8 @@ class UpdateSceneMasterRequest(BaseItemModel):
     title: str = Field(..., description="Name shown to the staff")
     max_duration_seconds: int = Field(
         ...,
+        ge=1,
+        le=10,
         description="How long the staff may record (1-10 seconds)",
     )
 
@@ -106,7 +108,7 @@ class UpdateSceneMasterRequest(BaseItemModel):
 class UpdateSceneMasterResponse(BaseApiResponseModel):
     """Response for POST /updateSceneMaster."""
 
-    scene_masters: list[SceneMaster] = Field(
+    scene_master: SceneMaster = Field(
         ...,
-        description="List of all scene masters after update",
+        description="Updated scene master with temporary image URLs",
     )

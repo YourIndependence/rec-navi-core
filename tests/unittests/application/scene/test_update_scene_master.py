@@ -22,10 +22,11 @@ from tests.mockups.mock_object_storage import MockObjectStorage
 
 @pytest.mark.asyncio
 async def test_usecase_delegates_to_update_scene_master():
-    """Test usecase delegates to core update_scene_master and returns its output."""
+    """Test usecase delegates to core update_scene_master and attaches image URLs."""
     mock_db = AsyncMock()
     storage = MockObjectStorage(bucket_name="test-bucket")
     expected_output = AsyncMock()
+    expected_output.attach_presigned_url.return_value = expected_output
 
     with patch(
         "recnavi.application.scene.update_scene_master.update_scene_master",
@@ -50,6 +51,9 @@ async def test_usecase_delegates_to_update_scene_master():
         example_image="base64_example_data",
         guide_image="base64_guide_data",
         bucket_name="test-bucket",
+        storage=storage,
+    )
+    expected_output.attach_presigned_url.assert_awaited_once_with(
         storage=storage,
     )
     assert result is expected_output
