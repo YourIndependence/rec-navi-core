@@ -11,9 +11,13 @@
 
 import base64
 import binascii
+import io
+import zipfile
 from collections.abc import AsyncIterator
+from collections.abc import Sequence
 
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.archive_entry import ArchiveEntry
 
 
 class MockObjectStorage(BaseObjectStorage):
@@ -85,3 +89,24 @@ class MockObjectStorage(BaseObjectStorage):
     ) -> str:
         """Return a deterministic fake URL."""
         return f"mock://{self.bucket_name}/{object_key}?expires={expiration}"
+
+    async def create_archive(
+        self,
+        *,
+        object_key: str,
+        entries: Sequence[ArchiveEntry],
+    ) -> None:
+        """Build a small in-memory archive for isolated tests."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
+            for entry in entries:
+                content = (
+                    await self.download_object(object_key=entry.object_key)
+                    if entry.object_key is not None
+                    else entry.content
+                )
+                archive.writestr(entry.filename, content)
+        self.objects[(self.bucket_name, object_key)] = (
+            buffer.getvalue(),
+            "application/zip",
+        )

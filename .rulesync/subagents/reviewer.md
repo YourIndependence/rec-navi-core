@@ -116,3 +116,5 @@ Start with a one-line verdict, then list issues by severity.
 ## Suggestions (confidence < 80, optional)
 
 [Before/after code blocks only for genuinely simpler alternatives. Skip if none.]
+
+- Project access must follow ARCH-013: canonical permission guard, exact denial, no inline role/owner/group policy, and authorization before effects. Update the operation-role map for new entry points.

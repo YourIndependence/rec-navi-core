@@ -19,6 +19,8 @@ from recnavi.apis.schemas.project_schemas import CreateProjectRequest
 from recnavi.apis.schemas.project_schemas import CreateProjectResponse
 from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
 from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
+from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
+from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
@@ -28,6 +30,9 @@ from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.delete_project import delete_project_usecase
+from recnavi.application.project.download_project import (
+    download_project_usecase,
+)
 from recnavi.application.project.update_project import update_project_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
@@ -39,8 +44,10 @@ from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
+from recnavi.core.types.project import DOWNLOAD_URL_EXPIRATION_SECONDS
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserSummary
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -193,3 +200,25 @@ async def delete_project_endpoint(
     )
 
     return DeleteProjectResponse(project_id=item.project_id)
+
+
+@cms_router.post("/downloadProject")
+async def download_project_endpoint(
+    request: Request,
+    item: DownloadProjectRequest,
+    user: User = Depends(verify_user),
+) -> DownloadProjectResponse:
+    """Create a download archive for the project's owner."""
+    archive = await download_project_usecase(
+        projects_db=request.app.state.database[PROJECTS_TABLE_NAME],
+        project_id=item.project_id,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+    if archive.download_url is None:
+        raise ClientNotFoundError("Project not found.")
+
+    return DownloadProjectResponse(
+        download_url=archive.download_url,
+        expires_in_seconds=DOWNLOAD_URL_EXPIRATION_SECONDS,
+    )

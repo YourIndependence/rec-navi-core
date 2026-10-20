@@ -418,3 +418,38 @@ async def test_project_attach_presigned_url_never_serializes_storage_keys():
     assert "thumbnailKey" not in scene
     assert view.project_id == "proj-123"
     assert view.group_id == "group-456"
+
+
+@pytest.mark.asyncio
+async def test_project_download_url_is_temporary_and_returns_self():
+    project = build_project(
+        scenes=[
+            {
+                "sceneId": "s1",
+                "scenePrincipal": "opening",
+                "status": "approved",
+                "videoKey": "projects/proj-123/scenes/s1/video.mp4",
+            },
+        ],
+    )
+    storage = MockObjectStorage(bucket_name="media")
+    storage.objects[("media", project.scenes[0].video_key)] = (
+        b"video",
+        "video/mp4",
+    )
+    original = project.to_storage_item()
+    result = await project.create_download_url(storage=storage)
+    assert result is project
+    assert project.download_url
+    assert (
+        project.model_dump(by_alias=True)["downloadUrl"]
+        == project.download_url
+    )
+    assert project.to_storage_item() == original
+    assert "downloadUrl" not in project.to_storage_item()
+    assert (
+        Project.model_validate(project.to_storage_item()).download_url is None
+    )
+    first_url = project.download_url
+    await project.create_download_url(storage=storage)
+    assert project.download_url != first_url

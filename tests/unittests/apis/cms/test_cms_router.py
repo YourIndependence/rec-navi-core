@@ -373,3 +373,29 @@ def test_review_scene_rejects_invalid_result(
         )
     assert response.status_code == 422
     usecase.assert_not_awaited()
+
+
+def test_download_project_delegates_to_usecase(cms_client, auth_headers):
+    archive = _make_project()
+    archive.download_url = "https://example.org/archive"
+    with patch(
+        "recnavi.apis.cms.cms_router.download_project_usecase",
+        new=AsyncMock(return_value=archive),
+    ) as usecase:
+        response = cms_client.post(
+            "/downloadProject",
+            headers=auth_headers,
+            json={"projectId": "p"},
+        )
+    assert response.status_code == 200
+    assert response.json()["downloadUrl"] == archive.download_url
+    assert response.json()["expiresInSeconds"] == 3600
+    assert usecase.await_args.kwargs["project_id"] == "p"
+    assert (
+        usecase.await_args.kwargs["projects_db"]
+        is cms_client.app.state.database[PROJECTS_TABLE_NAME]
+    )
+    assert (
+        usecase.await_args.kwargs["storage"]
+        is cms_client.app.state.object_storage
+    )

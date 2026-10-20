@@ -135,3 +135,13 @@ Use-case function names retain `_usecase`, for example
 Unit test filenames mirror the module: `test_review_scene.py`.
 See [ARCH-001](adrs/ARCH-001-clean-architecture.md#file-naming) for the decision
 and its automated enforcement.
+
+
+## Project authorization
+
+Follow [ARCH-013](adrs/ARCH-013-project-authorization.md). Existing-project
+operations use Project.validate_permission with the declared role and the
+canonical ClientAuthorizationError message. Do not add inline role, owner, or
+group policy. Authorize before mutation, storage access, or return. Keep the
+operation-role map current when adding or moving operations. Enforcement lives
+in the ADR's companion `.rules.ts` and runs through `archgate check`.

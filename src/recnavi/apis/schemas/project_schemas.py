@@ -113,3 +113,16 @@ class DeleteProjectResponse(BaseApiResponseModel):
     """Response for POST /deleteProject."""
 
     project_id: str = Field(..., description="Deleted project ID")
+
+
+class DownloadProjectRequest(BaseItemModel):
+    """Request to archive an approved project."""
+
+    project_id: str = Field(..., min_length=1)
+
+
+class DownloadProjectResponse(BaseApiResponseModel):
+    """Time-limited archive download URL."""
+
+    download_url: str
+    expires_in_seconds: int
