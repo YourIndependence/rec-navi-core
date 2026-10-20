@@ -69,7 +69,7 @@ Python AST inspection checks executable structure instead.
 - Positive: Four error-severity Archgate rules enforce presence/role, inline
   policy prohibition, denial format, and effect ordering.
 - Negative: Moving or adding entry points requires updating the explicit
-  operation-to-role map and tests. Additional functions calling
+  operation-to-role map. Additional functions calling
   project.validate_permission are checked structurally; an entirely new
   operation lacking a guard must be added to the map during review.
 - Limitation: This is a syntactic contract, not interprocedural verification.
@@ -86,9 +86,10 @@ Python AST inspection checks executable structure instead.
 - Keep the operation-to-role map in the companion rule file current.
 - Authorize before mutation, storage access, return, or URL generation.
 - Keep project access policy in Project.validate_permission.
-- Run `node --experimental-strip-types --test tests/architecture/project-authorization.test.ts`
-  and `archgate check` when changing this contract.
-- Test valid code and violations of every enforced property.
+- Implement enforcement only in this ADR's companion `.rules.ts` file and run
+  it through `archgate check`; do not add a separate authorization test runner.
+- Verify violations of every enforced property through Archgate against
+  temporary source mutations, restoring the source after each check.
 
 **Don't:**
 

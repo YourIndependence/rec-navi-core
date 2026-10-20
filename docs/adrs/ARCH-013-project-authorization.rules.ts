@@ -108,7 +108,7 @@ async function check(ctx: RuleContext, id: CheckId): Promise<void> {
     }
     for (const name of Object.keys(POLICIES[relative] ?? {})) {
       if (id === "project-authorization-required" && !nodes(tree.body).some((item) => item.name === name)) {
-        ctx.report.violation({ file, line: 1, message: `Authorization entry point ${name} is missing; update the explicit policy map when moving it`, fix: "Update the ADR policy map and its tests together with the entry point" });
+        ctx.report.violation({ file, line: 1, message: `Authorization entry point ${name} is missing; update the explicit policy map when moving it`, fix: "Update the ADR policy map together with the entry point" });
       }
     }
   }

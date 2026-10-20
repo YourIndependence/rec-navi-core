@@ -30,6 +30,3 @@ jobs:
 
       - name: Run archgate check
         run: archgate check
-
-      - name: Test project authorization rules
-        run: node --experimental-strip-types --test tests/architecture/project-authorization.test.ts

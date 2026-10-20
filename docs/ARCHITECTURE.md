@@ -143,4 +143,5 @@ Follow [ARCH-013](adrs/ARCH-013-project-authorization.md). Existing-project
 operations use Project.validate_permission with the declared role and the
 canonical ClientAuthorizationError message. Do not add inline role, owner, or
 group policy. Authorize before mutation, storage access, or return. Keep the
-operation-role map and AST rule tests current when adding or moving operations.
+operation-role map current when adding or moving operations. Enforcement lives
+in the ADR's companion `.rules.ts` and runs through `archgate check`.

@@ -89,6 +89,7 @@ Existing-project operations authorize through a standalone
 (or the declared STAFF/user.role policy), raising
 `ClientAuthorizationError("User does not have access permission to this project")`.
 Do not add role, owner, or group comparisons at call sites. Authorize before
-mutation, storage access, or return. Keep the explicit operation-role map and
-architecture rule tests current when adding or moving operations. Independent
+mutation, storage access, or return. Keep the explicit operation-role map
+current when adding or moving operations. Use only the ADR companion
+`.rules.ts` through `archgate check` for enforcement. Independent
 scene assignment checks and list filtering retain their existing purpose.
