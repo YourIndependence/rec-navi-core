@@ -138,17 +138,20 @@ class Project(BaseModel):
             raise ClientValueError("Scene video must belong to this project.")
 
     def _create_download_entries(self) -> list[ArchiveEntry]:
-        entries: list[ArchiveEntry] = []
-        for position, scene in enumerate(self.scenes, start=1):
-            principal = (
-                re.sub(r"[^\w-]", "_", scene.scene_principal)[:100] or "scene"
-            )
-            entries.append(
-                ArchiveEntry(
-                    filename=f"{position:02d}_{principal}.mp4",
-                    object_key=scene.video_key,
+        entries = [
+            ArchiveEntry(
+                filename=(
+                    f"{position:02d}_"
+                    + (
+                        re.sub(r"[^\w-]", "_", scene.scene_principal)[:100]
+                        or "scene"
+                    )
+                    + ".mp4"
                 ),
+                object_key=scene.video_key,
             )
+            for position, scene in enumerate(self.scenes, start=1)
+        ]
         entries.append(self._create_download_metadata_entry(entries=entries))
         return entries
 
