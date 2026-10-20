@@ -18,25 +18,14 @@ from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientValueError
 
 
-async def upsert_scene_master(
-    *,
-    scenes_db: BaseDatabase,
-    scene_master: SceneMaster,
-) -> SceneMaster:
-    """Persist an already validated scene master."""
-    await scenes_db.put_item(scene_master.to_storage_item())
-    return scene_master
-
-
 async def update_scene_master(
     *,
     scenes_db: BaseDatabase,
     scene_principal: str,
-    title: str,
-    max_duration_seconds: int,
+    title: str | None = None,
+    max_duration_seconds: int | None = None,
     example_image: str | None,
     guide_image: str | None,
-    bucket_name: str,
     storage: BaseObjectStorage,
     user: User,
 ) -> SceneMaster:
@@ -44,31 +33,53 @@ async def update_scene_master(
     if not user.can_act_as(UserRole.ADMIN):
         raise ClientAuthorizationError("Only admins can update scene masters")
 
-    update = SceneMaster(
-        scene_principal=scene_principal,
-        title=title,
-        max_duration_seconds=max_duration_seconds,
-    )
-    item = await scenes_db.get_item({"scenePrincipal": update.scene_principal})
+    item = await scenes_db.get_item({"scenePrincipal": scene_principal})
 
     if item:
         scene_master = SceneMaster.model_validate(item)
+        if title is not None:
+            scene_master.title = title
+        if max_duration_seconds is not None:
+            scene_master.max_duration_seconds = max_duration_seconds
+
     else:
         if example_image is None or guide_image is None:
             raise ClientValueError(
                 "exampleImage and guideImage are required when creating a new scene",
             )
-        scene_master = update
+        if title is None:
+            raise ClientValueError("title is required.")
+        if max_duration_seconds is None:
+            raise ClientValueError("max_duration_seconds is required.")
 
-    scene_master.title = update.title
-    scene_master.max_duration_seconds = update.max_duration_seconds
-    async with scene_master.update_images(
-        storage=storage,
-        bucket_name=bucket_name,
-        example_image=example_image,
-        guide_image=guide_image,
-    ):
-        return await upsert_scene_master(
+        scene_master = SceneMaster(
+            scene_principal=scene_principal,
+            title=title,
+            max_duration_seconds=max_duration_seconds,
+        )
+
+    if example_image is None and guide_image is None:
+        return await _save_scene_master(
             scenes_db=scenes_db,
             scene_master=scene_master,
         )
+
+    async with scene_master.update_images(
+        storage=storage,
+        example_image=example_image,
+        guide_image=guide_image,
+    ):
+        return await _save_scene_master(
+            scenes_db=scenes_db,
+            scene_master=scene_master,
+        )
+
+
+async def _save_scene_master(
+    *,
+    scenes_db: BaseDatabase,
+    scene_master: SceneMaster,
+) -> SceneMaster:
+    """Persist an already validated scene master."""
+    await scenes_db.put_item(scene_master.to_storage_item())
+    return scene_master

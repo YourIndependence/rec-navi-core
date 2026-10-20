@@ -74,6 +74,8 @@ class UpdateSceneResponse(BaseApiResponseModel):
 class UpdateSceneMasterRequest(SceneMaster):
     """Create or update the master identified by the required client key."""
 
+    title: str | None = Field(default=None, min_length=1)
+    max_duration_seconds: int | None = Field(default=None, ge=1, le=10)
     example_image: str | None = None
     guide_image: str | None = None
 

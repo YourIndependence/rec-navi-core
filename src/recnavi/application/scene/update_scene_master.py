@@ -10,7 +10,7 @@
 """Update scene master use case."""
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.scene.upsert_scene_master import update_scene_master
+from recnavi.core.scene.update_scene_master import update_scene_master
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
 from recnavi.core.types.user import User
@@ -21,11 +21,10 @@ async def update_scene_master_usecase(
     scenes_db: BaseDatabase,
     user: User,
     scene_principal: str,
-    title: str,
-    max_duration_seconds: int,
+    title: str | None = None,
+    max_duration_seconds: int | None = None,
     example_image: str | None,
     guide_image: str | None,
-    bucket_name: str,
     storage: BaseObjectStorage,
 ) -> SceneMaster:
     """Create or update scene master with image upload."""
@@ -37,7 +36,6 @@ async def update_scene_master_usecase(
         max_duration_seconds=max_duration_seconds,
         example_image=example_image,
         guide_image=guide_image,
-        bucket_name=bucket_name,
         storage=storage,
     )
 

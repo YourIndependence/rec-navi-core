@@ -22,7 +22,11 @@ from tests.mockups.mock_users import get_mock_x_user
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_update_scene_master():
+@pytest.mark.parametrize(
+    ("title", "duration"),
+    [("Test Scene", 5), (None, 7), ("Renamed", None), (None, None)],
+)
+async def test_usecase_delegates_to_update_scene_master(title, duration):
     """Test usecase delegates to core update_scene_master and attaches image URLs."""
     mock_db = AsyncMock()
     storage = MockObjectStorage(bucket_name="test-bucket")
@@ -37,11 +41,10 @@ async def test_usecase_delegates_to_update_scene_master():
             scenes_db=mock_db,
             user=get_mock_x_user(),
             scene_principal="test_scene",
-            title="Test Scene",
-            max_duration_seconds=5,
+            title=title,
+            max_duration_seconds=duration,
             example_image="base64_example_data",
             guide_image="base64_guide_data",
-            bucket_name="test-bucket",
             storage=storage,
         )
 
@@ -49,11 +52,10 @@ async def test_usecase_delegates_to_update_scene_master():
         scenes_db=mock_db,
         user=get_mock_x_user(),
         scene_principal="test_scene",
-        title="Test Scene",
-        max_duration_seconds=5,
+        title=title,
+        max_duration_seconds=duration,
         example_image="base64_example_data",
         guide_image="base64_guide_data",
-        bucket_name="test-bucket",
         storage=storage,
     )
     expected_output.attach_presigned_url.assert_awaited_once_with(

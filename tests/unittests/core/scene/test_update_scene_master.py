@@ -7,14 +7,14 @@
 # For internal use only.
 # developer team.
 
-"""Regression tests for scene master writes."""
+"""Regression tests for scene master updates."""
 
 from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
 
-from recnavi.core.scene.upsert_scene_master import update_scene_master
+from recnavi.core.scene.update_scene_master import update_scene_master
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientValueError
@@ -32,7 +32,6 @@ async def test_non_admin_cannot_read_or_write_master(role):
         await update_scene_master(
             scenes_db=database,
             storage=storage,
-            bucket_name="test-bucket",
             scene_principal="cooking",
             title="Cooking",
             max_duration_seconds=5,
@@ -57,7 +56,6 @@ async def test_invalid_principal_has_no_effects(principal):
         await update_scene_master(
             scenes_db=database,
             storage=storage,
-            bucket_name="test-bucket",
             scene_principal=principal,
             title="Cooking",
             max_duration_seconds=5,
@@ -76,7 +74,6 @@ async def test_create_and_metadata_update_preserve_durable_references():
     kwargs = {
         "scenes_db": database,
         "storage": storage,
-        "bucket_name": "test-bucket",
         "scene_principal": "shop_gaikan",
         "user": get_mock_x_user(),
     }
@@ -120,7 +117,6 @@ async def test_creation_requires_both_images_before_upload(images):
         await update_scene_master(
             scenes_db=database,
             storage=storage,
-            bucket_name="test-bucket",
             scene_principal="shop",
             title="Shop",
             max_duration_seconds=5,
@@ -140,7 +136,6 @@ async def test_replaces_only_requested_image(replacement):
     kwargs = {
         "scenes_db": database,
         "storage": storage,
-        "bucket_name": "test-bucket",
         "scene_principal": "shop",
         "title": "Shop",
         "max_duration_seconds": 5,
@@ -174,7 +169,6 @@ async def test_failed_write_preserves_previous_images_and_database(failure):
     kwargs = {
         "scenes_db": database,
         "storage": storage,
-        "bucket_name": "test-bucket",
         "scene_principal": "shop",
         "title": "Shop",
         "max_duration_seconds": 5,
@@ -218,7 +212,6 @@ async def test_invalid_second_image_does_not_upload_first_image(image):
         await update_scene_master(
             scenes_db=database,
             storage=storage,
-            bucket_name="test-bucket",
             scene_principal="shop",
             title="Shop",
             max_duration_seconds=5,
@@ -228,3 +221,104 @@ async def test_invalid_second_image_does_not_upload_first_image(image):
         )
     assert storage.objects == {}
     assert database.items == []
+
+
+@pytest.mark.asyncio
+async def test_partial_metadata_update_preserves_omitted_title():
+    database = MockDatabase(
+        key_names=("scenePrincipal",),
+        initial_items=[
+            {
+                "scenePrincipal": "shop",
+                "title": "Original",
+                "maxDurationSeconds": 5,
+                "thumbnailUri": "scenes/shop/old/example.jpg",
+                "guideUri": "scenes/shop/old/guide.jpg",
+            },
+        ],
+    )
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    result = await update_scene_master(
+        scenes_db=database,
+        storage=storage,
+        scene_principal="shop",
+        max_duration_seconds=7,
+        example_image=None,
+        guide_image=None,
+        user=get_mock_x_user(),
+    )
+    assert result.title == "Original"
+    assert result.max_duration_seconds == 7
+    assert result.thumbnail_uri == "scenes/shop/old/example.jpg"
+    assert database.items[0] == result.to_storage_item()
+    assert storage.objects == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("title", "duration"),
+    [(None, None), ("Renamed", None), ("", None), (None, 0), (None, 11)],
+)
+async def test_existing_metadata_updates_preserve_or_validate_fields(
+    title,
+    duration,
+):
+    original = {
+        "scenePrincipal": "shop",
+        "title": "Original",
+        "maxDurationSeconds": 5,
+    }
+    database = MockDatabase(
+        key_names=("scenePrincipal",),
+        initial_items=[original],
+    )
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    arguments = {
+        "scenes_db": database,
+        "storage": storage,
+        "scene_principal": "shop",
+        "title": title,
+        "max_duration_seconds": duration,
+        "example_image": None,
+        "guide_image": None,
+        "user": get_mock_x_user(),
+    }
+    if title == "" or duration in (0, 11):
+        with pytest.raises(ValidationError):
+            await update_scene_master(**arguments)
+        assert database.items == [original]
+    else:
+        result = await update_scene_master(**arguments)
+        assert result.title == (title if title is not None else "Original")
+        assert result.max_duration_seconds == 5
+    assert storage.objects == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("title", "duration", "message"),
+    [
+        (None, 5, "title is required"),
+        ("New", None, "max_duration_seconds is required"),
+    ],
+)
+async def test_new_master_requires_metadata_before_upload(
+    title,
+    duration,
+    message,
+):
+    database = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    with pytest.raises(ClientValueError, match=message):
+        await update_scene_master(
+            scenes_db=database,
+            storage=storage,
+            scene_principal="shop",
+            title=title,
+            max_duration_seconds=duration,
+            example_image="ZXhhbXBsZQ==",
+            guide_image="Z3VpZGU=",
+            user=get_mock_x_user(),
+        )
+    assert database.items == []
+    assert storage.objects == {}

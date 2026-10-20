@@ -45,7 +45,6 @@ from recnavi.application.scene.update_scene_master import (
     update_scene_master_usecase,
 )
 from recnavi.application.user.get_group_users import get_group_users_usecase
-from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -250,7 +249,6 @@ async def update_scene_master_endpoint(
         max_duration_seconds=item.max_duration_seconds,
         example_image=item.example_image,
         guide_image=item.guide_image,
-        bucket_name=MEDIA_BUCKET_NAME,
         storage=request.app.state.object_storage,
     )
 

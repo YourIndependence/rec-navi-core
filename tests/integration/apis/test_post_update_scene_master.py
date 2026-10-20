@@ -117,6 +117,30 @@ async def test_update_scene_master_returns_updated_scene_master(
         assert updated_master["maxDurationSeconds"] == 7
         assert updated_master["thumbnailUrl"] == master["thumbnailUrl"]
         assert updated_master["guideUrl"] == master["guideUrl"]
+        response = client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={"scenePrincipal": principal, "maxDurationSeconds": 8},
+        )
+        assert response.status_code == 200, response.text
+        partial = response.json()["sceneMaster"]
+        assert partial["title"] == "Updated Master"
+        assert partial["maxDurationSeconds"] == 8
+        response = client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={"scenePrincipal": principal, "exampleImage": "bmV3"},
+        )
+        assert response.status_code == 200, response.text
+        image_only = response.json()["sceneMaster"]
+        assert image_only["title"] == partial["title"]
+        assert (
+            image_only["maxDurationSeconds"] == partial["maxDurationSeconds"]
+        )
+        assert image_only["thumbnailUrl"] != partial["thumbnailUrl"]
+        assert image_only["guideUrl"] == partial["guideUrl"]
+        stored = await database.get_item({"scenePrincipal": principal})
+        assert stored["thumbnailUri"].startswith(f"scenes/{principal}/")
     finally:
         await storage.delete_objects_by_prefix(prefix=f"scenes/{principal}/")
         await database.delete_item(key={"scenePrincipal": principal})
@@ -222,3 +246,25 @@ def test_update_scene_master_rejects_creation_without_images(
     assert response.json()["message"] == (
         "exampleImage and guideImage are required when creating a new scene"
     )
+
+
+@pytest.mark.parametrize("missing_field", ["title", "maxDurationSeconds"])
+def test_update_scene_master_requires_metadata_on_create(
+    client,
+    auth_headers,
+    missing_field,
+):
+    payload = {
+        "scenePrincipal": "it_missing_metadata",
+        "title": "New",
+        "maxDurationSeconds": 5,
+        "exampleImage": "ZXhhbXBsZQ==",
+        "guideImage": "Z3VpZGU=",
+    }
+    payload.pop(missing_field)
+    response = client.post(
+        "/updateSceneMaster",
+        headers=auth_headers,
+        json=payload,
+    )
+    assert response.status_code == 400

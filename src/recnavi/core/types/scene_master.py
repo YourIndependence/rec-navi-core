@@ -23,8 +23,10 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
 
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.storage.image_urls import generate_image_url
+from recnavi.exceptions.exceptions import ClientValueError
 
 
 class SceneMaster(BaseModel):
@@ -33,6 +35,7 @@ class SceneMaster(BaseModel):
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
+        validate_assignment=True,
     )
 
     scene_principal: str = Field(
@@ -84,7 +87,6 @@ class SceneMaster(BaseModel):
         self,
         *,
         storage: BaseObjectStorage,
-        bucket_name: str,
         example_image: str | None,
         guide_image: str | None,
     ) -> AsyncIterator[Self]:
@@ -92,8 +94,7 @@ class SceneMaster(BaseModel):
         example_image = self.validate_image(example_image)
         guide_image = self.validate_image(guide_image)
         if example_image is None and guide_image is None:
-            yield self
-            return
+            raise ClientValueError("At least one image must be provided")
 
         image_prefix = f"scenes/{self.scene_principal}/{uuid4().hex}/"
         previous_images = (self.thumbnail_uri, self.guide_uri)
@@ -101,7 +102,6 @@ class SceneMaster(BaseModel):
         try:
             await self._upload_images(
                 storage=storage,
-                bucket_name=bucket_name,
                 image_prefix=image_prefix,
                 example_image=example_image,
                 guide_image=guide_image,
@@ -112,7 +112,6 @@ class SceneMaster(BaseModel):
             if committed:
                 await self._delete_replaced_images(
                     storage=storage,
-                    bucket_name=bucket_name,
                     previous_images=previous_images,
                 )
             else:
@@ -152,7 +151,6 @@ class SceneMaster(BaseModel):
         self,
         *,
         storage: BaseObjectStorage,
-        bucket_name: str,
         image_prefix: str,
         example_image: str | None,
         guide_image: str | None,
@@ -160,14 +158,12 @@ class SceneMaster(BaseModel):
         if example_image is not None:
             self.thumbnail_uri = await self._upload_image(
                 storage=storage,
-                bucket_name=bucket_name,
                 object_key=f"{image_prefix}example.jpg",
                 image=example_image,
             )
         if guide_image is not None:
             self.guide_uri = await self._upload_image(
                 storage=storage,
-                bucket_name=bucket_name,
                 object_key=f"{image_prefix}guide.jpg",
                 image=guide_image,
             )
@@ -176,7 +172,6 @@ class SceneMaster(BaseModel):
     async def _upload_image(
         *,
         storage: BaseObjectStorage,
-        bucket_name: str,
         object_key: str,
         image: str,
     ) -> str:
@@ -185,19 +180,19 @@ class SceneMaster(BaseModel):
             base64_data=image,
             content_type="image/jpeg",
         )
-        return f"s3://{bucket_name}/{object_key}"
+        return object_key
 
     async def _delete_replaced_images(
         self,
         *,
         storage: BaseObjectStorage,
-        bucket_name: str,
         previous_images: Sequence[str | None],
     ) -> None:
         current_images = {self.thumbnail_uri, self.guide_uri}
-        owned_prefix = f"s3://{bucket_name}/scenes/{self.scene_principal}/"
+        owned_prefix = f"scenes/{self.scene_principal}/"
         for image_uri in set(previous_images) - current_images:
-            if image_uri is not None and image_uri.startswith(owned_prefix):
-                await storage.delete_object_by_key(
-                    object_key=image_uri.removeprefix(f"s3://{bucket_name}/"),
-                )
+            if image_uri is None:
+                continue
+            object_key = image_uri.removeprefix(f"s3://{MEDIA_BUCKET_NAME}/")
+            if object_key.startswith(owned_prefix):
+                await storage.delete_object_by_key(object_key=object_key)
