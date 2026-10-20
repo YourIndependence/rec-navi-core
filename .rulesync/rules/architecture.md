@@ -37,10 +37,6 @@ infrastructure/  <- External I/O: DB sessions, boto3 clients, third-party APIs
 ### Deviations from Canonical Clean Architecture
 
 - `core/` owns **abstract base classes** for databases and stores. Application code imports only from `core`, not `infrastructure`. Concrete implementations are injected at startup via registries.
-- **Registry pattern** is the DI mechanism: `database_registry`, `store_registry`, `dataloader_registry`, `preprocessor_strategy_registry`, `chunker_registry`, `tool_registry`, `agent_registry`. Concrete implementations register themselves during startup; consumers retrieve them by key at runtime.
-- Agent sub-module (`core/agents/`) holds all Google ADK `Agent` definitions. `core/agents/agent_registry.py` provides dynamic agent registration with DynamoDB persistence, allowing runtime agent CRUD via CMS API without code deployment.
-- Tool sub-module (`core/tools/`) contains all tool implementations. Tool modules must follow the tool registry initialization pattern: each `*_tool.py` or `*_tools.py` module exposes a synchronous `initialize()` function and registers tools with `tool_registry` during startup. `core/tools/tool_registry.py` provides runtime tool lookup for dynamic agent construction.
-- `core/agent_runner/` wraps `google.adk.runners.Runner` and is the only place an ADK `Runner` is instantiated.
 
 ## Media model serialization
 
