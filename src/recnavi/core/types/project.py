@@ -12,7 +12,6 @@
 
 import json
 import re
-from collections.abc import Sequence
 from datetime import UTC
 from datetime import datetime
 from enum import StrEnum
@@ -112,10 +111,11 @@ class Project(BaseModel):
     ) -> str:
         """Archive approved recordings in shooting order with their metadata."""
         self._validate_download_scenes()
+        metadata = self._create_download_metadata_entry()
         archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
         await storage.create_archive(
             object_key=archive_key,
-            entries=self._create_download_entries(),
+            entries=self._create_download_entries(metadata=metadata),
         )
         return archive_key
 
@@ -137,29 +137,25 @@ class Project(BaseModel):
         ):
             raise ClientValueError("Scene video must belong to this project.")
 
-    def _create_download_entries(self) -> list[ArchiveEntry]:
+    def _create_download_entries(
+        self,
+        *,
+        metadata: ArchiveEntry,
+    ) -> list[ArchiveEntry]:
         entries = [
             ArchiveEntry(
-                filename=(
-                    f"{position:02d}_"
-                    + (
-                        re.sub(r"[^\w-]", "_", scene.scene_principal)[:100]
-                        or "scene"
-                    )
-                    + ".mp4"
+                filename=self._download_scene_filename(
+                    scene=scene,
+                    position=position,
                 ),
                 object_key=scene.video_key,
             )
             for position, scene in enumerate(self.scenes, start=1)
         ]
-        entries.append(self._create_download_metadata_entry(entries=entries))
+        entries.append(metadata)
         return entries
 
-    def _create_download_metadata_entry(
-        self,
-        *,
-        entries: Sequence[ArchiveEntry],
-    ) -> ArchiveEntry:
+    def _create_download_metadata_entry(self) -> ArchiveEntry:
         return ArchiveEntry(
             filename="metadata.json",
             content=json.dumps(
@@ -173,19 +169,25 @@ class Project(BaseModel):
                             "scenePrincipal": scene.scene_principal,
                             "createdBy": scene.created_by,
                             "createdAt": scene.created_at,
-                            "fileName": entry.filename,
+                            "fileName": self._download_scene_filename(
+                                scene=scene,
+                                position=position,
+                            ),
                         }
-                        for scene, entry in zip(
-                            self.scenes,
-                            entries,
-                            strict=True,
-                        )
+                        for position, scene in enumerate(self.scenes, start=1)
                     ],
                 },
                 ensure_ascii=False,
                 indent=2,
             ).encode(),
         )
+
+    @staticmethod
+    def _download_scene_filename(*, scene: Scene, position: int) -> str:
+        principal = (
+            re.sub(r"[^\w-]", "_", scene.scene_principal)[:100] or "scene"
+        )
+        return f"{position:02d}_{principal}.mp4"
 
     def validate_permission(
         self,
