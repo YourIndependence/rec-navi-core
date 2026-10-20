@@ -7,113 +7,109 @@
 # For internal use only.
 # developer team.
 
-"""Upsert scene master domain logic."""
+"""Scene master updates and persistence."""
 
-import uuid
+from uuid import uuid4
+
+from pydantic import ValidationError
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.scene_master_update import SceneMasterCreate
+from recnavi.core.types.scene_master_update import SceneMasterUpdate
+from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
 async def upsert_scene_master(
     *,
     scenes_db: BaseDatabase,
-    scene_principal: str,
-    title: str,
-    max_duration_seconds: int,
-    thumbnail_uri: str,
-    guide_uri: str,
+    scene_master: SceneMaster,
 ) -> SceneMaster:
-    """Create or update scene master."""
-    scene_master = SceneMaster(
-        scene_principal=scene_principal,
-        title=title,
-        max_duration_seconds=max_duration_seconds,
-        thumbnail_uri=thumbnail_uri,
-        guide_uri=guide_uri,
-    )
-
+    """Persist an already validated scene master."""
     await scenes_db.put_item(scene_master.to_storage_item())
-
     return scene_master
 
 
 async def update_scene_master(
     *,
     scenes_db: BaseDatabase,
-    scene_principal: str | None,
+    scene_principal: str,
     title: str,
     max_duration_seconds: int,
     example_image: str | None,
     guide_image: str | None,
     bucket_name: str,
     storage: BaseObjectStorage,
+    user: User,
 ) -> SceneMaster:
-    """Create or update scene master with image upload.
+    """Validate and update a master before publishing its durable references."""
+    if not user.can_act_as(UserRole.ADMIN):
+        raise ClientAuthorizationError("Only admins can update scene masters")
 
-    A null scene_principal means create: a new id is issued.
-    """
-    existing_scene = None
-    if scene_principal is None:
-        scene_principal = uuid.uuid4().hex
-    else:
-        existing_scene = await scenes_db.get_item(
-            {"scenePrincipal": scene_principal},
-        )
-
-    if not existing_scene:
-        if not example_image or not guide_image:
-            raise ClientUnprocessableEntityError(
-                "exampleImage and guideImage are required when creating a new scene",
-            )
-
-        thumbnail_uri = (
-            f"s3://{bucket_name}/scenes/{scene_principal}/example.jpg"
-        )
-        guide_uri = f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
-
-        await storage.upload_base64(
-            object_key=f"scenes/{scene_principal}/example.jpg",
-            base64_data=example_image,
-            content_type="image/jpeg",
-        )
-        await storage.upload_base64(
-            object_key=f"scenes/{scene_principal}/guide.jpg",
-            base64_data=guide_image,
-            content_type="image/jpeg",
-        )
-    else:
-        existing_master = SceneMaster.model_validate(existing_scene)
-        thumbnail_uri = existing_master.thumbnail_uri
-        guide_uri = existing_master.guide_uri
-
-        if example_image:
-            await storage.upload_base64(
-                object_key=f"scenes/{scene_principal}/example.jpg",
-                base64_data=example_image,
-                content_type="image/jpeg",
-            )
-            thumbnail_uri = (
-                f"s3://{bucket_name}/scenes/{scene_principal}/example.jpg"
-            )
-
-        if guide_image:
-            await storage.upload_base64(
-                object_key=f"scenes/{scene_principal}/guide.jpg",
-                base64_data=guide_image,
-                content_type="image/jpeg",
-            )
-            guide_uri = (
-                f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
-            )
-
-    return await upsert_scene_master(
-        scenes_db=scenes_db,
+    update = SceneMasterUpdate(
         scene_principal=scene_principal,
         title=title,
         max_duration_seconds=max_duration_seconds,
-        thumbnail_uri=thumbnail_uri,
-        guide_uri=guide_uri,
+        example_image=example_image,
+        guide_image=guide_image,
     )
+    item = await scenes_db.get_item({"scenePrincipal": update.scene_principal})
+    if item:
+        scene_master = SceneMaster.model_validate(item)
+    else:
+        try:
+            SceneMasterCreate.model_validate(update.model_dump())
+        except ValidationError as error:
+            raise ClientUnprocessableEntityError(
+                "exampleImage and guideImage are required when creating a new scene",
+            ) from error
+        scene_master = SceneMaster(
+            scene_principal=update.scene_principal,
+            title=update.title,
+            max_duration_seconds=update.max_duration_seconds,
+        )
+
+    previous_images = {scene_master.thumbnail_uri, scene_master.guide_uri}
+    scene_master.title = update.title
+    scene_master.max_duration_seconds = update.max_duration_seconds
+    image_prefix = f"scenes/{update.scene_principal}/{uuid4().hex}/"
+    committed = False
+    try:
+        if update.example_image is not None:
+            object_key = f"{image_prefix}example.jpg"
+            await storage.upload_base64(
+                object_key=object_key,
+                base64_data=update.example_image,
+                content_type="image/jpeg",
+            )
+            scene_master.thumbnail_uri = f"s3://{bucket_name}/{object_key}"
+        if update.guide_image is not None:
+            object_key = f"{image_prefix}guide.jpg"
+            await storage.upload_base64(
+                object_key=object_key,
+                base64_data=update.guide_image,
+                content_type="image/jpeg",
+            )
+            scene_master.guide_uri = f"s3://{bucket_name}/{object_key}"
+        result = await upsert_scene_master(
+            scenes_db=scenes_db,
+            scene_master=scene_master,
+        )
+        committed = True
+        current_images = {scene_master.thumbnail_uri, scene_master.guide_uri}
+        owned_prefix = f"s3://{bucket_name}/scenes/{update.scene_principal}/"
+        for image_uri in previous_images - current_images:
+            if image_uri is not None and image_uri.startswith(owned_prefix):
+                await storage.delete_object_by_key(
+                    object_key=image_uri.removeprefix(f"s3://{bucket_name}/"),
+                )
+        return result
+    finally:
+        if not committed and (
+            update.example_image is not None or update.guide_image is not None
+        ):
+            await storage.delete_objects_by_prefix(prefix=image_prefix)

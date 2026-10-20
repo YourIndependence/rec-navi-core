@@ -13,11 +13,14 @@ from uuid import uuid4
 
 import pytest
 
+from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import ENV
 from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.core.storage.image_urls import MEDIA_URL_EXPIRATION_SECONDS
+from recnavi.core.types.user import UserRole
 from recnavi.main import app
+from tests.mockups.mock_users import get_mock_x_user
 
 
 def test_update_scene_master_returns_400_when_no_token(client):
@@ -25,7 +28,7 @@ def test_update_scene_master_returns_400_when_no_token(client):
     response = client.post(
         "/updateSceneMaster",
         json={
-            "scenePrincipal": None,
+            "scenePrincipal": "it_invalid",
             "title": "Cooking Scene",
             "maxDurationSeconds": 5,
             "exampleImage": "ZmFrZSBpbWFnZQ==",
@@ -88,13 +91,12 @@ async def test_update_scene_master_returns_updated_scene_master(
         assert master["maxDurationSeconds"] == 5
         assert "thumbnailUri" not in master
         assert "guideUri" not in master
-        for field, filename in (
-            ("thumbnailUrl", "example.jpg"),
-            ("guideUrl", "guide.jpg"),
-        ):
-            assert master[field] == (
-                f"mock://{MEDIA_BUCKET_NAME}/scenes/{principal}/{filename}"
-                f"?expires={MEDIA_URL_EXPIRATION_SECONDS}"
+        for field in ("thumbnailUrl", "guideUrl"):
+            assert master[field].startswith(
+                f"mock://{MEDIA_BUCKET_NAME}/scenes/{principal}/",
+            )
+            assert master[field].endswith(
+                f"?expires={MEDIA_URL_EXPIRATION_SECONDS}",
             )
         stored = await database.get_item({"scenePrincipal": principal})
         assert stored["title"] == "Cooking Master"
@@ -131,11 +133,73 @@ def test_update_scene_master_rejects_duration_outside_bounds(
         "/updateSceneMaster",
         headers=auth_headers,
         json={
-            "scenePrincipal": None,
+            "scenePrincipal": "it_invalid",
             "title": "Invalid Duration",
             "maxDurationSeconds": duration,
             "exampleImage": "ZXhhbXBsZQ==",
             "guideImage": "Z3VpZGU=",
+        },
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize("role", [UserRole.OWNER, UserRole.STAFF])
+def test_update_scene_master_forbids_non_admin(client, auth_headers, role):
+    previous = app.dependency_overrides[verify_user]
+    app.dependency_overrides[verify_user] = lambda: (
+        get_mock_x_user().model_copy(update={"role": role})
+    )
+    try:
+        response = client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={
+                "scenePrincipal": "it_denied",
+                "title": "Denied",
+                "maxDurationSeconds": 5,
+                "exampleImage": "ZXhhbXBsZQ==",
+                "guideImage": "Z3VpZGU=",
+            },
+        )
+        assert response.status_code == 403
+        assert response.json()["status"] == "error"
+    finally:
+        app.dependency_overrides[verify_user] = previous
+
+
+@pytest.mark.parametrize("principal", [None, "", "../other", "nested/key"])
+def test_update_scene_master_requires_readable_client_key(
+    client,
+    auth_headers,
+    principal,
+):
+    response = client.post(
+        "/updateSceneMaster",
+        headers=auth_headers,
+        json={
+            "scenePrincipal": principal,
+            "title": "Invalid",
+            "maxDurationSeconds": 5,
+            "exampleImage": "ZXhhbXBsZQ==",
+            "guideImage": "Z3VpZGU=",
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_update_scene_master_validates_all_images_before_upload(
+    client,
+    auth_headers,
+):
+    response = client.post(
+        "/updateSceneMaster",
+        headers=auth_headers,
+        json={
+            "scenePrincipal": "it_invalid_image",
+            "title": "Invalid",
+            "maxDurationSeconds": 5,
+            "exampleImage": "ZXhhbXBsZQ==",
+            "guideImage": "!invalid!",
         },
     )
     assert response.status_code == 422

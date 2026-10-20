@@ -19,6 +19,7 @@ from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.scene_master_update import SceneMasterUpdate
 
 
 class GetSceneMastersResponse(BaseModel):
@@ -70,39 +71,8 @@ class UpdateSceneResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Updated project")
 
 
-class UpdateSceneMasterRequest(BaseItemModel):
-    """Request for POST /updateSceneMaster.
-
-    Creates a new scene master when scenePrincipal is null,
-    otherwise upserts the scene master with the given scenePrincipal.
-    """
-
-    scene_principal: str | None = Field(
-        None,
-        description="Identifier of the scene master (null creates a new one)",
-    )
-    title: str = Field(..., description="Name shown to the staff")
-    max_duration_seconds: int = Field(
-        ...,
-        ge=1,
-        le=10,
-        description="How long the staff may record (1-10 seconds)",
-    )
-
-    example_image: str | None = Field(
-        None,
-        description=(
-            "Base64-encoded example photo "
-            "(required on create, optional on update)"
-        ),
-    )
-    guide_image: str | None = Field(
-        None,
-        description=(
-            "Base64-encoded framing guide "
-            "(required on create, optional on update)"
-        ),
-    )
+class UpdateSceneMasterRequest(SceneMasterUpdate):
+    """Create or update the master identified by the required client key."""
 
 
 class UpdateSceneMasterResponse(BaseApiResponseModel):

@@ -399,3 +399,48 @@ def test_download_project_delegates_to_usecase(cms_client, auth_headers):
         usecase.await_args.kwargs["storage"]
         is cms_client.app.state.object_storage
     )
+
+
+def test_update_scene_master_forwards_user_and_returns_signed_master(
+    cms_client,
+    auth_headers,
+):
+    master = SceneMaster(
+        scene_principal="shop_gaikan",
+        title="Shop",
+        max_duration_seconds=5,
+        thumbnail_url="https://signed/example",
+        guide_url="https://signed/guide",
+    )
+    with patch(
+        "recnavi.apis.cms.cms_router.update_scene_master_usecase",
+        new=AsyncMock(return_value=master),
+    ) as usecase:
+        response = cms_client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={
+                "scenePrincipal": "shop_gaikan",
+                "title": "Shop",
+                "maxDurationSeconds": 5,
+                "exampleImage": "ZXhhbXBsZQ==",
+                "guideImage": "Z3VpZGU=",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["sceneMaster"] == master.model_dump(by_alias=True)
+    assert usecase.call_args.kwargs["user"] == get_mock_x_user()
+    assert usecase.call_args.kwargs["scene_principal"] == "shop_gaikan"
+    assert (
+        usecase.call_args.kwargs["storage"]
+        is cms_client.app.state.object_storage
+    )
+    assert (
+        usecase.call_args.kwargs["scenes_db"]
+        is cms_client.app.state.database[SCENES_TABLE_NAME]
+    )
+    schema = cms_client.get("/openapi.json").json()["components"]["schemas"][
+        "UpdateSceneMasterRequest"
+    ]
+    assert "scenePrincipal" in schema["required"]
+    assert schema["properties"]["scenePrincipal"]["type"] == "string"

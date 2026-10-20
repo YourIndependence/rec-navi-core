@@ -237,13 +237,14 @@ async def download_project_endpoint(
 async def update_scene_master_endpoint(
     request: Request,
     item: UpdateSceneMasterRequest,
-    _user: User = Depends(verify_user),
+    user: User = Depends(verify_user),
 ) -> UpdateSceneMasterResponse:
     """Create or update scene master."""
     scenes_db = request.app.state.database[SCENES_TABLE_NAME]
 
     scene_master = await update_scene_master_usecase(
         scenes_db=scenes_db,
+        user=user,
         scene_principal=item.scene_principal,
         title=item.title,
         max_duration_seconds=item.max_duration_seconds,

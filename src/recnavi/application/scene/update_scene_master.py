@@ -13,12 +13,14 @@ from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.upsert_scene_master import update_scene_master
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.user import User
 
 
 async def update_scene_master_usecase(
     *,
     scenes_db: BaseDatabase,
-    scene_principal: str | None,
+    user: User,
+    scene_principal: str,
     title: str,
     max_duration_seconds: int,
     example_image: str | None,
@@ -29,6 +31,7 @@ async def update_scene_master_usecase(
     """Create or update scene master with image upload."""
     scene_master = await update_scene_master(
         scenes_db=scenes_db,
+        user=user,
         scene_principal=scene_principal,
         title=title,
         max_duration_seconds=max_duration_seconds,

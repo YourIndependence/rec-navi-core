@@ -18,6 +18,7 @@ from recnavi.application.scene.update_scene_master import (
     update_scene_master_usecase,
 )
 from tests.mockups.mock_object_storage import MockObjectStorage
+from tests.mockups.mock_users import get_mock_x_user
 
 
 @pytest.mark.asyncio
@@ -34,6 +35,7 @@ async def test_usecase_delegates_to_update_scene_master():
     ) as mock_update:
         result = await update_scene_master_usecase(
             scenes_db=mock_db,
+            user=get_mock_x_user(),
             scene_principal="test_scene",
             title="Test Scene",
             max_duration_seconds=5,
@@ -45,6 +47,7 @@ async def test_usecase_delegates_to_update_scene_master():
 
     mock_update.assert_awaited_once_with(
         scenes_db=mock_db,
+        user=get_mock_x_user(),
         scene_principal="test_scene",
         title="Test Scene",
         max_duration_seconds=5,

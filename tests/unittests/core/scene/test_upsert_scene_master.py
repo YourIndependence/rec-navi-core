@@ -7,344 +7,224 @@
 # For internal use only.
 # developer team.
 
-"""Tests for upsert_scene_master."""
+"""Regression tests for scene master writes."""
 
-import base64
-import re
+from unittest.mock import AsyncMock
 
 import pytest
 from pydantic import ValidationError
 
 from recnavi.core.scene.upsert_scene_master import update_scene_master
-from recnavi.core.scene.upsert_scene_master import upsert_scene_master
-from recnavi.core.types.scene_master import SceneMaster
+from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
+from tests.mockups.mock_users import get_mock_x_user
 
 
 @pytest.mark.asyncio
-async def test_upsert_scene_master_creates_new_scene():
-    """Test upsert creates new scene master when it doesn't exist."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-
-    result = await upsert_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="new_scene",
-        title="New Scene",
-        max_duration_seconds=5,
-        thumbnail_uri="s3://bucket/scenes/new_scene/example.jpg",
-        guide_uri="s3://bucket/scenes/new_scene/guide.jpg",
-    )
-
-    assert isinstance(result, SceneMaster)
-    assert result.scene_principal == "new_scene"
-    assert result.title == "New Scene"
-    assert result.max_duration_seconds == 5
-    assert result.thumbnail_uri == "s3://bucket/scenes/new_scene/example.jpg"
-    assert result.guide_uri == "s3://bucket/scenes/new_scene/guide.jpg"
-
-    stored_item = await scenes_db.get_item({"scenePrincipal": "new_scene"})
-    assert stored_item is not None
-    assert stored_item["title"] == "New Scene"
-
-
-@pytest.mark.asyncio
-async def test_upsert_scene_master_updates_existing_scene():
-    """Test upsert updates existing scene master."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    await scenes_db.put_item(
-        {
-            "scenePrincipal": "existing_scene",
-            "title": "Old Title",
-            "maxDurationSeconds": 3,
-            "thumbnailUri": "s3://bucket/old_example.jpg",
-            "guideUri": "s3://bucket/old_guide.jpg",
-        },
-    )
-
-    result = await upsert_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="existing_scene",
-        title="Updated Title",
-        max_duration_seconds=7,
-        thumbnail_uri="s3://bucket/new_example.jpg",
-        guide_uri="s3://bucket/new_guide.jpg",
-    )
-
-    assert isinstance(result, SceneMaster)
-    assert result.scene_principal == "existing_scene"
-    assert result.title == "Updated Title"
-    assert result.max_duration_seconds == 7
-    assert result.thumbnail_uri == "s3://bucket/new_example.jpg"
-    assert result.guide_uri == "s3://bucket/new_guide.jpg"
-
-    stored_item = await scenes_db.get_item(
-        {"scenePrincipal": "existing_scene"},
-    )
-    assert stored_item["title"] == "Updated Title"
-    assert stored_item["maxDurationSeconds"] == 7
-
-
-@pytest.mark.asyncio
-async def test_upsert_scene_master_validates_max_duration_min():
-    """Test model validation rejects maxDurationSeconds < 1."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-
-    with pytest.raises(
-        ValidationError,
-        match="max_duration_seconds",
-    ):
-        await upsert_scene_master(
-            scenes_db=scenes_db,
-            scene_principal="invalid_scene",
-            title="Invalid Scene",
-            max_duration_seconds=0,
-            thumbnail_uri="s3://bucket/example.jpg",
-            guide_uri="s3://bucket/guide.jpg",
-        )
-
-
-@pytest.mark.asyncio
-async def test_upsert_scene_master_validates_max_duration_max():
-    """Test model validation rejects maxDurationSeconds > 10."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-
-    with pytest.raises(
-        ValidationError,
-        match="max_duration_seconds",
-    ):
-        await upsert_scene_master(
-            scenes_db=scenes_db,
-            scene_principal="invalid_scene",
-            title="Invalid Scene",
-            max_duration_seconds=11,
-            thumbnail_uri="s3://bucket/example.jpg",
-            guide_uri="s3://bucket/guide.jpg",
-        )
-
-
-@pytest.mark.asyncio
-async def test_upsert_scene_master_allows_valid_range():
-    """Test upsert accepts maxDurationSeconds from 1 to 10."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-
-    for duration in [1, 5, 10]:
-        result = await upsert_scene_master(
-            scenes_db=scenes_db,
-            scene_principal=f"scene_{duration}",
-            title=f"Scene {duration}",
-            max_duration_seconds=duration,
-            thumbnail_uri="s3://bucket/example.jpg",
-            guide_uri="s3://bucket/guide.jpg",
-        )
-        assert result.max_duration_seconds == duration
-
-
-def _b64(raw: bytes) -> str:
-    return base64.b64encode(raw).decode()
-
-
-async def _seed_existing(scenes_db: MockDatabase) -> None:
-    await scenes_db.put_item(
-        {
-            "scenePrincipal": "existing_scene",
-            "title": "Old Title",
-            "maxDurationSeconds": 3,
-            "thumbnailUri": "s3://test-bucket/scenes/existing_scene/example.jpg",
-            "guideUri": "s3://test-bucket/scenes/existing_scene/guide.jpg",
-        },
-    )
-
-
-@pytest.mark.asyncio
-async def test_update_scene_master_creates_scene_with_images():
-    """Test creating a new scene uploads both images as jpeg."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    storage = MockObjectStorage(bucket_name="test-bucket")
-
-    scene_master = await update_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="new_scene",
-        title="New Scene",
-        max_duration_seconds=5,
-        example_image=_b64(b"example"),
-        guide_image=_b64(b"guide"),
-        bucket_name="test-bucket",
-        storage=storage,
-    )
-
-    assert isinstance(scene_master, SceneMaster)
-    assert scene_master.scene_principal == "new_scene"
-    assert scene_master.title == "New Scene"
-    assert scene_master.max_duration_seconds == 5
-    assert storage.objects == {
-        ("test-bucket", "scenes/new_scene/example.jpg"): (
-            b"example",
-            "image/jpeg",
-        ),
-        ("test-bucket", "scenes/new_scene/guide.jpg"): (
-            b"guide",
-            "image/jpeg",
-        ),
-    }
-
-
-@pytest.mark.asyncio
-async def test_update_scene_master_updates_scene_without_images():
-    """Test updating an existing scene without images uploads nothing."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    await _seed_existing(scenes_db)
-    storage = MockObjectStorage(bucket_name="test-bucket")
-
-    scene_master = await update_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="existing_scene",
-        title="Updated Title",
-        max_duration_seconds=7,
-        example_image=None,
-        guide_image=None,
-        bucket_name="test-bucket",
-        storage=storage,
-    )
-
-    assert isinstance(scene_master, SceneMaster)
-    assert scene_master.title == "Updated Title"
-    assert scene_master.max_duration_seconds == 7
-    assert (
-        scene_master.thumbnail_uri
-        == "s3://test-bucket/scenes/existing_scene/example.jpg"
-    )
-    assert (
-        scene_master.guide_uri
-        == "s3://test-bucket/scenes/existing_scene/guide.jpg"
-    )
-    assert storage.objects == {}
-
-
-@pytest.mark.asyncio
-async def test_update_scene_master_raises_422_when_images_missing_on_create():
-    """Test creating without images raises 422 and uploads nothing."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    storage = MockObjectStorage(bucket_name="test-bucket")
-
-    with pytest.raises(
-        ClientUnprocessableEntityError,
-        match="exampleImage and guideImage are required when creating a new scene",
-    ):
+@pytest.mark.parametrize("role", [UserRole.STAFF, UserRole.OWNER])
+async def test_non_admin_cannot_read_or_write_master(role):
+    database = AsyncMock()
+    storage = AsyncMock()
+    with pytest.raises(ClientAuthorizationError):
         await update_scene_master(
-            scenes_db=scenes_db,
-            scene_principal="new_scene",
-            title="New Scene",
-            max_duration_seconds=5,
-            example_image=None,
-            guide_image=None,
-            bucket_name="test-bucket",
+            scenes_db=database,
             storage=storage,
+            bucket_name="test-bucket",
+            scene_principal="cooking",
+            title="Cooking",
+            max_duration_seconds=5,
+            example_image="ZXhhbXBsZQ==",
+            guide_image="Z3VpZGU=",
+            user=get_mock_x_user().model_copy(update={"role": role}),
         )
+    database.get_item.assert_not_awaited()
+    database.put_item.assert_not_awaited()
+    storage.upload_base64.assert_not_awaited()
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "principal",
+    [None, "", "../other", "nested/key", "   "],
+)
+async def test_invalid_principal_has_no_effects(principal):
+    database = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    with pytest.raises(ValidationError):
+        await update_scene_master(
+            scenes_db=database,
+            storage=storage,
+            bucket_name="test-bucket",
+            scene_principal=principal,
+            title="Cooking",
+            max_duration_seconds=5,
+            example_image="ZXhhbXBsZQ==",
+            guide_image="Z3VpZGU=",
+            user=get_mock_x_user(),
+        )
+    assert database.items == []
     assert storage.objects == {}
 
 
 @pytest.mark.asyncio
-async def test_update_scene_master_updates_only_example_image():
-    """Test only the provided example image is uploaded."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    await _seed_existing(scenes_db)
+async def test_create_and_metadata_update_preserve_durable_references():
+    database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
-
-    scene_master = await update_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="existing_scene",
-        title="Title",
-        max_duration_seconds=5,
-        example_image=_b64(b"new_example"),
-        guide_image=None,
-        bucket_name="test-bucket",
-        storage=storage,
-    )
-
-    assert isinstance(scene_master, SceneMaster)
-    assert storage.objects == {
-        ("test-bucket", "scenes/existing_scene/example.jpg"): (
-            b"new_example",
-            "image/jpeg",
-        ),
+    kwargs = {
+        "scenes_db": database,
+        "storage": storage,
+        "bucket_name": "test-bucket",
+        "scene_principal": "shop_gaikan",
+        "user": get_mock_x_user(),
     }
-
-
-@pytest.mark.asyncio
-async def test_update_scene_master_updates_only_guide_image():
-    """Test only the provided guide image is uploaded."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    await _seed_existing(scenes_db)
-    storage = MockObjectStorage(bucket_name="test-bucket")
-
-    await update_scene_master(
-        scenes_db=scenes_db,
-        scene_principal="existing_scene",
-        title="Title",
+    created = await update_scene_master(
+        **kwargs,
+        title="Shop",
         max_duration_seconds=5,
-        example_image=None,
-        guide_image=_b64(b"new_guide"),
-        bucket_name="test-bucket",
-        storage=storage,
+        example_image="ZXhhbXBsZQ==",
+        guide_image="Z3VpZGU=",
     )
-
-    assert storage.objects == {
-        ("test-bucket", "scenes/existing_scene/guide.jpg"): (
-            b"new_guide",
-            "image/jpeg",
-        ),
-    }
-
-
-@pytest.mark.asyncio
-async def test_update_scene_master_issues_new_id_when_principal_is_null():
-    """Test a null scenePrincipal creates a scene with an issued id."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
-    storage = MockObjectStorage(bucket_name="test-bucket")
-
-    scene_master = await update_scene_master(
-        scenes_db=scenes_db,
-        scene_principal=None,
-        title="New Scene",
-        max_duration_seconds=5,
-        example_image=_b64(b"example"),
-        guide_image=_b64(b"guide"),
-        bucket_name="test-bucket",
-        storage=storage,
-    )
-
-    assert isinstance(scene_master, SceneMaster)
-    issued_id = scene_master.scene_principal
-    assert re.fullmatch(r"[0-9a-f]{32}", issued_id)
+    assert created.scene_principal == "shop_gaikan"
+    assert len(storage.objects) == 2
     assert (
-        scene_master.thumbnail_uri
-        == f"s3://test-bucket/scenes/{issued_id}/example.jpg"
+        await database.get_item({"scenePrincipal": "shop_gaikan"})
+    ) == created.to_storage_item()
+    updated = await update_scene_master(
+        **kwargs,
+        title="Shop exterior",
+        max_duration_seconds=7,
+        example_image=None,
+        guide_image=None,
     )
-    assert ("test-bucket", f"scenes/{issued_id}/guide.jpg") in storage.objects
-    stored = await scenes_db.get_item({"scenePrincipal": issued_id})
-    assert stored["title"] == "New Scene"
+    assert updated.title == "Shop exterior"
+    assert updated.max_duration_seconds == 7
+    assert updated.thumbnail_uri == created.thumbnail_uri
+    assert updated.guide_uri == created.guide_uri
+    assert len(storage.objects) == 2
+    assert "thumbnailUrl" not in database.items[0]
+    assert "guideUrl" not in database.items[0]
 
 
 @pytest.mark.asyncio
-async def test_update_scene_master_raises_422_when_null_principal_without_images():
-    """Test creating via a null id still requires both images."""
-    scenes_db = MockDatabase(key_names=("scenePrincipal",))
+@pytest.mark.parametrize(
+    "images",
+    [(None, None), ("ZXhhbXBsZQ==", None), (None, "Z3VpZGU=")],
+)
+async def test_creation_requires_both_images_before_upload(images):
+    database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
-
     with pytest.raises(ClientUnprocessableEntityError):
         await update_scene_master(
-            scenes_db=scenes_db,
-            scene_principal=None,
-            title="New Scene",
-            max_duration_seconds=5,
-            example_image=_b64(b"example"),
-            guide_image=None,
-            bucket_name="test-bucket",
+            scenes_db=database,
             storage=storage,
+            bucket_name="test-bucket",
+            scene_principal="shop",
+            title="Shop",
+            max_duration_seconds=5,
+            example_image=images[0],
+            guide_image=images[1],
+            user=get_mock_x_user(),
         )
-
     assert storage.objects == {}
-    assert (await scenes_db.scan()).items == []
+    assert database.items == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement", ["example", "guide"])
+async def test_replaces_only_requested_image(replacement):
+    database = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    kwargs = {
+        "scenes_db": database,
+        "storage": storage,
+        "bucket_name": "test-bucket",
+        "scene_principal": "shop",
+        "title": "Shop",
+        "max_duration_seconds": 5,
+        "user": get_mock_x_user(),
+    }
+    created = await update_scene_master(
+        **kwargs,
+        example_image="ZXhhbXBsZQ==",
+        guide_image="Z3VpZGU=",
+    )
+    result = await update_scene_master(
+        **kwargs,
+        example_image="bmV3" if replacement == "example" else None,
+        guide_image="bmV3" if replacement == "guide" else None,
+    )
+    if replacement == "example":
+        assert result.thumbnail_uri != created.thumbnail_uri
+        assert result.guide_uri == created.guide_uri
+    else:
+        assert result.guide_uri != created.guide_uri
+        assert result.thumbnail_uri == created.thumbnail_uri
+    assert database.items[0] == result.to_storage_item()
+    assert len(storage.objects) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["upload", "database"])
+async def test_failed_write_preserves_previous_images_and_database(failure):
+    database = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    kwargs = {
+        "scenes_db": database,
+        "storage": storage,
+        "bucket_name": "test-bucket",
+        "scene_principal": "shop",
+        "title": "Shop",
+        "max_duration_seconds": 5,
+        "user": get_mock_x_user(),
+    }
+    await update_scene_master(
+        **kwargs,
+        example_image="ZXhhbXBsZQ==",
+        guide_image="Z3VpZGU=",
+    )
+    previous_objects = dict(storage.objects)
+    previous_item = dict(database.items[0])
+    if failure == "upload":
+        upload = storage.upload_base64
+        storage.upload_base64 = AsyncMock()
+
+        async def fail_second_upload(**arguments):
+            if arguments["object_key"].endswith("guide.jpg"):
+                raise OSError("upload failed")
+            await upload(**arguments)
+
+        storage.upload_base64.side_effect = fail_second_upload
+    else:
+        database.put_item = AsyncMock(side_effect=OSError("database failed"))
+    with pytest.raises(OSError, match="failed"):
+        await update_scene_master(
+            **kwargs,
+            example_image="bmV3",
+            guide_image="bmV3",
+        )
+    assert storage.objects == previous_objects
+    assert database.items == [previous_item]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("image", ["", "not base64", "!!!", "\u00e9"])
+async def test_invalid_second_image_does_not_upload_first_image(image):
+    database = MockDatabase(key_names=("scenePrincipal",))
+    storage = MockObjectStorage(bucket_name="test-bucket")
+    with pytest.raises(ValidationError):
+        await update_scene_master(
+            scenes_db=database,
+            storage=storage,
+            bucket_name="test-bucket",
+            scene_principal="shop",
+            title="Shop",
+            max_duration_seconds=5,
+            example_image="ZXhhbXBsZQ==",
+            guide_image=image,
+            user=get_mock_x_user(),
+        )
+    assert storage.objects == {}
+    assert database.items == []
