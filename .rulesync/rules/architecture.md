@@ -37,9 +37,9 @@ infrastructure/  <- External I/O: DB sessions, boto3 clients, third-party APIs
 ### Deviations from Canonical Clean Architecture
 
 - `core/` owns **abstract base classes** for databases and stores. Application code imports only from `core`, not `infrastructure`. Concrete implementations are injected at startup via registries.
-- **Registry pattern** is the DI mechanism: `database_registry`, `store_registry`, `dataloader_registry`, `preprocessor_strategy_registry`, `chunker_registry`, `tool_registry`, `agent_registry`. Concrete implementations register themselves during startup; consumers retrieve them by key at runtime. Tool registration follows ARCH-013.
+- **Registry pattern** is the DI mechanism: `database_registry`, `store_registry`, `dataloader_registry`, `preprocessor_strategy_registry`, `chunker_registry`, `tool_registry`, `agent_registry`. Concrete implementations register themselves during startup; consumers retrieve them by key at runtime.
 - Agent sub-module (`core/agents/`) holds all Google ADK `Agent` definitions. `core/agents/agent_registry.py` provides dynamic agent registration with DynamoDB persistence, allowing runtime agent CRUD via CMS API without code deployment.
-- Tool sub-module (`core/tools/`) contains all tool implementations. Tool modules must follow [ARCH-013 Tool Registry and Initialization Pattern](../../docs/adrs/ARCH-013-tool-registry-pattern.md): each `*_tool.py` or `*_tools.py` module exposes a synchronous `initialize()` function and registers tools with `tool_registry` during startup. `core/tools/tool_registry.py` provides runtime tool lookup for dynamic agent construction.
+- Tool sub-module (`core/tools/`) contains all tool implementations. Tool modules must follow the tool registry initialization pattern: each `*_tool.py` or `*_tools.py` module exposes a synchronous `initialize()` function and registers tools with `tool_registry` during startup. `core/tools/tool_registry.py` provides runtime tool lookup for dynamic agent construction.
 - `core/agent_runner/` wraps `google.adk.runners.Runner` and is the only place an ADK `Runner` is instantiated.
 
 ## Media model serialization
@@ -79,3 +79,16 @@ All I/O -- database, HTTP, external APIs -- must be async. FastAPI endpoints are
 - ECS integration tests: mark with both `real_aws` and `ecs`; they are skipped only when `AWS_ENDPOINT_URL` points to LocalStack
 - Async tests: decorate with `@pytest.mark.asyncio`
 - Format + lint before committing: `uv run ruff format src/ tests/ && uv run ruff check src/ tests/`
+
+
+## Project authorization
+
+Follow [ARCH-013](../../docs/adrs/ARCH-013-project-authorization.md).
+Existing-project operations authorize through a standalone
+`if not project.validate_permission(user=user, as_role=UserRole.OWNER):` guard
+(or the declared STAFF/user.role policy), raising
+`ClientAuthorizationError("User does not have access permission to this project")`.
+Do not add role, owner, or group comparisons at call sites. Authorize before
+mutation, storage access, or return. Keep the explicit operation-role map and
+architecture rule tests current when adding or moving operations. Independent
+scene assignment checks and list filtering retain their existing purpose.

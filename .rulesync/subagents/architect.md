@@ -128,3 +128,5 @@ Explain choices. Flag candidates for new ADRs explicitly.
 - **No cross-layer imports**: `core/` must not import from `infrastructure/`; `apis/` must go through `application/`.
 - **Async-first**: All I/O-touching code must be `async def`.
 - **No bare `Any`**: Use proper Python type hints at all layer boundaries.
+
+- Project access must follow ARCH-013: canonical permission guard, exact denial, no inline role/owner/group policy, and authorization before effects. Update the operation-role map for new entry points.
