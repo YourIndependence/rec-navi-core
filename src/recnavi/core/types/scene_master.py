@@ -12,9 +12,6 @@
 
 import base64
 import binascii
-from collections.abc import AsyncIterator
-from collections.abc import Sequence
-from contextlib import asynccontextmanager
 from typing import Self
 from uuid import uuid4
 
@@ -24,6 +21,7 @@ from pydantic import Field
 from pydantic import alias_generators
 
 from recnavi.config.variables import MEDIA_BUCKET_NAME
+from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.storage.image_urls import generate_image_url
 from recnavi.exceptions.exceptions import ClientValueError
@@ -82,43 +80,45 @@ class SceneMaster(BaseModel):
                 raise ValueError("Image must not be empty")
         return value
 
-    @asynccontextmanager
     async def update_images(
         self,
         *,
         storage: BaseObjectStorage,
         thumbnail_image: str | None,
         guide_image: str | None,
-    ) -> AsyncIterator[Self]:
-        """Stage images and finalize them when the caller's persistence succeeds."""
-        thumbnail_image = self.validate_image(thumbnail_image)
-        guide_image = self.validate_image(guide_image)
+    ) -> Self:
+        """Upload replacements, delete previous images, and return this master."""
         if thumbnail_image is None and guide_image is None:
             raise ClientValueError("At least one image must be provided")
 
+        if thumbnail_image is None:
+            previous_thumbnail_uri = None
+        else:
+            previous_thumbnail_uri = self.thumbnail_uri
+
+        if guide_image is None:
+            previous_guide_uri = None
+        else:
+            previous_guide_uri = self.guide_uri
+
+        thumbnail_image = self.validate_image(thumbnail_image)
+        guide_image = self.validate_image(guide_image)
         image_prefix = f"scenes/{self.scene_principal}/{uuid4().hex}/"
-        previous_images = (self.thumbnail_uri, self.guide_uri)
-        committed = False
-        try:
-            await self._upload_images(
-                storage=storage,
-                image_prefix=image_prefix,
-                thumbnail_image=thumbnail_image,
-                guide_image=guide_image,
+
+        await self._upload_images(
+            storage=storage,
+            image_prefix=image_prefix,
+            thumbnail_image=thumbnail_image,
+            guide_image=guide_image,
+        )
+        for previous_image_uri in (previous_thumbnail_uri, previous_guide_uri):
+            if previous_image_uri is None:
+                continue
+            object_key = previous_image_uri.removeprefix(
+                f"s3://{MEDIA_BUCKET_NAME}/",
             )
-            yield self
-            committed = True
-        finally:
-            if committed:
-                await self._delete_replaced_images(
-                    storage=storage,
-                    previous_images=previous_images,
-                )
-            else:
-                try:
-                    await storage.delete_objects_by_prefix(prefix=image_prefix)
-                finally:
-                    self.thumbnail_uri, self.guide_uri = previous_images
+            await storage.delete_object_by_key(object_key=object_key)
+        return self
 
     async def attach_presigned_url(
         self,
@@ -134,6 +134,11 @@ class SceneMaster(BaseModel):
             storage=storage,
             image_uri=self.guide_uri,
         )
+        return self
+
+    async def save(self, *, scenes_db: BaseDatabase) -> Self:
+        """Persist durable references and return this master."""
+        await scenes_db.put_item(self.to_storage_item())
         return self
 
     def to_storage_item(self) -> dict[str, object]:
@@ -181,18 +186,3 @@ class SceneMaster(BaseModel):
             content_type="image/jpeg",
         )
         return object_key
-
-    async def _delete_replaced_images(
-        self,
-        *,
-        storage: BaseObjectStorage,
-        previous_images: Sequence[str | None],
-    ) -> None:
-        current_images = {self.thumbnail_uri, self.guide_uri}
-        owned_prefix = f"scenes/{self.scene_principal}/"
-        for image_uri in set(previous_images) - current_images:
-            if image_uri is None:
-                continue
-            object_key = image_uri.removeprefix(f"s3://{MEDIA_BUCKET_NAME}/")
-            if object_key.startswith(owned_prefix):
-                await storage.delete_object_by_key(object_key=object_key)

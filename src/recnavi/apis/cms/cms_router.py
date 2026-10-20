@@ -243,13 +243,13 @@ async def update_scene_master_endpoint(
 
     scene_master = await update_scene_master_usecase(
         scenes_db=scenes_db,
+        storage=request.app.state.object_storage,
         user=user,
         scene_principal=item.scene_principal,
         title=item.title,
         max_duration_seconds=item.max_duration_seconds,
         thumbnail_image=item.thumbnail_image,
         guide_image=item.guide_image,
-        storage=request.app.state.object_storage,
     )
 
     return UpdateSceneMasterResponse(scene_master=scene_master)

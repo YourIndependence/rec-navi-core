@@ -19,24 +19,24 @@ from recnavi.core.types.user import User
 async def update_scene_master_usecase(
     *,
     scenes_db: BaseDatabase,
+    storage: BaseObjectStorage,
     user: User,
     scene_principal: str,
     title: str | None = None,
     max_duration_seconds: int | None = None,
     thumbnail_image: str | None,
     guide_image: str | None,
-    storage: BaseObjectStorage,
 ) -> SceneMaster:
     """Create or update scene master with image upload."""
     scene_master = await update_scene_master(
         scenes_db=scenes_db,
+        storage=storage,
         user=user,
         scene_principal=scene_principal,
         title=title,
         max_duration_seconds=max_duration_seconds,
         thumbnail_image=thumbnail_image,
         guide_image=guide_image,
-        storage=storage,
     )
 
     return await scene_master.attach_presigned_url(storage=storage)

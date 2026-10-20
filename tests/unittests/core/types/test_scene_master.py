@@ -103,43 +103,24 @@ async def test_master_updates_images_without_persisting_payloads():
         max_duration_seconds=5,
     )
     storage = MockObjectStorage(bucket_name="media")
-    async with master.update_images(
+    result = await master.update_images(
         storage=storage,
         thumbnail_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
-    ) as result:
-        assert result is master
-        assert master.thumbnail_uri.startswith("scenes/shop/")
-        assert master.thumbnail_uri.endswith("/thumbnail.jpg")
-        assert (
-            master.guide_uri
-            == master.thumbnail_uri.removesuffix("thumbnail.jpg") + "guide.jpg"
-        )
-    assert len(storage.objects) == 2
+    )
+    assert result is master
+    assert master.thumbnail_uri.startswith("scenes/shop/")
+    assert master.thumbnail_uri.endswith("/thumbnail.jpg")
+    assert (
+        master.guide_uri
+        == master.thumbnail_uri.removesuffix("thumbnail.jpg") + "guide.jpg"
+    )
+    assert storage.objects == {
+        ("media", master.thumbnail_uri): (b"example", "image/jpeg"),
+        ("media", master.guide_uri): (b"guide", "image/jpeg"),
+    }
     assert "thumbnailImage" not in master.to_storage_item()
     assert "guideImage" not in master.to_storage_item()
-
-
-@pytest.mark.asyncio
-async def test_master_restores_references_when_persistence_fails():
-    master = SceneMaster(
-        scene_principal="shop",
-        title="Shop",
-        max_duration_seconds=5,
-        thumbnail_uri="s3://media/scenes/shop/old/thumbnail.jpg",
-        guide_uri="s3://media/scenes/shop/old/guide.jpg",
-    )
-    previous = master.to_storage_item()
-    storage = MockObjectStorage(bucket_name="media")
-    with pytest.raises(OSError, match="persistence failed"):
-        async with master.update_images(
-            storage=storage,
-            thumbnail_image="ZXhhbXBsZQ==",
-            guide_image="Z3VpZGU=",
-        ):
-            raise OSError("persistence failed")
-    assert master.to_storage_item() == previous
-    assert storage.objects == {}
 
 
 @pytest.mark.asyncio
@@ -151,12 +132,11 @@ async def test_update_images_rejects_missing_replacements_without_storage_access
     )
     storage = AsyncMock()
     with pytest.raises(ClientValueError, match="At least one image"):
-        async with master.update_images(
+        await master.update_images(
             storage=storage,
             thumbnail_image=None,
             guide_image=None,
-        ):
-            pytest.fail("Missing images must not enter the update context")
+        )
     storage.upload_base64.assert_not_awaited()
     storage.delete_objects_by_prefix.assert_not_awaited()
 
@@ -183,12 +163,88 @@ async def test_image_update_cleans_owned_keys_and_preserves_unrelated_objects(
         if legacy_uri
         else old_key,
     )
-    async with master.update_images(
+    result = await master.update_images(
         storage=storage,
         thumbnail_image="bmV3",
         guide_image=None,
-    ):
-        assert master.thumbnail_uri.startswith("scenes/shop/")
+    )
+    assert result is master
+    assert master.thumbnail_uri.startswith("scenes/shop/")
     assert (MEDIA_BUCKET_NAME, old_key) not in storage.objects
     assert (MEDIA_BUCKET_NAME, unrelated_key) in storage.objects
     assert len(storage.objects) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement", ["thumbnail", "guide"])
+async def test_successful_replacement_keeps_new_reference_and_untouched_image(
+    replacement: str,
+):
+    storage = MockObjectStorage(bucket_name="media")
+    master = SceneMaster(
+        scene_principal="shop",
+        title="Shop",
+        max_duration_seconds=5,
+        thumbnail_uri="scenes/shop/old/thumbnail.jpg",
+        guide_uri="scenes/shop/old/guide.jpg",
+    )
+    for key in (master.thumbnail_uri, master.guide_uri):
+        await storage.upload_base64(
+            object_key=key,
+            base64_data="b2xk",
+            content_type="image/jpeg",
+        )
+    result = await master.update_images(
+        storage=storage,
+        thumbnail_image="bmV3" if replacement == "thumbnail" else None,
+        guide_image="bmV3" if replacement == "guide" else None,
+    )
+    assert result is master
+    assert await storage.download_object(object_key=master.thumbnail_uri) == (
+        b"new" if replacement == "thumbnail" else b"old"
+    )
+    assert await storage.download_object(object_key=master.guide_uri) == (
+        b"new" if replacement == "guide" else b"old"
+    )
+    assert len(storage.objects) == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["thumbnail", "guide", "delete"])
+async def test_image_failure_propagates_without_rollback(failure: str):
+    master = SceneMaster(
+        scene_principal="shop",
+        title="Shop",
+        max_duration_seconds=5,
+        thumbnail_uri="scenes/shop/old/thumbnail.jpg",
+        guide_uri="scenes/shop/old/guide.jpg",
+    )
+    storage = AsyncMock()
+    error = OSError("storage failed")
+    if failure == "delete":
+        storage.delete_object_by_key.side_effect = error
+    else:
+        storage.upload_base64.side_effect = (
+            [error] if failure == "thumbnail" else [None, error]
+        )
+    with pytest.raises(OSError) as caught:
+        await master.update_images(
+            storage=storage,
+            thumbnail_image="bmV3",
+            guide_image="bmV3",
+        )
+    assert caught.value is error
+    storage.delete_objects_by_prefix.assert_not_awaited()
+    assert storage.upload_base64.await_count == (
+        1 if failure == "thumbnail" else 2
+    )
+    if failure == "delete":
+        assert storage.delete_object_by_key.await_count == 1
+        assert master.guide_uri != "scenes/shop/old/guide.jpg"
+    else:
+        storage.delete_object_by_key.assert_not_awaited()
+        assert master.guide_uri == "scenes/shop/old/guide.jpg"
+    if failure == "thumbnail":
+        assert master.thumbnail_uri == "scenes/shop/old/thumbnail.jpg"
+    else:
+        assert master.thumbnail_uri != "scenes/shop/old/thumbnail.jpg"

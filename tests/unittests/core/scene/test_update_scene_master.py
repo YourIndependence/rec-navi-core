@@ -163,7 +163,7 @@ async def test_replaces_only_requested_image(replacement):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure", ["upload", "database"])
-async def test_failed_write_preserves_previous_images_and_database(failure):
+async def test_failed_write_propagates_without_rollback(failure):
     database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
     kwargs = {
@@ -199,8 +199,13 @@ async def test_failed_write_preserves_previous_images_and_database(failure):
             thumbnail_image="bmV3",
             guide_image="bmV3",
         )
-    assert storage.objects == previous_objects
     assert database.items == [previous_item]
+    if failure == "upload":
+        assert previous_objects.items() <= storage.objects.items()
+        assert len(storage.objects) == len(previous_objects) + 1
+    else:
+        assert previous_objects.keys().isdisjoint(storage.objects)
+        assert len(storage.objects) == 2
 
 
 @pytest.mark.asyncio
