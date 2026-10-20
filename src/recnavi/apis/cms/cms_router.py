@@ -47,6 +47,7 @@ from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.project import DOWNLOAD_URL_EXPIRATION_SECONDS
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserSummary
+from recnavi.exceptions.exceptions import ClientNotFoundError
 
 
 cms_router = APIRouter(tags=["CMS"])
@@ -214,6 +215,9 @@ async def download_project_endpoint(
         user=user,
         storage=request.app.state.object_storage,
     )
+    if archive.download_url is None:
+        raise ClientNotFoundError("Project not found.")
+
     return DownloadProjectResponse(
         download_url=archive.download_url,
         expires_in_seconds=DOWNLOAD_URL_EXPIRATION_SECONDS,

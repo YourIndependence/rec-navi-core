@@ -111,11 +111,12 @@ class Project(BaseModel):
         storage: BaseObjectStorage,
     ) -> str:
         """Archive approved recordings in shooting order with their metadata."""
-        metadata = self._create_download_metadata_entry()
         archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
+        metadata = self._create_download_metadata_entry()
+        scenes_entries = self._create_download_entries(metadata=metadata)
         await storage.create_archive(
             object_key=archive_key,
-            entries=self._create_download_entries(metadata=metadata),
+            entries=scenes_entries,
         )
         return archive_key
 
