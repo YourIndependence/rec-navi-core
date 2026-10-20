@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+from pydantic import field_validator
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
@@ -68,3 +69,27 @@ class UpdateSceneResponse(BaseApiResponseModel):
     model_config = ConfigDict(from_attributes=True)
 
     project: Project = Field(..., description="Updated project")
+
+
+class UpdateSceneMasterRequest(SceneMaster):
+    """Create or update the master identified by the required client key."""
+
+    title: str | None = Field(default=None, min_length=1)
+    max_duration_seconds: int | None = Field(default=None, ge=1, le=10)
+    thumbnail_image: str | None = None
+    guide_image: str | None = None
+
+    @field_validator("thumbnail_image", "guide_image")
+    @classmethod
+    def validate_image(cls, value: str | None) -> str | None:
+        """Validate transport payloads with the domain image rule."""
+        return SceneMaster.validate_image(value)
+
+
+class UpdateSceneMasterResponse(BaseApiResponseModel):
+    """Response for POST /updateSceneMaster."""
+
+    scene_master: SceneMaster = Field(
+        ...,
+        description="Updated scene master with temporary image URLs",
+    )

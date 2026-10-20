@@ -23,14 +23,14 @@ async def test_get_scene_masters_attaches_urls_and_returns_core_views():
         SceneMaster(
             scene_principal="cooking",
             title="Cooking",
-            max_duration_seconds=60,
+            max_duration_seconds=5,
         ),
     ]
     expected_output = [
         SceneMaster(
             scene_principal="cooking",
             title="Cooking",
-            max_duration_seconds=60,
+            max_duration_seconds=5,
             thumbnail_url="https://signed/image",
         ),
     ]

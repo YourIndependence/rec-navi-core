@@ -36,7 +36,7 @@ async def scene_master_data() -> AsyncIterator[dict[str, object]]:
         "title": "Integration Test Scene",
         "thumbnailUri": f"s3://{MEDIA_BUCKET_NAME}/masters/thumbnail.jpg",
         "guideUri": "masters/guide.png",
-        "maxDurationSeconds": 30,
+        "maxDurationSeconds": 5,
     }
     await database.put_item(item)
 

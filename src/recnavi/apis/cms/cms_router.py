@@ -26,6 +26,8 @@ from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
 from recnavi.apis.schemas.scene_schemas import ReviewSceneRequest
 from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
+from recnavi.apis.schemas.scene_schemas import UpdateSceneMasterRequest
+from recnavi.apis.schemas.scene_schemas import UpdateSceneMasterResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
@@ -39,6 +41,9 @@ from recnavi.application.scene.get_scene_masters import (
 )
 from recnavi.application.scene.get_templates import get_templates_usecase
 from recnavi.application.scene.review_scene import review_scene_usecase
+from recnavi.application.scene.update_scene_master import (
+    update_scene_master_usecase,
+)
 from recnavi.application.user.get_group_users import get_group_users_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
@@ -222,3 +227,29 @@ async def download_project_endpoint(
         download_url=archive.download_url,
         expires_in_seconds=DOWNLOAD_URL_EXPIRATION_SECONDS,
     )
+
+
+@cms_router.post(
+    "/updateSceneMaster",
+    response_model=UpdateSceneMasterResponse,
+)
+async def update_scene_master_endpoint(
+    request: Request,
+    item: UpdateSceneMasterRequest,
+    user: User = Depends(verify_user),
+) -> UpdateSceneMasterResponse:
+    """Create or update scene master."""
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    scene_master = await update_scene_master_usecase(
+        scenes_db=scenes_db,
+        storage=request.app.state.object_storage,
+        user=user,
+        scene_principal=item.scene_principal,
+        title=item.title,
+        max_duration_seconds=item.max_duration_seconds,
+        thumbnail_image=item.thumbnail_image,
+        guide_image=item.guide_image,
+    )
+
+    return UpdateSceneMasterResponse(scene_master=scene_master)
