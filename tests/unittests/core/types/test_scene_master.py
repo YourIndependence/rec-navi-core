@@ -19,25 +19,25 @@ async def test_master_urls_are_refreshed_without_losing_durable_references():
         scene_principal="opening",
         title="Opening",
         max_duration_seconds=5,
-        thumbnail_uri="masters/example.jpg",
+        thumbnail_uri="masters/thumbnail.jpg",
         guide_uri="masters/guide.png",
     )
     original = master.to_storage_item()
     storage = MockObjectStorage(bucket_name="media")
     storage.generate_presigned_url = AsyncMock(
         side_effect=[
-            "https://signed/example-1",
+            "https://signed/thumbnail-1",
             "https://signed/guide-1",
-            "https://signed/example-2",
+            "https://signed/thumbnail-2",
             "https://signed/guide-2",
         ],
     )
     first = await master.attach_presigned_url(storage=storage)
     assert first is master
-    assert master.thumbnail_url == "https://signed/example-1"
+    assert master.thumbnail_url == "https://signed/thumbnail-1"
     second = await master.attach_presigned_url(storage=storage)
     assert second is master
-    assert second.thumbnail_url == "https://signed/example-2"
+    assert second.thumbnail_url == "https://signed/thumbnail-2"
     assert second.guide_url == "https://signed/guide-2"
     assert first.to_storage_item() == second.to_storage_item() == original
     restored = SceneMaster.model_validate(second.to_storage_item())
@@ -48,7 +48,7 @@ async def test_master_urls_are_refreshed_without_losing_durable_references():
         "scenePrincipal": "opening",
         "title": "Opening",
         "maxDurationSeconds": 5,
-        "thumbnailUrl": "https://signed/example-2",
+        "thumbnailUrl": "https://signed/thumbnail-2",
         "guideUrl": "https://signed/guide-2",
     }
 
@@ -105,18 +105,18 @@ async def test_master_updates_images_without_persisting_payloads():
     storage = MockObjectStorage(bucket_name="media")
     async with master.update_images(
         storage=storage,
-        example_image="ZXhhbXBsZQ==",
+        thumbnail_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
     ) as result:
         assert result is master
         assert master.thumbnail_uri.startswith("scenes/shop/")
-        assert master.thumbnail_uri.endswith("/example.jpg")
+        assert master.thumbnail_uri.endswith("/thumbnail.jpg")
         assert (
             master.guide_uri
-            == master.thumbnail_uri.removesuffix("example.jpg") + "guide.jpg"
+            == master.thumbnail_uri.removesuffix("thumbnail.jpg") + "guide.jpg"
         )
     assert len(storage.objects) == 2
-    assert "exampleImage" not in master.to_storage_item()
+    assert "thumbnailImage" not in master.to_storage_item()
     assert "guideImage" not in master.to_storage_item()
 
 
@@ -126,7 +126,7 @@ async def test_master_restores_references_when_persistence_fails():
         scene_principal="shop",
         title="Shop",
         max_duration_seconds=5,
-        thumbnail_uri="s3://media/scenes/shop/old/example.jpg",
+        thumbnail_uri="s3://media/scenes/shop/old/thumbnail.jpg",
         guide_uri="s3://media/scenes/shop/old/guide.jpg",
     )
     previous = master.to_storage_item()
@@ -134,7 +134,7 @@ async def test_master_restores_references_when_persistence_fails():
     with pytest.raises(OSError, match="persistence failed"):
         async with master.update_images(
             storage=storage,
-            example_image="ZXhhbXBsZQ==",
+            thumbnail_image="ZXhhbXBsZQ==",
             guide_image="Z3VpZGU=",
         ):
             raise OSError("persistence failed")
@@ -153,7 +153,7 @@ async def test_update_images_rejects_missing_replacements_without_storage_access
     with pytest.raises(ClientValueError, match="At least one image"):
         async with master.update_images(
             storage=storage,
-            example_image=None,
+            thumbnail_image=None,
             guide_image=None,
         ):
             pytest.fail("Missing images must not enter the update context")
@@ -167,8 +167,8 @@ async def test_image_update_cleans_owned_keys_and_preserves_unrelated_objects(
     legacy_uri,
 ):
     storage = MockObjectStorage(bucket_name=MEDIA_BUCKET_NAME)
-    old_key = "scenes/shop/old/example.jpg"
-    unrelated_key = "scenes/other/example.jpg"
+    old_key = "scenes/shop/old/thumbnail.jpg"
+    unrelated_key = "scenes/other/thumbnail.jpg"
     for key in (old_key, unrelated_key):
         await storage.upload_base64(
             object_key=key,
@@ -185,7 +185,7 @@ async def test_image_update_cleans_owned_keys_and_preserves_unrelated_objects(
     )
     async with master.update_images(
         storage=storage,
-        example_image="bmV3",
+        thumbnail_image="bmV3",
         guide_image=None,
     ):
         assert master.thumbnail_uri.startswith("scenes/shop/")

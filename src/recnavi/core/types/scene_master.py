@@ -51,7 +51,7 @@ class SceneMaster(BaseModel):
     thumbnail_uri: str | None = Field(
         default=None,
         exclude=True,
-        description="Location of the example photo to imitate",
+        description="Location of the scene master thumbnail",
     )
     guide_uri: str | None = Field(
         default=None,
@@ -87,13 +87,13 @@ class SceneMaster(BaseModel):
         self,
         *,
         storage: BaseObjectStorage,
-        example_image: str | None,
+        thumbnail_image: str | None,
         guide_image: str | None,
     ) -> AsyncIterator[Self]:
         """Stage images and finalize them when the caller's persistence succeeds."""
-        example_image = self.validate_image(example_image)
+        thumbnail_image = self.validate_image(thumbnail_image)
         guide_image = self.validate_image(guide_image)
-        if example_image is None and guide_image is None:
+        if thumbnail_image is None and guide_image is None:
             raise ClientValueError("At least one image must be provided")
 
         image_prefix = f"scenes/{self.scene_principal}/{uuid4().hex}/"
@@ -103,7 +103,7 @@ class SceneMaster(BaseModel):
             await self._upload_images(
                 storage=storage,
                 image_prefix=image_prefix,
-                example_image=example_image,
+                thumbnail_image=thumbnail_image,
                 guide_image=guide_image,
             )
             yield self
@@ -152,14 +152,14 @@ class SceneMaster(BaseModel):
         *,
         storage: BaseObjectStorage,
         image_prefix: str,
-        example_image: str | None,
+        thumbnail_image: str | None,
         guide_image: str | None,
     ) -> None:
-        if example_image is not None:
+        if thumbnail_image is not None:
             self.thumbnail_uri = await self._upload_image(
                 storage=storage,
-                object_key=f"{image_prefix}example.jpg",
-                image=example_image,
+                object_key=f"{image_prefix}thumbnail.jpg",
+                image=thumbnail_image,
             )
         if guide_image is not None:
             self.guide_uri = await self._upload_image(

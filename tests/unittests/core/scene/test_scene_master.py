@@ -99,7 +99,7 @@ async def test_scene_master_images_are_presigned_without_storage_uris():
     )
     storage = AsyncMock()
     storage.generate_presigned_url.side_effect = [
-        "https://signed/example",
+        "https://signed/thumbnail",
         "https://signed/guide",
     ]
     result = await attach_scene_master_urls(
@@ -110,7 +110,7 @@ async def test_scene_master_images_are_presigned_without_storage_uris():
         "scenePrincipal": "cooking",
         "title": "Cooking",
         "maxDurationSeconds": 5,
-        "thumbnailUrl": "https://signed/example",
+        "thumbnailUrl": "https://signed/thumbnail",
         "guideUrl": "https://signed/guide",
     }
     assert [

@@ -43,7 +43,7 @@ async def test_usecase_delegates_to_update_scene_master(title, duration):
             scene_principal="test_scene",
             title=title,
             max_duration_seconds=duration,
-            example_image="base64_example_data",
+            thumbnail_image="base64_thumbnail_data",
             guide_image="base64_guide_data",
             storage=storage,
         )
@@ -54,7 +54,7 @@ async def test_usecase_delegates_to_update_scene_master(title, duration):
         scene_principal="test_scene",
         title=title,
         max_duration_seconds=duration,
-        example_image="base64_example_data",
+        thumbnail_image="base64_thumbnail_data",
         guide_image="base64_guide_data",
         storage=storage,
     )

@@ -14,7 +14,10 @@ from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "uri",
-    ["masters/example.jpg", f"s3://{MEDIA_BUCKET_NAME}/masters/example.jpg"],
+    [
+        "masters/thumbnail.jpg",
+        f"s3://{MEDIA_BUCKET_NAME}/masters/thumbnail.jpg",
+    ],
 )
 async def test_image_reference_is_signed_in_media_bucket(uri):
     storage = AsyncMock()
@@ -24,7 +27,7 @@ async def test_image_reference_is_signed_in_media_bucket(uri):
         == "https://signed/image"
     )
     storage.generate_presigned_url.assert_awaited_once_with(
-        object_key="masters/example.jpg",
+        object_key="masters/thumbnail.jpg",
         expiration=3600,
     )
 

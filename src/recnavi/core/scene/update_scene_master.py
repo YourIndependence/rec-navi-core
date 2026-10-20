@@ -24,7 +24,7 @@ async def update_scene_master(
     scene_principal: str,
     title: str | None = None,
     max_duration_seconds: int | None = None,
-    example_image: str | None,
+    thumbnail_image: str | None,
     guide_image: str | None,
     storage: BaseObjectStorage,
     user: User,
@@ -43,9 +43,9 @@ async def update_scene_master(
             scene_master.max_duration_seconds = max_duration_seconds
 
     else:
-        if example_image is None or guide_image is None:
+        if thumbnail_image is None or guide_image is None:
             raise ClientValueError(
-                "exampleImage and guideImage are required when creating a new scene",
+                "thumbnailImage and guideImage are required when creating a new scene",
             )
         if title is None:
             raise ClientValueError("title is required.")
@@ -58,7 +58,7 @@ async def update_scene_master(
             max_duration_seconds=max_duration_seconds,
         )
 
-    if example_image is None and guide_image is None:
+    if thumbnail_image is None and guide_image is None:
         return await _save_scene_master(
             scenes_db=scenes_db,
             scene_master=scene_master,
@@ -66,7 +66,7 @@ async def update_scene_master(
 
     async with scene_master.update_images(
         storage=storage,
-        example_image=example_image,
+        thumbnail_image=thumbnail_image,
         guide_image=guide_image,
     ):
         return await _save_scene_master(

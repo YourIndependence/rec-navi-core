@@ -23,7 +23,7 @@ async def update_scene_master_usecase(
     scene_principal: str,
     title: str | None = None,
     max_duration_seconds: int | None = None,
-    example_image: str | None,
+    thumbnail_image: str | None,
     guide_image: str | None,
     storage: BaseObjectStorage,
 ) -> SceneMaster:
@@ -34,7 +34,7 @@ async def update_scene_master_usecase(
         scene_principal=scene_principal,
         title=title,
         max_duration_seconds=max_duration_seconds,
-        example_image=example_image,
+        thumbnail_image=thumbnail_image,
         guide_image=guide_image,
         storage=storage,
     )

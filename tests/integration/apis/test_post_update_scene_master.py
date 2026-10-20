@@ -31,7 +31,7 @@ def test_update_scene_master_returns_400_when_no_token(client):
             "scenePrincipal": "it_invalid",
             "title": "Cooking Scene",
             "maxDurationSeconds": 5,
-            "exampleImage": "ZmFrZSBpbWFnZQ==",
+            "thumbnailImage": "ZmFrZSBpbWFnZQ==",
             "guideImage": "ZmFrZSBndWlkZQ==",
         },
     )
@@ -77,7 +77,7 @@ async def test_update_scene_master_returns_updated_scene_master(
                 "scenePrincipal": principal,
                 "title": "Cooking Master",
                 "maxDurationSeconds": 5,
-                "exampleImage": "ZXhhbXBsZQ==",
+                "thumbnailImage": "ZXhhbXBsZQ==",
                 "guideImage": "Z3VpZGU=",
             },
         )
@@ -129,7 +129,7 @@ async def test_update_scene_master_returns_updated_scene_master(
         response = client.post(
             "/updateSceneMaster",
             headers=auth_headers,
-            json={"scenePrincipal": principal, "exampleImage": "bmV3"},
+            json={"scenePrincipal": principal, "thumbnailImage": "bmV3"},
         )
         assert response.status_code == 200, response.text
         image_only = response.json()["sceneMaster"]
@@ -160,7 +160,7 @@ def test_update_scene_master_rejects_duration_outside_bounds(
             "scenePrincipal": "it_invalid",
             "title": "Invalid Duration",
             "maxDurationSeconds": duration,
-            "exampleImage": "ZXhhbXBsZQ==",
+            "thumbnailImage": "ZXhhbXBsZQ==",
             "guideImage": "Z3VpZGU=",
         },
     )
@@ -181,7 +181,7 @@ def test_update_scene_master_forbids_non_admin(client, auth_headers, role):
                 "scenePrincipal": "it_denied",
                 "title": "Denied",
                 "maxDurationSeconds": 5,
-                "exampleImage": "ZXhhbXBsZQ==",
+                "thumbnailImage": "ZXhhbXBsZQ==",
                 "guideImage": "Z3VpZGU=",
             },
         )
@@ -204,7 +204,7 @@ def test_update_scene_master_requires_readable_client_key(
             "scenePrincipal": principal,
             "title": "Invalid",
             "maxDurationSeconds": 5,
-            "exampleImage": "ZXhhbXBsZQ==",
+            "thumbnailImage": "ZXhhbXBsZQ==",
             "guideImage": "Z3VpZGU=",
         },
     )
@@ -222,7 +222,7 @@ def test_update_scene_master_validates_all_images_before_upload(
             "scenePrincipal": "it_invalid_image",
             "title": "Invalid",
             "maxDurationSeconds": 5,
-            "exampleImage": "ZXhhbXBsZQ==",
+            "thumbnailImage": "ZXhhbXBsZQ==",
             "guideImage": "!invalid!",
         },
     )
@@ -244,7 +244,7 @@ def test_update_scene_master_rejects_creation_without_images(
     )
     assert response.status_code == 400
     assert response.json()["message"] == (
-        "exampleImage and guideImage are required when creating a new scene"
+        "thumbnailImage and guideImage are required when creating a new scene"
     )
 
 
@@ -258,7 +258,7 @@ def test_update_scene_master_requires_metadata_on_create(
         "scenePrincipal": "it_missing_metadata",
         "title": "New",
         "maxDurationSeconds": 5,
-        "exampleImage": "ZXhhbXBsZQ==",
+        "thumbnailImage": "ZXhhbXBsZQ==",
         "guideImage": "Z3VpZGU=",
     }
     payload.pop(missing_field)

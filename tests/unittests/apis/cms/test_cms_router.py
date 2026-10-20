@@ -409,7 +409,7 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
         scene_principal="shop_gaikan",
         title="Shop",
         max_duration_seconds=5,
-        thumbnail_url="https://signed/example",
+        thumbnail_url="https://signed/thumbnail",
         guide_url="https://signed/guide",
     )
     with patch(
@@ -423,7 +423,7 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
                 "scenePrincipal": "shop_gaikan",
                 "title": "Shop",
                 "maxDurationSeconds": 5,
-                "exampleImage": "ZXhhbXBsZQ==",
+                "thumbnailImage": "ZXhhbXBsZQ==",
                 "guideImage": "Z3VpZGU=",
             },
         )
@@ -431,6 +431,7 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
     assert response.json()["sceneMaster"] == master.model_dump(by_alias=True)
     assert usecase.call_args.kwargs["user"] == get_mock_x_user()
     assert usecase.call_args.kwargs["scene_principal"] == "shop_gaikan"
+    assert usecase.call_args.kwargs["thumbnail_image"] == "ZXhhbXBsZQ=="
     assert (
         usecase.call_args.kwargs["storage"]
         is cms_client.app.state.object_storage
@@ -444,3 +445,4 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
     ]
     assert "scenePrincipal" in schema["required"]
     assert schema["properties"]["scenePrincipal"]["type"] == "string"
+    assert "thumbnailImage" in schema["properties"]

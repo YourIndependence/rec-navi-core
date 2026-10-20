@@ -247,7 +247,7 @@ async def update_scene_master_endpoint(
         scene_principal=item.scene_principal,
         title=item.title,
         max_duration_seconds=item.max_duration_seconds,
-        example_image=item.example_image,
+        thumbnail_image=item.thumbnail_image,
         guide_image=item.guide_image,
         storage=request.app.state.object_storage,
     )

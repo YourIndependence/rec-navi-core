@@ -76,10 +76,10 @@ class UpdateSceneMasterRequest(SceneMaster):
 
     title: str | None = Field(default=None, min_length=1)
     max_duration_seconds: int | None = Field(default=None, ge=1, le=10)
-    example_image: str | None = None
+    thumbnail_image: str | None = None
     guide_image: str | None = None
 
-    @field_validator("example_image", "guide_image")
+    @field_validator("thumbnail_image", "guide_image")
     @classmethod
     def validate_image(cls, value: str | None) -> str | None:
         """Validate transport payloads with the domain image rule."""

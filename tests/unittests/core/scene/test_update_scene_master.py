@@ -35,7 +35,7 @@ async def test_non_admin_cannot_read_or_write_master(role):
             scene_principal="cooking",
             title="Cooking",
             max_duration_seconds=5,
-            example_image="ZXhhbXBsZQ==",
+            thumbnail_image="ZXhhbXBsZQ==",
             guide_image="Z3VpZGU=",
             user=get_mock_x_user().model_copy(update={"role": role}),
         )
@@ -59,7 +59,7 @@ async def test_invalid_principal_has_no_effects(principal):
             scene_principal=principal,
             title="Cooking",
             max_duration_seconds=5,
-            example_image="ZXhhbXBsZQ==",
+            thumbnail_image="ZXhhbXBsZQ==",
             guide_image="Z3VpZGU=",
             user=get_mock_x_user(),
         )
@@ -81,7 +81,7 @@ async def test_create_and_metadata_update_preserve_durable_references():
         **kwargs,
         title="Shop",
         max_duration_seconds=5,
-        example_image="ZXhhbXBsZQ==",
+        thumbnail_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
     )
     assert created.scene_principal == "shop_gaikan"
@@ -93,7 +93,7 @@ async def test_create_and_metadata_update_preserve_durable_references():
         **kwargs,
         title="Shop exterior",
         max_duration_seconds=7,
-        example_image=None,
+        thumbnail_image=None,
         guide_image=None,
     )
     assert updated.title == "Shop exterior"
@@ -120,7 +120,7 @@ async def test_creation_requires_both_images_before_upload(images):
             scene_principal="shop",
             title="Shop",
             max_duration_seconds=5,
-            example_image=images[0],
+            thumbnail_image=images[0],
             guide_image=images[1],
             user=get_mock_x_user(),
         )
@@ -129,7 +129,7 @@ async def test_creation_requires_both_images_before_upload(images):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("replacement", ["example", "guide"])
+@pytest.mark.parametrize("replacement", ["thumbnail", "guide"])
 async def test_replaces_only_requested_image(replacement):
     database = MockDatabase(key_names=("scenePrincipal",))
     storage = MockObjectStorage(bucket_name="test-bucket")
@@ -143,15 +143,15 @@ async def test_replaces_only_requested_image(replacement):
     }
     created = await update_scene_master(
         **kwargs,
-        example_image="ZXhhbXBsZQ==",
+        thumbnail_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
     )
     result = await update_scene_master(
         **kwargs,
-        example_image="bmV3" if replacement == "example" else None,
+        thumbnail_image="bmV3" if replacement == "thumbnail" else None,
         guide_image="bmV3" if replacement == "guide" else None,
     )
-    if replacement == "example":
+    if replacement == "thumbnail":
         assert result.thumbnail_uri != created.thumbnail_uri
         assert result.guide_uri == created.guide_uri
     else:
@@ -176,7 +176,7 @@ async def test_failed_write_preserves_previous_images_and_database(failure):
     }
     await update_scene_master(
         **kwargs,
-        example_image="ZXhhbXBsZQ==",
+        thumbnail_image="ZXhhbXBsZQ==",
         guide_image="Z3VpZGU=",
     )
     previous_objects = dict(storage.objects)
@@ -196,7 +196,7 @@ async def test_failed_write_preserves_previous_images_and_database(failure):
     with pytest.raises(OSError, match="failed"):
         await update_scene_master(
             **kwargs,
-            example_image="bmV3",
+            thumbnail_image="bmV3",
             guide_image="bmV3",
         )
     assert storage.objects == previous_objects
@@ -215,7 +215,7 @@ async def test_invalid_second_image_does_not_upload_first_image(image):
             scene_principal="shop",
             title="Shop",
             max_duration_seconds=5,
-            example_image="ZXhhbXBsZQ==",
+            thumbnail_image="ZXhhbXBsZQ==",
             guide_image=image,
             user=get_mock_x_user(),
         )
@@ -232,7 +232,7 @@ async def test_partial_metadata_update_preserves_omitted_title():
                 "scenePrincipal": "shop",
                 "title": "Original",
                 "maxDurationSeconds": 5,
-                "thumbnailUri": "scenes/shop/old/example.jpg",
+                "thumbnailUri": "scenes/shop/old/thumbnail.jpg",
                 "guideUri": "scenes/shop/old/guide.jpg",
             },
         ],
@@ -243,13 +243,13 @@ async def test_partial_metadata_update_preserves_omitted_title():
         storage=storage,
         scene_principal="shop",
         max_duration_seconds=7,
-        example_image=None,
+        thumbnail_image=None,
         guide_image=None,
         user=get_mock_x_user(),
     )
     assert result.title == "Original"
     assert result.max_duration_seconds == 7
-    assert result.thumbnail_uri == "scenes/shop/old/example.jpg"
+    assert result.thumbnail_uri == "scenes/shop/old/thumbnail.jpg"
     assert database.items[0] == result.to_storage_item()
     assert storage.objects == {}
 
@@ -279,7 +279,7 @@ async def test_existing_metadata_updates_preserve_or_validate_fields(
         "scene_principal": "shop",
         "title": title,
         "max_duration_seconds": duration,
-        "example_image": None,
+        "thumbnail_image": None,
         "guide_image": None,
         "user": get_mock_x_user(),
     }
@@ -316,7 +316,7 @@ async def test_new_master_requires_metadata_before_upload(
             scene_principal="shop",
             title=title,
             max_duration_seconds=duration,
-            example_image="ZXhhbXBsZQ==",
+            thumbnail_image="ZXhhbXBsZQ==",
             guide_image="Z3VpZGU=",
             user=get_mock_x_user(),
         )
