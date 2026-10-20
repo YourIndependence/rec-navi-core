@@ -3,7 +3,7 @@ id: ARCH-002
 title: Pydantic-First Type System (core/types/ as SSOT)
 domain: architecture
 status: active
-date: 2026-05-05
+date: 2026-10-21
 rules: true
 files:
   - 'src/**/*.py'
@@ -28,7 +28,90 @@ A concrete example: a `ResponseSchema(BaseModel)` was defined inside `applicatio
 
 **No new Pydantic `BaseModel` subclasses should be defined in `application/` or `infrastructure/`.**
 
+### Media models and temporary URLs
+
+Use one canonical domain model when a response differs only by presigned URLs.
+`SceneMaster`, `Scene`, and `Project` own an async
+`attach_presigned_url(*, storage: BaseObjectStorage) -> Self` method. It updates
+its own URL fields, returns `self`, retains durable references, and regenerates
+URLs on every call. It does not check object existence. Concrete storage
+clients remain in infrastructure. Application use cases orchestrate reads and
+URL attachment after authorization and filtering. `Project.attach_presigned_url()`
+recursively delegates to every child scene and preserves scene order. Callers
+use this aggregate method rather than iterating over its scenes themselves.
+
+```python
+master = SceneMaster.model_validate(item)
+public_master = await master.attach_presigned_url(storage=storage)
+response = public_master.model_dump(by_alias=True)
+item = public_master.to_storage_item()
+public_project = await project.attach_presigned_url(storage=storage)
+```
+
+Storage-only URI/key fields use `Field(exclude=True)`. Normal serialization and
+serialization schemas expose URLs and omit durable references.
+`to_storage_item() -> dict[str, object]` explicitly includes durable references
+and excludes temporary URLs. Aggregates such as `Project` call each child's
+storage method. All database writers use this explicit persistence boundary.
+Preserve existing aliases, metadata, URI validation, missing-media behavior,
+authorization, and the 3600-second signing lifetime.
+
+Project archive downloads follow the same model ownership and persistence
+boundary: `Project.create_download_url(*, storage: BaseObjectStorage) -> Self`
+creates a fresh archive through its private `_create_download_object()` method,
+updates `download_url`, and returns `self`. Authorization precedes this call;
+recording eligibility and source-key validation precede any storage access.
+Unlike playback URL attachment, archive creation is explicit and must not run
+as a side effect of project listing or scene URL attachment. Download URLs are
+excluded from `to_storage_item()`. Archive entries shared with storage adapters
+use a frozen Pydantic model in `core/types/`.
+
+Do not introduce a second `HogeView` solely to add temporary media URLs.
+Distinct contracts still warrant separate types: `UserSummary` deliberately
+omits personal information and remains separate. Template images in dependent
+PR #60 should follow this contract when adding presigned URLs; this decision
+does not change the template endpoint in #59.
+
+### Template thumbnail replacement
+
+`ScenesTemplate` owns thumbnail validation, upload keys and persistence via
+`save(*, templates_db)`. Template updates use a client-supplied readable key,
+partial metadata updates and a single model response, matching scene master
+management. Storage owns the bucket; callers pass only object keys.
+
+For templates, publish image references within a scoped replacement:
+
+```python
+async with template.update_thumbnail(storage=storage, thumbnail_image=image):
+    await template.save(templates_db=templates_db)
+```
+
+A unique key avoids overwriting the committed image. Successful scope exit
+removes the previous image after the database write. Failed upload or save
+removes the replacement and restores the model references. Cleanup failures
+propagate; database and storage do not form a distributed transaction. A crash
+or concurrent update may still leave an orphan image. Scene masters retain
+their existing `update_images()` lifecycle; this decision does not change it.
+
+Manual compliance: verify failure cleanup, legacy S3 URI replacement, exact-key
+deletion and durable-reference round trips with regression tests. Do not
+replace a template thumbnail at a fixed key or delete the old image before
+saving its replacement reference.
+
 ## Rationale
+
+**Alternative: Independent persistence and media View types**
+Duplicates domain fields or requires unions for nested aggregates. A difference
+limited to temporary URLs does not justify a second domain type.
+
+**Alternative: Return deep copies or select persistence by JSON mode**
+Copying every aggregate and child adds allocation and changes object identity.
+URL attachment consistently updates the current model and returns `self`, so
+callers retaining the same instance also observe refreshed URLs. Callers needing
+independent state must copy explicitly before attachment. Mode-dependent
+persistence relies on an implicit caller option; an explicit storage method
+keeps the persistence boundary visible. Every writer, including aggregate
+writers, must use it. Round-trip tests enforce that contract.
 
 **Alternative: Each layer defines its own Pydantic models**
 Allows slim, layer-specific models but introduces DRY violations. The same fields appear in multiple places and changes in one location are not reflected in another, creating a breeding ground for runtime errors.
@@ -57,7 +140,24 @@ Abandons type strictness. Loses the benefits of Pydantic validation and IDE auto
 - Define `class Xxx(BaseModel):` in `infrastructure/` (same rule)
 - Re-define a model that already exists in `core/types/` in another layer
 
+### Media model compliance
+
+**Do:**
+
+- Inject `BaseObjectStorage` into the async model method and return `self` after updating its URL fields.
+- Use `to_storage_item()` for media and aggregate database writes.
+- Test that storage round trips retain references and omit URLs after signing.
+- Verify responses and serialization schemas omit storage-only fields.
+
+**Don't:**
+
+- Persist temporary URLs or use ordinary `model_dump()` for media DB writes.
+- Define a separate View solely to attach URLs.
+- Remove durable references from the in-memory model during attachment.
+
 ## References
+
+- [PR #59 review](https://github.com/YourIndependence/rec-navi-core/pull/59#discussion_r4318691073)
 
 - [ARCH-001](./ARCH-001-clean-architecture.md) — 4-layer Clean Architecture
 - `src/trust/core/types/` — canonical list of domain types

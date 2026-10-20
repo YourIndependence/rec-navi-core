@@ -1,7 +1,168 @@
 /// <reference path="rules.d.ts" />
 
+const SRC_ROOT = "src/recnavi/";
+const UNIT_ROOT = "tests/unittests/";
+const DECLARATIVE_DIRS = ["apis/schemas/", "core/types/"];
+const EXEMPT_MODULES = new Set([
+  "config/variables.py",
+  "exceptions/exceptions.py",
+]);
+
+const normalizePath = (path: string): string => path.replace(/\\/g, "/");
+const isDeclarative = (path: string): boolean =>
+  DECLARATIVE_DIRS.some((dir) => path.startsWith(dir));
+const isExemptModule = (path: string): boolean =>
+  EXEMPT_MODULES.has(path) || /(?:^|\/)base_[^/]+\.py$/.test(path);
+const isExemptTest = (path: string): boolean =>
+  isExemptModule(path.replace(/(^|\/)test_([^/]+)\.py$/, "$1$2.py"));
+const mirroredTestPath = (sourcePath: string): string => {
+  const normalized = normalizePath(sourcePath).slice(SRC_ROOT.length);
+  const slash = normalized.lastIndexOf("/");
+  const directory = slash < 0 ? "" : `${normalized.slice(0, slash + 1)}`;
+  const moduleName = normalized.slice(slash + 1, -3);
+  return `${UNIT_ROOT}${directory}test_${moduleName}.py`;
+};
+
+function isPythonNode(value: unknown): value is PythonAstNode {
+  return typeof value === "object" && value !== null && "_type" in value;
+}
+
+function pythonNodes(value: unknown): PythonAstNode[] {
+  return Array.isArray(value) ? value.filter(isPythonNode) : [];
+}
+
+function isFixture(node: PythonAstNode): boolean {
+  return pythonNodes(node.decorator_list).some((decorator) => {
+    const target = decorator._type === "Call" ? decorator.func : decorator;
+    return isPythonNode(target) && (
+      (target._type === "Attribute" && target.attr === "fixture") ||
+      (target._type === "Name" && target.id === "fixture")
+    );
+  });
+}
+
+function integrationTests(statements: PythonAstNode[]): PythonAstNode[] {
+  return statements.flatMap((node) => {
+    if (["FunctionDef", "AsyncFunctionDef"].includes(node._type)) {
+      return typeof node.name === "string" && node.name.startsWith("test_") && !isFixture(node)
+        ? [node]
+        : [];
+    }
+    if (node._type === "ClassDef" && typeof node.name === "string" && node.name.startsWith("Test")) {
+      return integrationTests(pythonNodes(node.body));
+    }
+    return [];
+  });
+}
+
+function hasHttpResponseAssignment(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasHttpResponseAssignment);
+  if (!isPythonNode(value)) return false;
+  if (["FunctionDef", "AsyncFunctionDef", "ClassDef", "Lambda"].includes(value._type)) return false;
+
+  const targets = value._type === "Assign"
+    ? pythonNodes(value.targets)
+    : value._type === "AnnAssign" && isPythonNode(value.target) ? [value.target] : [];
+  if (targets.some((target) => target._type === "Name" && target.id === "response")) {
+    const call = isPythonNode(value.value) && value.value._type === "Await"
+      ? value.value.value
+      : value.value;
+    if (isPythonNode(call) && call._type === "Call" && isPythonNode(call.func)) {
+      const func = call.func;
+      if (func._type === "Attribute" && isPythonNode(func.value) &&
+        func.value._type === "Name" && func.value.id === "client" &&
+        typeof func.attr === "string" &&
+        ["get", "post", "put", "patch", "delete", "options", "head", "trace"].includes(func.attr)) {
+        return true;
+      }
+    }
+  }
+  return Object.values(value).some(hasHttpResponseAssignment);
+}
+
 export default {
   rules: {
+    "src-module-must-have-mirrored-unittest": {
+      description:
+        "Every behavioral src/recnavi module must have a unit test at the exact mirrored path under tests/unittests/.",
+      severity: "error",
+      check: async (ctx) => {
+        const sourceFiles = await ctx.glob("src/recnavi/**/*.py");
+        const testFiles = new Set(
+          (await ctx.glob("tests/unittests/**/*.py")).map(normalizePath),
+        );
+
+        for (const sourceFile of sourceFiles) {
+          const sourcePath = normalizePath(sourceFile);
+          if (sourcePath.endsWith("/__init__.py")) continue;
+          const relativePath = sourcePath.slice(SRC_ROOT.length);
+          if (isDeclarative(relativePath) || isExemptModule(relativePath)) continue;
+
+          const expected = mirroredTestPath(sourcePath);
+          if (testFiles.has(expected)) continue;
+          ctx.report.violation({
+            message: `No unit test mirrors this implementation module; expected ${expected}.`,
+            file: sourceFile,
+            line: 1,
+            fix: `Add ${expected} and test the behavior implemented by this module.`,
+          });
+        }
+      },
+    },
+    "unittest-must-mirror-src-module": {
+      description:
+        "Every tests/unittests module must match an implementation module at the same relative path under src/recnavi/.",
+      severity: "error",
+      check: async (ctx) => {
+        const sourceFiles = new Set(
+          (await ctx.glob("src/recnavi/**/*.py")).map(normalizePath),
+        );
+        const testFiles = await ctx.glob("tests/unittests/**/*.py");
+
+        for (const testFile of testFiles) {
+          const testPath = normalizePath(testFile);
+          if (
+            testPath.endsWith("/__init__.py") ||
+            testPath.endsWith("/conftest.py") ||
+            testPath.startsWith(`${UNIT_ROOT}mockups/`)
+          ) {
+            continue;
+          }
+          const relativePath = testPath.slice(UNIT_ROOT.length);
+          if (isDeclarative(relativePath) || isExemptTest(relativePath)) continue;
+          const slash = relativePath.lastIndexOf("/");
+          const directory = slash < 0 ? "" : relativePath.slice(0, slash + 1);
+          const filename = relativePath.slice(slash + 1);
+          const testModule = filename.match(/^test_(.+)\.py$/)?.[1];
+          if (!testModule) continue;
+
+          const matchingSource = [...sourceFiles].find((sourcePath) => {
+            if (!sourcePath.startsWith(SRC_ROOT)) return false;
+            const sourceRelativePath = sourcePath.slice(SRC_ROOT.length);
+            if (isDeclarative(sourceRelativePath)) return false;
+            const sourceSlash = sourceRelativePath.lastIndexOf("/");
+            const sourceDirectory = sourceSlash < 0
+              ? ""
+              : sourceRelativePath.slice(0, sourceSlash + 1);
+            const sourceModule = sourceRelativePath
+              .slice(sourceSlash + 1)
+              .replace(/\.py$/, "");
+            return sourceDirectory === directory &&
+              (testModule === sourceModule ||
+                testModule.startsWith(`${sourceModule}_`));
+          });
+          if (matchingSource) continue;
+
+          ctx.report.violation({
+            message:
+              `This unit test does not match a source module at the same path under src/recnavi/.`,
+            file: testFile,
+            line: 1,
+            fix: `Move or rename the test so its directory mirrors the implementation module path and its filename starts with test_<module-name>.`,
+          });
+        }
+      },
+    },
     /**
      * Every application use case must have a focused unit test. The test is
      * identified by its reference to the use-case function rather than by a
@@ -195,6 +356,77 @@ export default {
     },
 
     /**
+     * Every FastAPI endpoint must be exercised by a unit test in the matching
+     * API router directory. Keeping the router scope prevents an endpoint
+     * test for one router from satisfying coverage for another router that
+     * happens to expose the same method and path.
+     */
+    "every-api-endpoint-has-unittest": {
+      description:
+        "Every FastAPI API endpoint must have a corresponding HTTP unit test under the matching tests/unittests/apis/ router directory.",
+      severity: "error",
+      check: async (ctx) => {
+        const apiFiles = await ctx.glob("src/recnavi/apis/**/*.py");
+        const routePattern =
+          /@[A-Za-z_][\w.]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/g;
+        const methodCallPattern =
+          /\b[A-Za-z_][\w]*\.(get|post|put|patch|delete|options|head|trace)\s*\(\s*["']([^"']+)["']/gi;
+        const requestCallPattern =
+          /\b[A-Za-z_][\w]*\.request\s*\(\s*["'](GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD|TRACE)["']\s*,\s*["']([^"']+)["']/g;
+
+        const normalizePath = (path: string): string => {
+          const withoutQuery = path.split("?", 1)[0];
+          const withLeadingSlash = withoutQuery.startsWith("/")
+            ? withoutQuery
+            : `/${withoutQuery}`;
+          return withLeadingSlash.length > 1
+            ? withLeadingSlash.replace(/\/$/, "")
+            : withLeadingSlash;
+        };
+
+        for (const file of apiFiles) {
+          const normalizedFile = normalizePath(file);
+          const apiSubpath = normalizedFile.slice("src/recnavi/apis/".length);
+          const routerScope = apiSubpath.split("/")[0];
+          if (!routerScope || routerScope === "schemas") continue;
+
+          const testFiles = await ctx.glob(
+            `tests/unittests/apis/${routerScope}/**/*.py`,
+          );
+          const testedEndpoints = new Set<string>();
+          for (const testFile of testFiles) {
+            const content = await ctx.readFile(testFile);
+            for (const match of content.matchAll(methodCallPattern)) {
+              testedEndpoints.add(
+                `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+              );
+            }
+            for (const match of content.matchAll(requestCallPattern)) {
+              testedEndpoints.add(
+                `${match[1].toUpperCase()}:${normalizePath(match[2])}`,
+              );
+            }
+          }
+
+          const content = await ctx.readFile(file);
+          for (const match of content.matchAll(routePattern)) {
+            const endpoint = `${match[1].toUpperCase()}:${normalizePath(match[2])}`;
+            if (testedEndpoints.has(endpoint)) continue;
+
+            const line = content.slice(0, match.index ?? 0).split("\n").length;
+            ctx.report.violation({
+              message:
+                `API endpoint ${endpoint} has no corresponding unit test under tests/unittests/apis/${routerScope}/`,
+              file,
+              line,
+              fix: `Add a ${match[1].toUpperCase()} HTTP request test under tests/unittests/apis/${routerScope}/ for ${normalizePath(match[2])}.`,
+            });
+          }
+        }
+      },
+    },
+
+    /**
      * Every FastAPI endpoint must be exercised by an integration test.
      * This source/test topology check catches a new route being added without
      * the corresponding HTTP-boundary test.
@@ -257,101 +489,58 @@ export default {
       },
     },
 
-    /**
-     * Integration tests must not use @patch or unittest.mock.patch.
-     * Patching out real components turns the test into a unit test and removes
-     * the ability to verify that actual component interactions work correctly.
-     * (Moved from ARCH-004 — this is an implementation-level enforcement.)
-     */
-    "no-patch-in-integration-tests": {
+    "integration-test-must-call-http-client": {
       description:
-        "Integration tests must not patch application collaborators. Deterministic boundary doubles are allowed for LLM model resolution, notification sending, ECS handoff setup, and startup registry isolation.",
+        "Every integration test must assign an HTTP client response using response = client.get/post/etc. rather than only exercising models or functions directly.",
       severity: "error",
       check: async (ctx) => {
-        const matches = await ctx.grepFiles(
-          /@patch\s*\(|with\s+patch\s*\(/,
-          "tests/integration/**/*.py",
-        );
-        for (const match of matches) {
-          if (match.file.endsWith("conftest.py")) continue;
-          const allowedBoundaryPatch =
-            match.content.includes("_resolve_model") ||
-            match.content.includes("get_sentence_transformer_model") ||
-            match.content.includes("send_notice") ||
-            match.content.includes("run_task") ||
-            match.content.includes("initialize_store_registry") ||
-            match.content.includes("initialize_agent_registry");
-          if (allowedBoundaryPatch) continue;
-
-          ctx.report.violation({
-            message:
-              "unittest.mock.patch used in integration test — patching application collaborators turns this into a unit test",
-            file: match.file,
-            line: match.line,
-            fix: [
-              "Use real local services or framework-provided test doubles instead:",
-              "  - AWS services: use the LocalStack-backed integration profile",
-              "  - ADK sessions: use InMemorySessionService",
-              "  - FastAPI dependencies: use app.dependency_overrides",
-              "  - LLM determinism: patch only _resolve_model / MockModel boundary",
-              "  - If unit-level isolation is truly needed, move to tests/unittests/",
-            ].join("\n"),
-          });
-        }
-      },
-    },
-
-    /**
-     * monkeypatch.setattr() in integration tests must not replace components.
-     * Using monkeypatch.setattr() on a service, agent, store, or I/O attribute
-     * has the same effect as @patch — it removes a real collaborator from the
-     * integration path.
-     *
-     * monkeypatch is permitted ONLY for environment configuration (setenv, setitem).
-     */
-    "no-monkeypatch-setattr-component-in-integration": {
-      description:
-        "monkeypatch.setattr() must not replace services, agents, stores, or I/O in integration tests. It is allowed only for environment configuration (setenv, setitem).",
-      severity: "error",
-      check: async (ctx) => {
-        const testFiles = await ctx.glob("tests/integration/**/*.py");
-        for (const file of testFiles) {
-          if (file.endsWith("conftest.py")) continue;
-          const content = await ctx.readFile(file);
-          if (!content.includes("monkeypatch.setattr")) continue;
-
-          const lines = content.split("\n");
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes("monkeypatch.setattr")) {
-              ctx.report.violation({
-                message:
-                  "monkeypatch.setattr() in integration test replaces a real component — this defeats the purpose of integration testing",
-                file,
-                line: i + 1,
-                fix: [
-                  "Replace with an environment-safe alternative:",
-                  "  - For FastAPI dependencies: app.dependency_overrides[dep] = stub",
-                  "  - For AWS services: use moto @mock_aws",
-                  "  - For environment config: monkeypatch.setenv() or monkeypatch.setitem() are allowed",
-                  "  - If component isolation is needed, move to tests/unittests/",
-                ].join("\n"),
-              });
-              break;
-            }
+        for (const file of await ctx.glob("tests/integration/**/*.py")) {
+          const tree = await ctx.ast(file, "python");
+          for (const test of integrationTests(tree.body)) {
+            if (hasHttpResponseAssignment(test.body)) continue;
+            ctx.report.violation({
+              message: `Integration test '${test.name}' must assign a response from an HTTP client call in its own body.`,
+              file,
+              line: test.lineno,
+              fix: "Exercise the endpoint with response = client.get(...) or response = client.post(...) and assert the HTTP response. Move model-only or direct-function checks to tests/unittests/.",
+            });
           }
         }
       },
     },
 
-
-
-
-
-
-
-
-
-
+    "no-patch-in-integration-tests": {
+      description:
+        "Integration files must not contain patch text. Only verify_user may be overridden through FastAPI dependency_overrides.",
+      severity: "error",
+      check: async (ctx) => {
+        for (const file of await ctx.glob("tests/integration/**/*.py")) {
+          const lines = (await ctx.readFile(file)).split("\n");
+          for (let index = 0; index < lines.length; index++) {
+            const line = lines[index];
+            if (/patch/i.test(line)) {
+              ctx.report.violation({
+                message: "Integration file contains patch text; replacing collaborators is forbidden",
+                file,
+                line: index + 1,
+                fix: "Use the shared infrastructure and seed data through its public interface. For authentication only, use app.dependency_overrides[verify_user] and restore it afterward.",
+              });
+            }
+            for (const occurrence of line.matchAll(/dependency_overrides/g)) {
+              const access = line.slice(occurrence.index + occurrence[0].length);
+              if (!/^\s*(?:\[\s*verify_user\s*\]|\.pop\(\s*verify_user\s*[,\)])/.test(access)) {
+                ctx.report.violation({
+                  message: "Only verify_user may be accessed through dependency_overrides in integration files",
+                  file,
+                  line: index + 1,
+                  fix: "Use app.dependency_overrides[verify_user] for authentication only; preserve all other application dependencies.",
+                });
+              }
+            }
+          }
+        }
+      },
+    },
 
     /**
      * Async fixtures must use @pytest_asyncio.fixture, not @pytest.fixture.

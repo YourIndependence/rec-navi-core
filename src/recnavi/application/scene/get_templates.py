@@ -11,12 +11,18 @@
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.scene.scenes_template import get_templates
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scenes_template import ScenesTemplate
 
 
 async def get_templates_usecase(
     *,
     templates_db: BaseDatabase,
+    storage: BaseObjectStorage,
 ) -> list[ScenesTemplate]:
-    """List every scenes template."""
-    return await get_templates(templates_db=templates_db)
+    """List templates with temporary thumbnail URLs."""
+    templates = await get_templates(templates_db=templates_db)
+    return [
+        await template.attach_presigned_url(storage=storage)
+        for template in templates
+    ]

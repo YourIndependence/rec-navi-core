@@ -3,7 +3,7 @@ id: ARCH-001
 title: 4-Layer Clean Architecture (apis / application / core / infrastructure)
 domain: architecture
 status: active
-date: 2026-05-05
+date: 2026-10-19
 rules: true
 files:
   - 'src/**/*.py'
@@ -37,7 +37,28 @@ Dependency direction: `apis/ → application/ → core/ ← infrastructure/`
 | `exceptions/`  | Custom exceptions (accessible from all layers)                  |
 | `task_runner/` | Background task management                                      |
 
+### File Naming
+
+Application module filenames use `<verb>_<noun>.py` without the `_usecase`
+suffix. The `application/` directory already identifies the layer. Use-case
+function names retain `_usecase` to distinguish them from core operations.
+
+```python
+from recnavi.application.user.get_group_users import get_group_users_usecase
+```
+
+The implementation module `application/user/get_group_users.py` is tested by
+`tests/unittests/application/user/test_get_group_users.py` under ARCH-011.
+Rename imports, mock patch targets, and mirrored tests together. Do not retain
+compatibility modules ending in `_usecase.py`.
+
 ## Rationale
+
+**Alternative: `_usecase` on both modules and functions.** The module suffix
+repeats the layer and conflicts with the existing project application modules.
+Removing the function suffix as well would obscure application entry points at
+call sites, so this decision changes only module names and import paths.
+
 
 **Alternative: Feature-Sliced Design**
 Organizes directories by feature domain. As feature count grows, cross-cutting concerns like LLM clients and DB connections scatter across multiple features, making dependency graphs complex and hard to reason about.
@@ -50,28 +71,9 @@ Works at small scale but loses control of inter-component dependencies quickly. 
 - Registry-based DI is a lightweight DI mechanism for Python — no heavy DI framework required
 - Centralizing use cases in `application/` allows unit testing completely decoupled from FastAPI
 
-## Registry Pattern (DI Mechanism)
-
-Registries are defined in the core layer; concrete implementations are registered at startup.
-
-| Registry                         | Defined in                      | Registered by              |
-| -------------------------------- | ------------------------------- | -------------------------- |
-| `database_registry`              | `core/database/`                | `infrastructure/database/` |
-| `store_registry`                 | `core/store/`                   | startup script             |
-| `dataloader_registry`            | `core/dataloader/`              | startup script             |
-| `preprocessor_strategy_registry` | `core/preprocessor/strategies/` | startup script             |
-| `chunker_registry`               | `core/preprocessor/chunker/`    | startup script             |
-| `agent_registry`                 | `core/agents/agent_registry.py` | startup script             |
-| `tool_registry`                  | `core/tools/tool_registry.py`   | `core/tools/*_tool.py`, `core/tools/*_tools.py`, and `core/agents/*/tools.py` modules |
-
-Tool registration follows the dedicated Tool Registry initialization pattern defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md). Shared tool modules under `core/tools/` expose `initialize()` and register tools through `tool_registry` during startup. Agent-specific tool modules under `core/agents/*/tools.py` expose `initialize(prefix: str)` so tools can be registered with an agent-specific prefix.
-
 ## Known Deviations
 
 See [known-deviations.md](./known-deviations.md) for the full list of accepted compromises. Key items:
-
-- Several `core/agents/*/tools.py` files import `OpenAiLlmClient` directly from `infrastructure/`. The abstract `BaseLlmClient` in `core/external_clients_interface/` exists but is not yet applied. Gradual migration to Registry injection is planned (technical debt).
-- `apis/auth/auth.py` directly imports from `infrastructure/external_clients/ms_clients/`. To be resolved in an auth middleware refactor.
 
 ## Consequences
 
@@ -84,18 +86,16 @@ See [known-deviations.md](./known-deviations.md) for the full list of accepted c
 
 **Do:**
 
-- Add new external clients in `infrastructure/external_clients/` and implement the ABC from `core/external_clients_interface/`
-- Create new DB adapters in `infrastructure/database/*_database.py` with an `initialize()` function (auto-detected)
-- Resolve dependencies in `application/` through registry functions (`get_database()`, `get_store_instance_by_name()`, etc.)
-- Add shared tools in `core/tools/*_tool.py` or `core/tools/*_tools.py` with an `initialize()` function as defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md)
-- Add agent-specific tools in `core/agents/*/tools.py` with an `initialize(prefix: str)` function as defined in [ARCH-013](./ARCH-013-tool-registry-pattern.md)
+- Name application modules `<verb>_<noun>.py`, retaining `_usecase` on use-case functions
+- Update imports, mock patch targets, and mirrored unit tests when modules move
 
 **Don't:**
+
+- Add or retain application Python modules ending in `_usecase.py`
 
 - Import from `application/` or `apis/` inside `infrastructure/`
 - Import `apis/` Pydantic schemas inside `application/` (use `core/types/` instead)
 - Import concrete `infrastructure/` implementations directly inside `core/` (inject via Registry)
-- Register tools at module import time; use the Tool Registry initialization lifecycle instead
 
 ## References
 

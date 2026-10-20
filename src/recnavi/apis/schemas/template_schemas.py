@@ -9,15 +9,24 @@
 
 """Template-related API schemas."""
 
+from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import alias_generators
+from pydantic import field_validator
 
-from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.scenes_template import ScenesTemplate
 
 
-class GetTemplatesResponse(BaseApiResponseModel):
+class GetTemplatesResponse(BaseModel):
     """Response for GET /getTemplates."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+    status: str = Field(default="ok", description="Response status")
 
     templates: list[ScenesTemplate] = Field(
         ...,
@@ -25,34 +34,21 @@ class GetTemplatesResponse(BaseApiResponseModel):
     )
 
 
-class TemplateInput(BaseItemModel):
-    """Template fields sent by the client (mirrors ScenesTemplate).
+class UpdateTemplateRequest(ScenesTemplate):
+    """Create or update the template identified by a required client key."""
 
-    thumbnailUri is excluded; the image is sent separately on the request.
-    """
+    title: str | None = Field(default=None, min_length=1)
+    scene_principals: list[str] | None = None
+    thumbnail_image: str | None = None
 
-    template_id: str | None = Field(
-        None,
-        description="Identifier of the template (null creates a new one)",
-    )
-    title: str = Field(..., description="Name shown to the owner")
-    scene_principals: list[str] = Field(
-        ...,
-        description="Scene masters to lay out, in shooting order",
-    )
-
-
-class UpdateTemplateRequest(BaseItemModel):
-    """Request for POST /updateTemplate (admin-only)."""
-
-    template: TemplateInput = Field(..., description="Template to save")
-    thumbnail_image: str | None = Field(
-        None,
-        description="Base64-encoded JPEG (required on create, optional on update)",
-    )
+    @field_validator("thumbnail_image")
+    @classmethod
+    def validate_image(cls, value: str | None) -> str | None:
+        """Apply the domain image rule to transport input."""
+        return ScenesTemplate.validate_image(value)
 
 
 class UpdateTemplateResponse(BaseApiResponseModel):
     """Response for POST /updateTemplate."""
 
-    templates: list[ScenesTemplate] = Field(..., description="All templates")
+    template: ScenesTemplate = Field(..., description="Updated template")
