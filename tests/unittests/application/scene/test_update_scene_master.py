@@ -7,29 +7,31 @@
 # For internal use only.
 # developer team.
 
-"""Tests for update_scene_usecase."""
+"""Tests for update_scene_master_usecase."""
 
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
 import pytest
 
-from recnavi.application.scene.update_scene_usecase import update_scene_usecase
+from recnavi.application.scene.update_scene_master import (
+    update_scene_master_usecase,
+)
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 @pytest.mark.asyncio
-async def test_usecase_delegates_to_update_scene():
-    """Test usecase delegates to core update_scene and returns its output."""
+async def test_usecase_delegates_to_update_scene_master():
+    """Test usecase delegates to core update_scene_master and returns its output."""
     mock_db = AsyncMock()
-    storage = MockObjectStorage()
+    storage = MockObjectStorage(bucket_name="test-bucket")
     expected_output = AsyncMock()
 
     with patch(
-        "recnavi.application.scene.update_scene_usecase.update_scene",
+        "recnavi.application.scene.update_scene_master.update_scene_master",
         new=AsyncMock(return_value=expected_output),
     ) as mock_update:
-        result = await update_scene_usecase(
+        result = await update_scene_master_usecase(
             scenes_db=mock_db,
             scene_principal="test_scene",
             title="Test Scene",

@@ -30,6 +30,7 @@ Flag any design decision NOT covered by an existing ADR as a **New Design Decisi
 
 # Focus Areas
 
+- **Media Models**: Follow ARCH-002: one canonical media type, async in-place URL attachment returning `self`, and explicit `to_storage_item()` persistence for models and aggregates.
 - **Layer Ownership**: Decide which of `apis/`, `application/`, `core/`, `infrastructure/` owns new logic.
 - **Agent Design**: When adding a new ADK agent or tool, define the agent package structure and registry key.
 - **Registry Integration**: Decide which registry a new component belongs to and what string key it uses.
@@ -127,3 +128,5 @@ Explain choices. Flag candidates for new ADRs explicitly.
 - **No cross-layer imports**: `core/` must not import from `infrastructure/`; `apis/` must go through `application/`.
 - **Async-first**: All I/O-touching code must be `async def`.
 - **No bare `Any`**: Use proper Python type hints at all layer boundaries.
+
+- Project access must follow ARCH-013: canonical permission guard, exact denial, no inline role/owner/group policy, and authorization before effects. Update the operation-role map for new entry points.

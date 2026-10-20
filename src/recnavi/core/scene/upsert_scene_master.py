@@ -40,12 +40,12 @@ async def upsert_scene_master(
         guide_uri=guide_uri,
     )
 
-    await scenes_db.put_item(scene_master.model_dump(by_alias=True))
+    await scenes_db.put_item(scene_master.to_storage_item())
 
     return scene_master
 
 
-async def update_scene(
+async def update_scene_master(
     *,
     scenes_db: BaseDatabase,
     scene_principal: str | None,
@@ -80,13 +80,11 @@ async def update_scene(
         guide_uri = f"s3://{bucket_name}/scenes/{scene_principal}/guide.jpg"
 
         await storage.upload_base64(
-            bucket_name=bucket_name,
             object_key=f"scenes/{scene_principal}/example.jpg",
             base64_data=example_image,
             content_type="image/jpeg",
         )
         await storage.upload_base64(
-            bucket_name=bucket_name,
             object_key=f"scenes/{scene_principal}/guide.jpg",
             base64_data=guide_image,
             content_type="image/jpeg",
@@ -98,7 +96,6 @@ async def update_scene(
 
         if example_image:
             await storage.upload_base64(
-                bucket_name=bucket_name,
                 object_key=f"scenes/{scene_principal}/example.jpg",
                 base64_data=example_image,
                 content_type="image/jpeg",
@@ -109,7 +106,6 @@ async def update_scene(
 
         if guide_image:
             await storage.upload_base64(
-                bucket_name=bucket_name,
                 object_key=f"scenes/{scene_principal}/guide.jpg",
                 base64_data=guide_image,
                 content_type="image/jpeg",

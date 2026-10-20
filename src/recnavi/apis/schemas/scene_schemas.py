@@ -16,38 +16,58 @@ from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
+from recnavi.core.types.project import Project
+from recnavi.core.types.scene import ReviewSceneResult
+from recnavi.core.types.scene_master import SceneMaster
 
 
-class SceneMasterView(BaseModel):
-    """Scene master view for API responses.
-
-    This schema excludes S3 object keys (thumbnailUri, guideUri) from the
-    response. Clients request these via separate endpoints using scenePrincipal.
-    """
+class GetSceneMastersResponse(BaseModel):
+    """Response for GET /getSceneMasters."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
         populate_by_name=True,
     )
 
-    scene_principal: str = Field(
-        ...,
-        description="Identifier of the scene master",
-    )
-    title: str = Field(..., description="Name shown to the staff")
-    max_duration_seconds: int = Field(
-        ...,
-        description="How long the staff may record",
-    )
-
-
-class GetSceneMastersResponse(BaseApiResponseModel):
-    """Response for GET /getSceneMasters."""
-
-    scenes: list[SceneMasterView] = Field(
+    status: str = Field(default="ok", description="Response status")
+    scenes: list[SceneMaster] = Field(
         ...,
         description="List of all scene masters",
     )
+
+
+class ReviewSceneRequest(BaseItemModel):
+    """Request for POST /reviewScene."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    result: ReviewSceneResult = Field(..., description="Review result")
+    comment: str | None = Field(default=None, description="Review comment")
+
+
+class ReviewSceneResponse(BaseApiResponseModel):
+    """Response for POST /reviewScene."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: Project = Field(..., description="Updated project")
+
+
+class UpdateSceneRequest(BaseItemModel):
+    """Request for POST /updateScene."""
+
+    project_id: str = Field(..., description="Project ID")
+    scene_id: str = Field(..., description="Scene ID")
+    video: str = Field(..., description="Base64-encoded video data")
+    thumbnail: str = Field(..., description="Base64-encoded thumbnail data")
+
+
+class UpdateSceneResponse(BaseApiResponseModel):
+    """Response for POST /updateScene."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    project: Project = Field(..., description="Updated project")
 
 
 class SceneMasterInput(BaseItemModel):
@@ -67,8 +87,8 @@ class SceneMasterInput(BaseItemModel):
     )
 
 
-class UpdateSceneRequest(BaseItemModel):
-    """Request for POST /updateScene (admin-only).
+class UpdateSceneMasterRequest(BaseItemModel):
+    """Request for POST /updateSceneMaster.
 
     Creates a new scene master when scene.scenePrincipal is null,
     otherwise upserts the scene master with the given scenePrincipal.
@@ -91,10 +111,10 @@ class UpdateSceneRequest(BaseItemModel):
     )
 
 
-class UpdateSceneResponse(BaseApiResponseModel):
-    """Response for POST /updateScene."""
+class UpdateSceneMasterResponse(BaseApiResponseModel):
+    """Response for POST /updateSceneMaster."""
 
-    scenes: list[SceneMasterView] = Field(
+    scenes: list[SceneMaster] = Field(
         ...,
         description="List of all scene masters after update",
     )
