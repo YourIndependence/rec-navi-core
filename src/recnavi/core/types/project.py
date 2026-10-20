@@ -12,6 +12,7 @@
 
 import json
 import re
+from collections.abc import Sequence
 from datetime import UTC
 from datetime import datetime
 from enum import StrEnum
@@ -110,6 +111,15 @@ class Project(BaseModel):
         storage: BaseObjectStorage,
     ) -> str:
         """Archive approved recordings in shooting order with their metadata."""
+        self._validate_download_scenes()
+        archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
+        await storage.create_archive(
+            object_key=archive_key,
+            entries=self._create_download_entries(),
+        )
+        return archive_key
+
+    def _validate_download_scenes(self) -> None:
         if not self.scenes or any(
             scene.status != SceneStatus.APPROVED or not scene.video_key
             for scene in self.scenes
@@ -126,44 +136,53 @@ class Project(BaseModel):
             if scene.video_key
         ):
             raise ClientValueError("Scene video must belong to this project.")
+
+    def _create_download_entries(self) -> list[ArchiveEntry]:
         entries: list[ArchiveEntry] = []
-        scene_metadata: list[dict[str, str | None]] = []
         for position, scene in enumerate(self.scenes, start=1):
             principal = (
                 re.sub(r"[^\w-]", "_", scene.scene_principal)[:100] or "scene"
             )
-            filename = f"{position:02d}_{principal}.mp4"
             entries.append(
-                ArchiveEntry(filename=filename, object_key=scene.video_key),
+                ArchiveEntry(
+                    filename=f"{position:02d}_{principal}.mp4",
+                    object_key=scene.video_key,
+                ),
             )
-            scene_metadata.append(
+        entries.append(self._create_download_metadata_entry(entries=entries))
+        return entries
+
+    def _create_download_metadata_entry(
+        self,
+        *,
+        entries: Sequence[ArchiveEntry],
+    ) -> ArchiveEntry:
+        return ArchiveEntry(
+            filename="metadata.json",
+            content=json.dumps(
                 {
-                    "sceneId": scene.scene_id,
-                    "scenePrincipal": scene.scene_principal,
-                    "createdBy": scene.created_by,
-                    "createdAt": scene.created_at,
-                    "fileName": filename,
+                    "projectId": self.project_id,
+                    "projectName": self.project_name,
+                    "description": self.description,
+                    "scenes": [
+                        {
+                            "sceneId": scene.scene_id,
+                            "scenePrincipal": scene.scene_principal,
+                            "createdBy": scene.created_by,
+                            "createdAt": scene.created_at,
+                            "fileName": entry.filename,
+                        }
+                        for scene, entry in zip(
+                            self.scenes,
+                            entries,
+                            strict=True,
+                        )
+                    ],
                 },
-            )
-        metadata = {
-            "projectId": self.project_id,
-            "projectName": self.project_name,
-            "description": self.description,
-            "scenes": scene_metadata,
-        }
-        entries.append(
-            ArchiveEntry(
-                filename="metadata.json",
-                content=json.dumps(
-                    metadata,
-                    ensure_ascii=False,
-                    indent=2,
-                ).encode(),
-            ),
+                ensure_ascii=False,
+                indent=2,
+            ).encode(),
         )
-        archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
-        await storage.create_archive(object_key=archive_key, entries=entries)
-        return archive_key
 
     def validate_permission(
         self,
