@@ -97,6 +97,7 @@ class Project(BaseModel):
 
     async def create_download_url(self, *, storage: BaseObjectStorage) -> Self:
         """Create a fresh archive and attach its temporary download URL."""
+        self._validate_download_scenes()
         archive_key = await self._create_download_object(storage=storage)
         self.download_url = await storage.generate_presigned_url(
             object_key=archive_key,
@@ -110,7 +111,6 @@ class Project(BaseModel):
         storage: BaseObjectStorage,
     ) -> str:
         """Archive approved recordings in shooting order with their metadata."""
-        self._validate_download_scenes()
         metadata = self._create_download_metadata_entry()
         archive_key = f"projects/{self.project_id}/archives/{uuid4().hex}.zip"
         await storage.create_archive(
