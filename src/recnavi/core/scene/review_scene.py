@@ -13,9 +13,9 @@ from datetime import UTC
 from datetime import datetime
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
@@ -62,16 +62,18 @@ async def review_scene(
     scene.reviewed_by = user.user_id
     scene.reviewed_at = timestamp
     scene.review_comment = review_comment
+    if (
+        result == ReviewSceneResult.REJECTED
+        and project.status == ProjectStatus.SUBMITTED
+    ):
+        project.status = ProjectStatus.IN_PROGRESS
     previous_version = project.version
     project.update_scene(scene)
     await projects_db.put_item(
-        item=project.model_dump(by_alias=True),
+        item=project.to_storage_item(),
         condition_expression=(
             "attribute_not_exists(version) OR version = :previous_version"
         ),
         expression_attribute_values={":previous_version": previous_version},
     )
-    return await attach_scene_urls(
-        storage=storage,
-        project=project,
-    )
+    return await project.attach_presigned_url(storage=storage)

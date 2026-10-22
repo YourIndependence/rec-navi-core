@@ -9,14 +9,20 @@
 
 """S3 implementation of the object storage abstraction."""
 
+import asyncio
 import base64
 import binascii
+import tempfile
+import zipfile
 from collections.abc import AsyncIterator
+from collections.abc import Sequence
+from contextlib import aclosing
 
 import aioboto3
 
 from recnavi.config.variables import REGION
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.types.archive_entry import ArchiveEntry
 
 
 class S3Client(BaseObjectStorage):
@@ -121,5 +127,96 @@ class S3Client(BaseObjectStorage):
                 Bucket=self.bucket_name,
                 Key=object_key,
             )
-            async for chunk in response["Body"]:
-                yield chunk
+            body = response["Body"]
+            try:
+                async for chunk in body.iter_chunks(chunk_size=1024 * 1024):
+                    if chunk:
+                        yield chunk
+            finally:
+                body.close()
+
+    async def create_archive(
+        self,
+        *,
+        object_key: str,
+        entries: Sequence[ArchiveEntry],
+    ) -> None:
+        """Build a disk-backed ZIP and upload fixed-size multipart chunks."""
+        archive_file = await asyncio.to_thread(tempfile.TemporaryFile)
+        try:
+            archive = await asyncio.to_thread(
+                zipfile.ZipFile,
+                archive_file,
+                "w",
+                zipfile.ZIP_STORED,
+            )
+            try:
+                for entry in entries:
+                    target = await asyncio.to_thread(
+                        archive.open,
+                        entry.filename,
+                        "w",
+                        force_zip64=True,
+                    )
+                    try:
+                        if entry.object_key is not None:
+                            async with aclosing(
+                                self.download_object_stream(
+                                    object_key=entry.object_key,
+                                ),
+                            ) as chunks:
+                                async for chunk in chunks:
+                                    if chunk:
+                                        await asyncio.to_thread(
+                                            target.write,
+                                            chunk,
+                                        )
+                        else:
+                            await asyncio.to_thread(
+                                target.write,
+                                entry.content,
+                            )
+                    finally:
+                        await asyncio.to_thread(target.close)
+            finally:
+                await asyncio.to_thread(archive.close)
+            await asyncio.to_thread(archive_file.seek, 0)
+            async with self.session.client("s3") as s3:
+                upload = await s3.create_multipart_upload(
+                    Bucket=self.bucket_name,
+                    Key=object_key,
+                    ContentType="application/zip",
+                )
+                upload_id = upload["UploadId"]
+                try:
+                    parts = []
+                    while chunk := await asyncio.to_thread(
+                        archive_file.read,
+                        8 * 1024 * 1024,
+                    ):
+                        part_number = len(parts) + 1
+                        part = await s3.upload_part(
+                            Bucket=self.bucket_name,
+                            Key=object_key,
+                            UploadId=upload_id,
+                            PartNumber=part_number,
+                            Body=chunk,
+                        )
+                        parts.append(
+                            {"PartNumber": part_number, "ETag": part["ETag"]},
+                        )
+                    await s3.complete_multipart_upload(
+                        Bucket=self.bucket_name,
+                        Key=object_key,
+                        UploadId=upload_id,
+                        MultipartUpload={"Parts": parts},
+                    )
+                except BaseException:
+                    await s3.abort_multipart_upload(
+                        Bucket=self.bucket_name,
+                        Key=object_key,
+                        UploadId=upload_id,
+                    )
+                    raise
+        finally:
+            await asyncio.to_thread(archive_file.close)

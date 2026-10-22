@@ -8,11 +8,12 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene import SceneView
 from tests.mockups.mock_users import get_mock_x_user
 
 
@@ -55,6 +56,7 @@ def test_get_projects_parses_pagination_and_serializes_response(
     }
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
+        storage=staff_client.app.state.object_storage,
         user_id="test-user-123",
         group_id="it-group",
         limit=12,
@@ -85,6 +87,7 @@ def test_get_project_parses_request_and_serializes_response(
     }
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
+        storage=staff_client.app.state.object_storage,
         project_id="proj-123",
         user=get_mock_x_user(),
     )
@@ -102,7 +105,7 @@ def test_update_scene_parses_request_and_serializes_usecase_result(
         owner_user_id="test-user-123",
         created_at="2026-01-01T00:00:00Z",
         scenes=[
-            SceneView(
+            Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
                 video_key="private/video.mp4",
@@ -174,22 +177,14 @@ def test_update_scene_rejects_missing_fields_without_calling_usecase(
     usecase.assert_not_awaited()
 
 
-def test_submit_project_parses_request_and_serializes_response(
-    staff_client,
-    auth_headers,
-):
-    """Delegate submission and expose public scene URLs and missing IDs."""
-    project = _make_project()
-    project.scenes = [
-        SceneView(
-            scene_id="scene-456",
-            scene_principal="intro",
-            video_url="https://example.com/video",
-        ),
-    ]
+def test_submit_project_parses_request_and_returns_base_response(
+    staff_client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """Delegate notification with app-state dependencies and return base response."""
     with patch(
         "recnavi.apis.staff.staff_router.submit_project_usecase",
-        new=AsyncMock(return_value=(project, ["scene-456"])),
+        new=AsyncMock(return_value=None),
     ) as usecase:
         response = staff_client.post(
             "/submitProject",
@@ -197,14 +192,12 @@ def test_submit_project_parses_request_and_serializes_response(
             json={"projectId": "proj-123"},
         )
     assert response.status_code == 200
-    assert response.json()["missingSceneIds"] == ["scene-456"]
-    scene = response.json()["project"]["scenes"][0]
-    assert scene["videoUrl"] == "https://example.com/video"
-    assert "videoKey" not in scene
-    assert "thumbnailKey" not in scene
+    assert response.json() == {"status": "ok", "message": None}
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
-        storage=staff_client.app.state.object_storage,
+        users_db=staff_client.app.state.database[USERS_TABLE_NAME],
+        notifier=staff_client.app.state.notifier,
+        base_url=FRONTEND_BASE_URL,
         project_id="proj-123",
         user=get_mock_x_user(),
     )

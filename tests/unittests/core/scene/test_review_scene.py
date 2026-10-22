@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from recnavi.core.project.scene_urls import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.scene.review_scene import review_scene
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.scene import SCENE_URL_EXPIRATION_SECONDS
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
@@ -47,7 +47,7 @@ async def test_review_scene_approved_returns_correct_data():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -91,7 +91,7 @@ async def test_review_scene_rejected_returns_correct_data():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -131,7 +131,7 @@ async def test_review_scene_raises_403_for_non_owner():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     staff_user = User(
         user_id="staff-1",
         user_name="Test Staff",
@@ -169,7 +169,7 @@ async def test_review_scene_raises_403_for_wrong_group():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     other_owner = User(
         user_id="owner-2",
         user_name="Other Owner",
@@ -207,7 +207,7 @@ async def test_review_scene_raises_404_when_scene_not_found():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -245,7 +245,7 @@ async def test_review_scene_allows_re_review():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -292,7 +292,7 @@ async def test_review_scene_returns_view_with_urls_and_no_keys():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -344,7 +344,7 @@ async def test_review_scene_rejected_moves_submitted_project_to_in_progress():
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -379,13 +379,12 @@ async def test_review_scene_approved_keeps_submitted_project_submitted():
                 scene_id="scene-456",
                 scene_principal="cooking",
                 status=SceneStatus.PENDING,
-                video_key="videos/scene-456.mp4",
             ),
         ],
         created_at="2026-01-01T00:00:00Z",
         updated_at="2026-01-01T00:00:00Z",
     )
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+    db = MockDatabase(initial_items=[project.to_storage_item()])
     user = User(
         user_id="owner-1",
         user_name="Test Owner",
@@ -429,7 +428,7 @@ async def test_review_advances_version_and_clears_previous_comment(
             ),
         ],
     )
-    item = project.model_dump(by_alias=True)
+    item = project.to_storage_item()
     if legacy:
         item.pop("version")
     db = MockDatabase([item])
@@ -468,7 +467,7 @@ async def test_review_propagates_concurrent_write_conflict():
         scenes=[Scene(scene_id="s", scene_principal="cooking")],
     )
     db = AsyncMock()
-    db.get_item.return_value = project.model_dump(by_alias=True)
+    db.get_item.return_value = project.to_storage_item()
     db.put_item.side_effect = ClientConflictError("Concurrent write")
     with pytest.raises(ClientConflictError):
         await review_scene(
@@ -503,7 +502,7 @@ async def test_review_denies_another_owner_in_same_group():
     )
     with pytest.raises(ClientAuthorizationError):
         await review_scene(
-            projects_db=MockDatabase([project.model_dump(by_alias=True)]),
+            projects_db=MockDatabase([project.to_storage_item()]),
             project_id="p",
             scene_id="s",
             result=ReviewSceneResult.APPROVED,

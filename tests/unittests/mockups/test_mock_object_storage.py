@@ -10,9 +10,12 @@
 """Tests for the shared MockObjectStorage."""
 
 import base64
+import io
+import zipfile
 
 import pytest
 
+from recnavi.core.types.archive_entry import ArchiveEntry
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
@@ -115,3 +118,24 @@ async def test_generate_presigned_url_is_deterministic_and_not_https():
     )
 
     assert url == "mock://b/k?expires=60"
+
+
+@pytest.mark.asyncio
+async def test_mock_archive_contains_source_and_inline_metadata():
+    storage = MockObjectStorage(bucket_name="media")
+    await storage.upload_base64(
+        object_key="video.mp4",
+        base64_data=base64.b64encode(b"video").decode(),
+    )
+    await storage.create_archive(
+        object_key="archive.zip",
+        entries=[
+            ArchiveEntry(filename="01_video.mp4", object_key="video.mp4"),
+            ArchiveEntry(filename="metadata.json", content=b"{}"),
+        ],
+    )
+    with zipfile.ZipFile(
+        io.BytesIO(await storage.download_object(object_key="archive.zip")),
+    ) as archive:
+        assert archive.read("01_video.mp4") == b"video"
+        assert archive.read("metadata.json") == b"{}"

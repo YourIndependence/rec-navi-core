@@ -131,7 +131,7 @@ async def test_delete_project_staff_gets_403():
 
     with pytest.raises(
         ClientAuthorizationError,
-        match="Only owners can delete projects",
+        match="User does not have access permission to this project",
     ):
         await delete_project(
             projects_db=database,
@@ -174,7 +174,7 @@ async def test_delete_project_other_group_gets_403():
 
     with pytest.raises(
         ClientAuthorizationError,
-        match="Only owners can delete projects",
+        match="User does not have access permission to this project",
     ):
         await delete_project(
             projects_db=database,

@@ -69,20 +69,14 @@ class CreateProjectResponse(BaseApiResponseModel):
 class SubmitProjectRequest(BaseItemModel):
     """Request payload for POST /submitProject."""
 
-    project_id: str = Field(..., description="Project ID to submit")
+    project_id: str = Field(
+        ...,
+        description="Project ID to notify about",
+    )
 
 
 class SubmitProjectResponse(BaseApiResponseModel):
-    """Response for POST /submitProject."""
-
-    project: Project = Field(
-        ...,
-        description="Project (SUBMITTED if every scene has a video)",
-    )
-    missing_scene_ids: list[str] = Field(
-        default_factory=list,
-        description="Scene IDs requiring a recording or a retake (empty if submission is accepted)",
-    )
+    """Response for POST /submitProject (no extra fields)."""
 
 
 class ProjectInput(BaseModel):
@@ -132,3 +126,16 @@ class DeleteProjectResponse(BaseApiResponseModel):
     """Response for POST /deleteProject."""
 
     project_id: str = Field(..., description="Deleted project ID")
+
+
+class DownloadProjectRequest(BaseItemModel):
+    """Request to archive an approved project."""
+
+    project_id: str = Field(..., min_length=1)
+
+
+class DownloadProjectResponse(BaseApiResponseModel):
+    """Time-limited archive download URL."""
+
+    download_url: str
+    expires_in_seconds: int

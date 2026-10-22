@@ -10,7 +10,9 @@
 """S3 adapter behavior against Moto's in-memory AWS backend."""
 
 import base64
+import io
 import time
+import zipfile
 from collections.abc import AsyncIterator
 from urllib.parse import parse_qs
 from urllib.parse import urlsplit
@@ -21,6 +23,7 @@ import pytest_asyncio
 from botocore.exceptions import ClientError
 
 from recnavi.config.variables import REGION
+from recnavi.core.types.archive_entry import ArchiveEntry
 from recnavi.infrastructure.s3.s3_client import S3Client
 
 
@@ -106,7 +109,7 @@ async def test_download_returns_stored_bytes(storage):
 
 @pytest.mark.asyncio
 async def test_stream_preserves_all_bytes_across_chunks(storage):
-    payload = bytes(range(256)) * 20
+    payload = bytes(range(256)) * 8193
     async with storage.session.client("s3") as s3:
         await s3.put_object(
             Bucket=BUCKET,
@@ -216,3 +219,143 @@ async def test_missing_bucket_propagates_s3_error(buckets, mock_aws_session):
     with pytest.raises(ClientError) as exc_info:
         await storage.upload_base64(object_key="video.mp4", base64_data="eA==")
     assert exc_info.value.response["Error"]["Code"] == "NoSuchBucket"
+
+
+@pytest.mark.asyncio
+async def test_archive_round_trip_spans_multiple_upload_parts(storage):
+    content = b"x" * (9 * 1024 * 1024)
+    async with storage.session.client("s3") as s3:
+        await s3.put_object(
+            Bucket=BUCKET,
+            Key="archive-source/video.mp4",
+            Body=content,
+        )
+    await storage.create_archive(
+        object_key="archives/multipart.zip",
+        entries=[
+            ArchiveEntry(
+                filename="01_video.mp4",
+                object_key="archive-source/video.mp4",
+            ),
+            ArchiveEntry(filename="metadata.json", content=b"{}"),
+        ],
+    )
+    async with storage.session.client("s3") as s3:
+        result = await s3.get_object(
+            Bucket=BUCKET,
+            Key="archives/multipart.zip",
+        )
+        assert result["ContentType"] == "application/zip"
+        archive_bytes = await result["Body"].read()
+        assert (await s3.list_multipart_uploads(Bucket=BUCKET)).get(
+            "Uploads",
+            [],
+        ) == []
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+        assert archive.read("01_video.mp4") == content
+        assert archive.read("metadata.json") == b"{}"
+
+
+@pytest.mark.asyncio
+async def test_archive_empty_source_and_inline_content(storage):
+    async with storage.session.client("s3") as s3:
+        await s3.put_object(
+            Bucket=BUCKET,
+            Key="archive-source/empty.mp4",
+            Body=b"",
+        )
+    await storage.create_archive(
+        object_key="archives/empty.zip",
+        entries=[
+            ArchiveEntry(
+                filename="empty.mp4",
+                object_key="archive-source/empty.mp4",
+            ),
+        ],
+    )
+    with zipfile.ZipFile(
+        io.BytesIO(
+            await storage.download_object(object_key="archives/empty.zip"),
+        ),
+    ) as archive:
+        assert archive.read("empty.mp4") == b""
+
+
+@pytest.mark.asyncio
+async def test_archive_aborts_failed_multipart_upload(storage):
+    def fail_upload_part(**kwargs):
+        raise RuntimeError("upload failed")
+
+    storage.session.events.register(
+        "before-call.s3.UploadPart",
+        fail_upload_part,
+    )
+    try:
+        with pytest.raises(RuntimeError, match="upload failed"):
+            await storage.create_archive(
+                object_key="archives/failed.zip",
+                entries=[
+                    ArchiveEntry(filename="metadata.json", content=b"{}"),
+                ],
+            )
+        async with storage.session.client("s3") as s3:
+            assert (await s3.list_multipart_uploads(Bucket=BUCKET)).get(
+                "Uploads",
+                [],
+            ) == []
+            assert (
+                await s3.list_objects_v2(
+                    Bucket=BUCKET,
+                    Prefix="archives/failed.zip",
+                )
+            ).get("Contents", []) == []
+    finally:
+        storage.session.events.unregister(
+            "before-call.s3.UploadPart",
+            fail_upload_part,
+        )
+
+
+@pytest.mark.asyncio
+async def test_archive_ignores_empty_chunks(storage, monkeypatch):
+    async def chunks(*, object_key):
+        yield b""
+        yield b"video"
+        yield b""
+
+    monkeypatch.setattr(storage, "download_object_stream", chunks)
+    await storage.create_archive(
+        object_key="archives/chunks.zip",
+        entries=[ArchiveEntry(filename="video.mp4", object_key="source")],
+    )
+    with zipfile.ZipFile(
+        io.BytesIO(
+            await storage.download_object(object_key="archives/chunks.zip"),
+        ),
+    ) as archive:
+        assert archive.read("video.mp4") == b"video"
+
+
+@pytest.mark.asyncio
+async def test_archive_source_failure_publishes_nothing(storage):
+    with pytest.raises(ClientError):
+        await storage.create_archive(
+            object_key="archives/missing-source.zip",
+            entries=[
+                ArchiveEntry(
+                    filename="video.mp4",
+                    object_key="does-not-exist.mp4",
+                ),
+            ],
+        )
+    async with storage.session.client("s3") as s3:
+        assert (await s3.list_multipart_uploads(Bucket=BUCKET)).get(
+            "Uploads",
+            [],
+        ) == []
+        assert (
+            await s3.list_objects_v2(
+                Bucket=BUCKET,
+                Prefix="archives/missing-source.zip",
+            )
+        ).get("Contents", []) == []

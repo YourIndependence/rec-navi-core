@@ -7,261 +7,175 @@
 # For internal use only.
 # developer team.
 
-"""Submission rules, authorization, persistence, and concurrent updates."""
-
-from unittest.mock import AsyncMock
+"""Unit tests for submit_project core logic."""
 
 import pytest
 
+from recnavi.core.project.submit_project import build_review_url
 from recnavi.core.project.submit_project import submit_project
-from recnavi.core.types.project import Project
-from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+from recnavi.exceptions.exceptions import NotificationSendError
 from tests.mockups.mock_database import MockDatabase
-from tests.mockups.mock_object_storage import MockObjectStorage
+from tests.mockups.mock_notifier import MockNotifier
 
 
-@pytest.fixture
-def project() -> Project:
-    return Project(
-        project_id="project-1",
-        project_name="Shooting",
-        group_id="group-1",
-        owner_user_id="owner-1",
-        assigned_user_ids=["staff-1"],
-        created_at="2026-01-01T00:00:00Z",
-        version=4,
-        scenes=[
-            Scene(
-                scene_id="scene-1",
-                scene_principal="intro",
-                status=SceneStatus.PENDING,
-                video_key="video.mp4",
-                thumbnail_key="thumb.jpg",
-            ),
+BASE_URL = "https://example.com/"
+
+
+def _project_db() -> MockDatabase:
+    return MockDatabase(
+        initial_items=[
+            {
+                "projectId": "proj-1",
+                "groupId": "group-1",
+                "projectName": "Spring Menu",
+                "ownerUserId": "owner-1",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z",
+                "assignedUserIds": ["staff-1"],
+                "status": "in_progress",
+                "version": 1,
+                "scenes": [],
+            },
         ],
     )
 
 
-@pytest.fixture
-def user() -> User:
+def _users_db(*, email: str | None = "owner@example.com") -> MockDatabase:
+    owner = {"userId": "owner-1", "userName": "Owner", "groupId": "group-1"}
+    if email is not None:
+        owner["email"] = email
+    return MockDatabase(initial_items=[owner], key_names=("userId",))
+
+
+def _user(user_id: str, role: UserRole) -> User:
     return User(
-        user_id="staff-1",
-        user_name="Staff",
-        role=UserRole.STAFF,
+        user_id=user_id,
+        user_name=f"Name {user_id}",
         group_id="group-1",
+        role=role,
+    )
+
+
+async def _submit(
+    *,
+    user: User,
+    notifier: MockNotifier,
+    projects_db: MockDatabase | None = None,
+    users_db: MockDatabase | None = None,
+    project_id: str = "proj-1",
+) -> None:
+    await submit_project(
+        projects_db=projects_db or _project_db(),
+        users_db=users_db or _users_db(),
+        notifier=notifier,
+        base_url=BASE_URL,
+        project_id=project_id,
+        user=user,
+    )
+
+
+def test_build_review_url_joins_base_url_and_project_id():
+    """Test trailing slashes on the base URL are normalized."""
+    assert (
+        build_review_url(base_url="https://example.com/", project_id="p1")
+        == "https://example.com/projects/p1/review"
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("version", [None, 0, 4])
-async def test_submission_advances_version_and_returns_public_urls(
-    project,
-    user,
-    version,
-):
-    item = project.model_dump(by_alias=True)
-    if version is None:
-        item.pop("version")
-    else:
-        item["version"] = version
-    db = MockDatabase(initial_items=[item])
-    result, missing = await submit_project(
-        projects_db=db,
-        storage=MockObjectStorage(bucket_name="media"),
-        project_id=project.project_id,
-        user=user,
-    )
-    assert missing == []
-    assert result.status == ProjectStatus.SUBMITTED
-    assert result.version == (version or 0) + 1
-    assert result.updated_at is not None
-    public_scene = result.model_dump(by_alias=True)["scenes"][0]
-    assert public_scene["videoUrl"].startswith("mock://media/video.mp4?")
-    assert public_scene["thumbnailUrl"].startswith("mock://media/thumb.jpg?")
-    assert "videoKey" not in public_scene
-    assert "thumbnailKey" not in public_scene
-    stored = await db.get_item({"projectId": project.project_id})
-    assert stored["version"] == result.version
-    assert stored["status"] == "submitted"
-    assert stored["scenes"][0]["videoKey"] == "video.mp4"
-    assert "videoUrl" not in stored["scenes"][0]
+async def test_submit_project_assigned_staff_notifies_owner():
+    """Test assigned staff triggers exactly one email to the owner."""
+    notifier = MockNotifier()
 
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "status,video,missing",
-    [
-        (SceneStatus.PENDING, "video.mp4", []),
-        (SceneStatus.APPROVED, "video.mp4", []),
-        (SceneStatus.REJECTED, "video.mp4", ["scene-1"]),
-        (SceneStatus.NOT_RECORDED, "video.mp4", ["scene-1"]),
-        (SceneStatus.PENDING, None, ["scene-1"]),
-        (SceneStatus.APPROVED, "", ["scene-1"]),
-    ],
-)
-async def test_submission_reports_incomplete_scenes_without_writing(
-    project,
-    user,
-    status,
-    video,
-    missing,
-):
-    project.scenes[0].status = status
-    project.scenes[0].video_key = video
-    original = project.model_dump(by_alias=True)
-    db = MockDatabase(initial_items=[original])
-    result, actual_missing = await submit_project(
-        projects_db=db,
-        storage=MockObjectStorage(bucket_name="media"),
-        project_id=project.project_id,
-        user=user,
+    result = await submit_project(
+        projects_db=_project_db(),
+        users_db=_users_db(),
+        notifier=notifier,
+        base_url=BASE_URL,
+        project_id="proj-1",
+        user=_user("staff-1", UserRole.STAFF),
     )
-    assert actual_missing == missing
-    if missing:
-        assert result.status == ProjectStatus.IN_PROGRESS
-        assert await db.get_item({"projectId": project.project_id}) == original
 
-
-@pytest.mark.asyncio
-async def test_submission_retry_is_idempotent(project, user):
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    storage = MockObjectStorage(bucket_name="media")
-    first = await submit_project(
-        projects_db=db,
-        storage=storage,
-        project_id=project.project_id,
-        user=user,
-    )
-    second = await submit_project(
-        projects_db=db,
-        storage=storage,
-        project_id=project.project_id,
-        user=user,
-    )
-    assert first == second
-    assert second[0].version == 5
+    assert result is None
+    assert notifier.sent == [
+        {
+            "to_email": "owner@example.com",
+            "project_name": "Spring Menu",
+            "staff_name": "Name staff-1",
+            "review_url": "https://example.com/projects/proj-1/review",
+        },
+    ]
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "role,group,user_id",
+    "user",
     [
-        (UserRole.OWNER, "group-1", "staff-1"),
-        (UserRole.ADMIN, "group-1", "staff-1"),
-        (UserRole.STAFF, "other-group", "staff-1"),
-        (UserRole.STAFF, "group-1", "unassigned"),
+        _user("staff-2", UserRole.STAFF),
+        _user("owner-9", UserRole.OWNER),
     ],
 )
-async def test_submission_rejects_unauthorized_users(
-    project,
-    role,
-    group,
-    user_id,
-):
-    original = project.model_dump(by_alias=True)
-    db = MockDatabase(initial_items=[original])
-    user = User(user_id=user_id, user_name="Caller", role=role, group_id=group)
+async def test_submit_project_without_permission_sends_nothing(user):
+    """Test users who fail validate_permission are rejected before any email."""
+    notifier = MockNotifier()
+
     with pytest.raises(ClientAuthorizationError):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(bucket_name="media"),
-            project_id=project.project_id,
-            user=user,
-        )
-    assert await db.get_item({"projectId": project.project_id}) == original
+        await _submit(user=user, notifier=notifier)
+
+    assert notifier.sent == []
 
 
 @pytest.mark.asyncio
-async def test_submission_rejects_empty_project(project, user):
-    project.scenes = []
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
+async def test_submit_project_owner_without_email_raises_unprocessable():
+    """Test an owner without an email address cannot be notified."""
+    notifier = MockNotifier()
+
     with pytest.raises(ClientUnprocessableEntityError):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(bucket_name="media"),
-            project_id=project.project_id,
-            user=user,
+        await _submit(
+            user=_user("staff-1", UserRole.STAFF),
+            notifier=notifier,
+            users_db=_users_db(email=None),
+        )
+
+    assert notifier.sent == []
+
+
+@pytest.mark.asyncio
+async def test_submit_project_missing_owner_record_raises_unprocessable():
+    """Test a missing owner user record is treated as having no email."""
+    with pytest.raises(ClientUnprocessableEntityError):
+        await _submit(
+            user=_user("staff-1", UserRole.STAFF),
+            notifier=MockNotifier(),
+            users_db=MockDatabase(key_names=("userId",)),
         )
 
 
 @pytest.mark.asyncio
-async def test_submission_rejects_missing_project(user):
+async def test_submit_project_not_found_raises():
+    """Test a missing project raises not found."""
+    notifier = MockNotifier()
+
     with pytest.raises(ClientNotFoundError):
-        await submit_project(
-            projects_db=MockDatabase(),
-            storage=MockObjectStorage(bucket_name="media"),
+        await _submit(
+            user=_user("staff-1", UserRole.STAFF),
+            notifier=notifier,
             project_id="missing",
-            user=user,
         )
+
+    assert notifier.sent == []
 
 
 @pytest.mark.asyncio
-async def test_submission_does_not_overwrite_concurrent_scene_edit(
-    project,
-    user,
-):
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    original_put = db.put_item
-
-    async def concurrent_put(*args, **kwargs):
-        db.items[0] = {
-            **db.items[0],
-            "version": 5,
-            "description": "Concurrent edit",
-        }
-        await original_put(*args, **kwargs)
-
-    db.put_item = concurrent_put
-    with pytest.raises(ClientConflictError):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(bucket_name="media"),
-            project_id=project.project_id,
-            user=user,
+async def test_submit_project_propagates_notification_failure():
+    """Test a delivery failure is not swallowed."""
+    with pytest.raises(NotificationSendError):
+        await _submit(
+            user=_user("staff-1", UserRole.STAFF),
+            notifier=MockNotifier(fail=True),
         )
-    stored = await db.get_item({"projectId": project.project_id})
-    assert stored["status"] == "in_progress"
-    assert stored["description"] == "Concurrent edit"
-
-
-@pytest.mark.asyncio
-async def test_submission_propagates_database_failure(project, user):
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    db.put_item = AsyncMock(side_effect=RuntimeError("Database unavailable"))
-    with pytest.raises(RuntimeError, match="Database unavailable"):
-        await submit_project(
-            projects_db=db,
-            storage=MockObjectStorage(bucket_name="media"),
-            project_id=project.project_id,
-            user=user,
-        )
-
-
-@pytest.mark.asyncio
-async def test_concurrent_submission_returns_committed_result(project, user):
-    """Two submissions of the same complete version both succeed."""
-    db = MockDatabase(initial_items=[project.model_dump(by_alias=True)])
-    original_put = db.put_item
-
-    async def submit_first(*args, **kwargs):
-        db.items[0] = {**db.items[0], "version": 5, "status": "submitted"}
-        await original_put(*args, **kwargs)
-
-    db.put_item = submit_first
-    result, missing = await submit_project(
-        projects_db=db,
-        storage=MockObjectStorage(bucket_name="media"),
-        project_id=project.project_id,
-        user=user,
-    )
-    assert result.status == ProjectStatus.SUBMITTED
-    assert result.version == 5
-    assert missing == []

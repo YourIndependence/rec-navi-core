@@ -26,7 +26,9 @@ from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.project.submit_project import submit_project_usecase
 from recnavi.application.scene.update_scene import update_scene_usecase
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -44,6 +46,7 @@ async def get_projects_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     projects, next_cursor = await get_projects_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
         user_id=user.user_id,
         group_id=user.group_id,
         limit=limit,
@@ -66,6 +69,7 @@ async def get_project_endpoint(
     projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
     project = await get_project_usecase(
         projects_db=projects_db,
+        storage=request.app.state.object_storage,
         project_id=item.project_id,
         user=user,
     )
@@ -100,17 +104,14 @@ async def submit_project_endpoint(
     payload: SubmitProjectRequest,
     user: User = Depends(verify_user),
 ) -> SubmitProjectResponse:
-    """Submit project for owner review (staff only)."""
-    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
-
-    updated_project, missing_scene_ids = await submit_project_usecase(
-        projects_db=projects_db,
-        storage=request.app.state.object_storage,
+    """Notify the owner by email that staff finished shooting (staff only)."""
+    await submit_project_usecase(
+        projects_db=request.app.state.database[PROJECTS_TABLE_NAME],
+        users_db=request.app.state.database[USERS_TABLE_NAME],
+        notifier=request.app.state.notifier,
+        base_url=FRONTEND_BASE_URL,
         project_id=payload.project_id,
         user=user,
     )
 
-    return SubmitProjectResponse(
-        project=updated_project,
-        missing_scene_ids=missing_scene_ids,
-    )
+    return SubmitProjectResponse()

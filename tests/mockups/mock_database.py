@@ -40,23 +40,16 @@ class MockDatabase(BaseDatabase):
         self.items: list[dict[str, Any]] = initial_items or []
         self.key_names = key_names
 
-    async def get_item(
-        self,
-        key: dict[str, Any],
-        *,
-        consistent_read: bool = False,
-    ) -> dict[str, Any] | None:
+    async def get_item(self, key: dict[str, Any]) -> dict[str, Any] | None:
         """Get an item by primary key.
 
         Args:
-            consistent_read: Request the latest committed item.
             key: Primary key as a dictionary.
 
         Returns:
             Item if found, None otherwise.
 
         """
-        _ = consistent_read
         for item in self.items:
             if all(item.get(k) == v for k, v in key.items()):
                 return item

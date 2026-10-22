@@ -7,97 +7,65 @@
 # For internal use only.
 # developer team.
 
-"""Submit project for owner review."""
+"""Notify the project owner that staff finished shooting."""
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import attach_scene_urls
-from recnavi.core.storage.base_object_storage import BaseObjectStorage
+from recnavi.core.notification.base_notifier import BaseNotifier
 from recnavi.core.types.project import Project
-from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
+
+
+# Placeholder: the frontend must confirm the actual review screen path.
+REVIEW_PATH_TEMPLATE = "/projects/{project_id}/review"
+
+
+def build_review_url(*, base_url: str, project_id: str) -> str:
+    """Build the link to the review screen of a project."""
+    path = REVIEW_PATH_TEMPLATE.format(project_id=project_id)
+    return f"{base_url.rstrip('/')}{path}"
 
 
 async def submit_project(
     *,
     projects_db: BaseDatabase,
-    storage: BaseObjectStorage,
+    users_db: BaseDatabase,
+    notifier: BaseNotifier,
+    base_url: str,
     project_id: str,
     user: User,
-) -> tuple[Project, list[str]]:
-    """Accept completed shooting; report missing recordings and rejected scenes."""
-    item = await projects_db.get_item(
-        key={"projectId": project_id},
-        consistent_read=True,
-    )
+) -> None:
+    """Email the project owner that staff finished shooting.
 
+    Raises:
+        NotificationSendError: The email could not be delivered.
+
+    """
+    item = await projects_db.get_item(key={"projectId": project_id})
     if not item:
         raise ClientNotFoundError("Project not found")
 
     project = Project.model_validate(item)
 
-    if user.group_id != project.group_id:
+    if not project.validate_permission(user=user, as_role=UserRole.STAFF):
         raise ClientAuthorizationError(
-            "Access to other group's project is forbidden",
+            "User does not have access permission to this project",
         )
 
-    if user.role != UserRole.STAFF:
-        raise ClientAuthorizationError(
-            "Only staff can submit a project",
-        )
+    owner_item = await users_db.get_item(key={"userId": project.owner_user_id})
+    owner_email = owner_item.get("email") if owner_item else None
+    if not owner_email:
+        raise ClientUnprocessableEntityError("Owner has no email address")
 
-    if user.user_id not in project.assigned_user_ids:
-        raise ClientAuthorizationError(
-            "User is not assigned to this project",
-        )
-
-    if not project.scenes:
-        raise ClientUnprocessableEntityError(
-            "Cannot submit project with no scenes",
-        )
-
-    missing_scene_ids = project.get_missing_scene_ids()
-
-    if not missing_scene_ids and project.status != ProjectStatus.SUBMITTED:
-        previous_version = project.version
-        project.status = ProjectStatus.SUBMITTED
-        project.increment_version()
-        try:
-            await projects_db.put_item(
-                item=project.model_dump(by_alias=True),
-                condition_expression=(
-                    "attribute_exists(projectId) AND "
-                    "(attribute_not_exists(version) OR version = :previous_version)"
-                ),
-                expression_attribute_values={
-                    ":previous_version": previous_version,
-                },
-            )
-        except ClientConflictError:
-            latest = await projects_db.get_item(
-                key={"projectId": project_id},
-                consistent_read=True,
-            )
-            if latest is None:
-                raise
-            latest_project = Project.model_validate(latest)
-            if (
-                latest_project.status != ProjectStatus.SUBMITTED
-                or latest_project.group_id != user.group_id
-                or user.user_id not in latest_project.assigned_user_ids
-                or not latest_project.scenes
-                or latest_project.get_missing_scene_ids()
-            ):
-                raise
-            project = latest_project
-
-    project_view = await attach_scene_urls(
-        storage=storage,
-        project=project,
+    await notifier.send_project_submitted(
+        to_email=owner_email,
+        project_name=project.project_name,
+        staff_name=user.user_name,
+        review_url=build_review_url(
+            base_url=base_url,
+            project_id=project.project_id,
+        ),
     )
-
-    return (project_view, missing_scene_ids)
