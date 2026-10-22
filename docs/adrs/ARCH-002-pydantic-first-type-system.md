@@ -68,9 +68,7 @@ use a frozen Pydantic model in `core/types/`.
 
 Do not introduce a second `HogeView` solely to add temporary media URLs.
 Distinct contracts still warrant separate types: `UserSummary` deliberately
-omits personal information and remains separate. Template images in dependent
-PR #60 should follow this contract when adding presigned URLs; this decision
-does not change the template endpoint in #59.
+omits personal information and remains separate. Template images follow this contract. See ARCH-014 for the overall media delivery design.
 
 ## Rationale
 
