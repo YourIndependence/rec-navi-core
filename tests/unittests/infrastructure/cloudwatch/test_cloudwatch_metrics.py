@@ -80,3 +80,23 @@ async def test_publish_project_filter_stats_publishes_in_deployed_environments()
     kwargs = cloudwatch.put_metric_data.await_args.kwargs
     assert kwargs["Namespace"] == "RecNavi"
     assert len(kwargs["MetricData"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_transport_failure_is_logged_without_failing_listing(caplog):
+    from botocore.exceptions import EndpointConnectionError
+
+    cloudwatch = AsyncMock()
+    cloudwatch.put_metric_data.side_effect = EndpointConnectionError(
+        endpoint_url="https://cloudwatch.invalid",
+    )
+    stats = build_filter_stats(queried_count=10, filtered_count=1)
+    with (
+        patch(f"{MODULE}.ENV", "dev"),
+        patch(
+            f"{MODULE}.aioboto3.Session",
+            return_value=_session_with(cloudwatch),
+        ),
+    ):
+        await CloudWatchMetricsPublisher().publish_project_filter_stats(stats)
+    assert "failed to put getMyProjects metrics" in caplog.text
