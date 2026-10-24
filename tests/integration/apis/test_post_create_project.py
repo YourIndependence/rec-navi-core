@@ -13,6 +13,7 @@ from contextlib import suppress
 from typing import cast
 
 import pytest
+from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
@@ -50,7 +51,7 @@ async def test_create_project_returns_good(
     )[PROJECTS_TABLE_NAME]
     previous = app.dependency_overrides[verify_user]
 
-    def owner_user(request):
+    def owner_user(request: Request):
         return previous(request).model_copy(update={"role": UserRole.OWNER})
 
     app.dependency_overrides[verify_user] = owner_user
