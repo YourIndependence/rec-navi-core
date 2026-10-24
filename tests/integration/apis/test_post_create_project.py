@@ -127,6 +127,7 @@ async def test_create_project_returns_good(
         assert project_recode["version"] == 0
 
     finally:
+        app.dependency_overrides[verify_user] = previous
         with suppress(Exception):
             await database.delete_item(
                 {"projectId": project_id},
