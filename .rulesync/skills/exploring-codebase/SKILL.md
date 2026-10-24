@@ -1,6 +1,6 @@
 ---
 name: exploring-codebase
-description: Scans the TRUST project to understand the architecture, conventions, and existing patterns relevant to a planned change. Use before designing or implementing any feature or bug fix.
+description: Scans the rec-navi-core project to understand the architecture, conventions, and existing patterns relevant to a planned change. Use before designing or implementing any feature or bug fix.
 ---
 
 # Exploring Codebase
@@ -14,18 +14,23 @@ Builds a focused picture of the existing code relevant to a task.
 ### Step 1: Locate Relevant Files
 
 ```bash
-grep -r "<topic>" src/trust --include="*.py" -l
-find src/trust -type f -name "*.py" -path "*<topic>*"
+rg -l "<topic>" src/recnavi -g "*.py"
+rg --files src/recnavi -g "*<topic>*.py"
 ```
 
 Target the most affected layer:
 
 | Change type | Start here |
 |---|---|
-| New endpoint | `src/trust/apis/` |
-| Business logic | `src/trust/application/` or `src/trust/core/` |
-| New agent or tool | `src/trust/core/agents/` |
-| External client | `src/trust/infrastructure/` |
+| New endpoint | `src/recnavi/apis/` |
+| Business logic | `src/recnavi/application/` or `src/recnavi/core/` |
+| Domain models / project or scene behavior | `src/recnavi/core/` |
+| Database / object-storage interfaces | `src/recnavi/core/database/`, `src/recnavi/core/storage/` |
+| External client | `src/recnavi/infrastructure/` |
+
+Resolve actual modules and injected interfaces from the current checkout. Do not
+assume TRUST agent/tool registries exist in this repository. Trace database and
+object-storage abstractions, media serialization and project authorization when relevant.
 
 ### Step 2: Read Key Files
 
@@ -33,13 +38,13 @@ For each found file, extract:
 
 - **Public interface**: function signatures, class `__init__`, names exported in `__init__.py`
 - **Layer dependencies**: what it imports from other layers
-- **Registry participation**: is it registered by key? Where?
+- **Dependency injection**: which core abstraction and startup/request dependency supplies it?
 
 ### Step 3: Identify Conventions
 
 From the files above, derive:
 
-- **Naming**: `snake_case` modules, `PascalCase` classes, `get_<name>_agent()` factory pattern
+- **Naming**: `snake_case` modules, `PascalCase` models, `<verb>_<noun>` domain functions
 - **Async**: is the affected layer async?
 - **Registry key**: what string is used for this component type?
 - **Test location**: `tests/unittests/<same-path-as-src>/`
