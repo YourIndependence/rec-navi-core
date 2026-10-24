@@ -30,7 +30,7 @@ first "yes".
 | ---------------------------------------------------------------- | -------------- | -------------------------------------------------------- |
 | Is it a rule about the domain, true regardless of who calls it?   | `core/`        | `core/<domain>/<noun>.py`                                 |
 | Is it a shape of domain data?                                     | `core/types/`  | `core/types/<noun>.py`                                    |
-| Is it a thing a user wants to achieve, in steps?                  | `application/` | `application/<domain>/<verb>_<noun>_usecase.py`           |
+| Is it a thing a user wants to achieve, in steps?                  | `application/` | `application/<domain>/<verb>_<noun>.py`           |
 | Is it how that flow is exposed over HTTP?                         | `apis/`        | `apis/<group>/<group>_router.py`                          |
 | Is it how an external system is actually reached?                 | `infrastructure/` | `infrastructure/<service>/<name>.py`                   |
 
@@ -54,7 +54,7 @@ async def get_projects(
 **`application/` -- use cases only.** A use case answers "what does the caller
 want to achieve". It is the only place that composes several core calls, applies
 authorization decisions, or sequences steps. It is named `<verb>_<noun>_usecase`
-and is callable with no HTTP present.
+and is callable with no HTTP present. Module filenames omit `_usecase`; function names retain it (ARCH-001).
 
 ```python
 async def get_projects_usecase(
@@ -81,7 +81,7 @@ comments that narrate the flow -- if the endpoint needs a comment to explain
 what it is doing, the explanation belongs in a use case name.
 
 ```python
-@cms_router.get("/getProjects")
+@staff_router.get("/getProjects")
 async def get_projects_endpoint(
     request: Request,
     user: User = Depends(verify_user),
@@ -131,8 +131,8 @@ A use case is tested without FastAPI, using `MockDatabase` from
 `tests/mockups/`:
 
 ```
-src/recnavi/application/project/get_projects_usecase.py
-  -> tests/unittests/application/project/test_get_projects_usecase.py
+src/recnavi/application/project/get_projects.py
+  -> tests/unittests/application/project/test_get_projects.py
 ```
 
 If a test for an `application/` module needs a FastAPI `TestClient`, the logic
