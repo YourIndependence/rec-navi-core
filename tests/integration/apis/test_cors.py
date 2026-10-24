@@ -9,40 +9,37 @@
 
 """CORS preflight tests against the real app middleware."""
 
-from fastapi.testclient import TestClient
-
-from recnavi.main import app
-
-
 ALLOWED_ORIGIN = "http://localhost:5173"
 DENIED_ORIGIN = "http://evil.example.test"
 
 
-def _preflight(*, origin: str) -> dict[str, str]:
-    client = TestClient(app)
+def test_preflight_from_allowed_origin_is_echoed(client) -> None:
     response = client.options(
         "/health",
         headers={
-            "Origin": origin,
+            "Origin": ALLOWED_ORIGIN,
             "Access-Control-Request-Method": "GET",
             "Access-Control-Request-Headers": "Authorization",
         },
     )
-    return dict(response.headers)
-
-
-def test_preflight_from_allowed_origin_is_echoed() -> None:
-    headers = _preflight(origin=ALLOWED_ORIGIN)
-    assert headers.get("access-control-allow-origin") == ALLOWED_ORIGIN
+    assert response.status_code == 200
+    assert (
+        response.headers.get("access-control-allow-origin") == ALLOWED_ORIGIN
+    )
     assert (
         "authorization"
-        in headers.get(
-            "access-control-allow-headers",
-            "",
-        ).lower()
+        in response.headers.get("access-control-allow-headers", "").lower()
     )
 
 
-def test_preflight_from_disallowed_origin_is_not_allowed() -> None:
-    headers = _preflight(origin=DENIED_ORIGIN)
-    assert "access-control-allow-origin" not in headers
+def test_preflight_from_disallowed_origin_is_not_allowed(client) -> None:
+    response = client.options(
+        "/health",
+        headers={
+            "Origin": DENIED_ORIGIN,
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization",
+        },
+    )
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers
