@@ -59,6 +59,7 @@ def test_get_projects_parses_pagination_and_serializes_response(
         group_id="it-group",
         limit=12,
         cursor="previous-page",
+        metrics=staff_client.app.state.metrics_publisher,
     )
 
 
