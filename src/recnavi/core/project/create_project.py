@@ -63,6 +63,6 @@ async def create_project(
         scenes=scenes,
     )
 
-    await projects_db.put_item(project.model_dump(by_alias=True))
+    await projects_db.put_item(project.to_storage_item())
 
     return project

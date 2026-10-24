@@ -15,6 +15,7 @@ from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from recnavi.core.types.user import UserSummary
 
 
 class GetMeResponse(BaseApiResponseModel):
@@ -43,4 +44,13 @@ class CreateUserResponse(BaseApiResponseModel):
     users: list[User] = Field(
         ...,
         description="Users in the caller's group after creation",
+    )
+
+
+class GetGroupUsersResponse(BaseApiResponseModel):
+    """Response schema for GET /getGroupUsers endpoint."""
+
+    users: list[UserSummary] = Field(
+        ...,
+        description="All users in the authenticated user's group",
     )

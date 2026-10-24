@@ -19,10 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.errors import ServerErrorMiddleware
 
 from recnavi.apis.cms.cms_router import cms_router
-from recnavi.apis.pub.pub_router import pub_router
 from recnavi.apis.root.root_router import root_router
+from recnavi.apis.staff.staff_router import staff_router
 from recnavi.config.variables import CORS_ORIGINS
 from recnavi.config.variables import ENV
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -34,6 +35,7 @@ from recnavi.infrastructure.cognito.cognito_identity_provider import (
     CognitoIdentityProvider,
 )
 from recnavi.infrastructure.database.dynamodb import DynamoDb
+from recnavi.infrastructure.s3.s3_client import S3Client
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -57,6 +59,8 @@ async def lifespan(_app: FastAPI):
 
         _app.state.identity_provider = CognitoIdentityProvider()
         logger.info("identity provider initialized.")
+        _app.state.object_storage = S3Client(bucket_name=MEDIA_BUCKET_NAME)
+        logger.info("object storage initialized.")
 
         if ENV not in ["LOCAL", "CI"]:
             post_notify_discord(
@@ -100,7 +104,7 @@ app.add_middleware(
 
 app.include_router(root_router)
 app.include_router(cms_router)
-app.include_router(pub_router)
+app.include_router(staff_router)
 
 
 @app.middleware("http")
