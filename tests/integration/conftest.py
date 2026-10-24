@@ -90,7 +90,7 @@ def get_mock_x_user() -> User:
     return User(
         user_id="test-user-123",
         user_name="Test User",
-        role=UserRole.OWNER,
+        role=UserRole.ADMIN,
         group_id="it-group",
     )
 
