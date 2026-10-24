@@ -1,5 +1,103 @@
 /// <reference path="rules.d.ts" />
 
+function pythonNode(value: unknown): value is PythonAstNode {
+  return typeof value === "object" && value !== null && "_type" in value;
+}
+
+function pythonNodes(value: unknown): PythonAstNode[] {
+  return Array.isArray(value) ? value.filter(pythonNode) : [];
+}
+
+function named(value: unknown, name: string): boolean {
+  return pythonNode(value) && value._type === "Name" && value.id === name;
+}
+
+function containsNode(value: unknown, predicate: (node: PythonAstNode) => boolean): boolean {
+  if (Array.isArray(value)) return value.some((child) => containsNode(child, predicate));
+  if (!pythonNode(value)) return false;
+  if (["FunctionDef", "AsyncFunctionDef", "ClassDef", "Lambda"].includes(value._type)) return false;
+  return predicate(value) || Object.values(value).some((child) => containsNode(child, predicate));
+}
+
+function receivesMockSession(scope: PythonAstNode | undefined): boolean {
+  if (!scope || !pythonNode(scope.args)) return false;
+  const args = scope.args;
+  return ["args", "posonlyargs", "kwonlyargs"].some((kind) =>
+    pythonNodes(args[kind]).some((arg) => arg.arg === "mock_aws_session"),
+  );
+}
+
+function assignedTargets(statement: PythonAstNode): PythonAstNode[] {
+  if (statement._type === "Assign") return pythonNodes(statement.targets);
+  if (statement._type === "AnnAssign" && pythonNode(statement.target)) return [statement.target];
+  return [];
+}
+
+function injectsMockSession(statement: PythonAstNode, instance: string): boolean {
+  return named(statement.value, "mock_aws_session") &&
+    assignedTargets(statement).some((target) =>
+      target._type === "Attribute" && target.attr === "session" && named(target.value, instance),
+    );
+}
+
+function hasInjectionBeforeUse(statements: PythonAstNode[], index: number, instance: string): boolean {
+  for (const statement of statements.slice(index + 1)) {
+    if (injectsMockSession(statement, instance)) return true;
+    if (assignedTargets(statement).some((target) => named(target, instance))) return false;
+    if (containsNode(statement, (node) =>
+      ["Call", "Await", "Return", "Yield", "YieldFrom"].includes(node._type) &&
+      containsNode(node, (child) => named(child, instance)),
+    )) return false;
+  }
+  return false;
+}
+
+async function checkMockSessionInjection(ctx: RuleContext, className: "DynamoDb" | "S3Client"): Promise<void> {
+  for (const file of await ctx.glob("tests/unittests/**/*.py")) {
+    const tree = await ctx.ast(file, "python");
+    const constructors = new Set<string>([className]);
+    for (const statement of tree.body) {
+      if (statement._type !== "ImportFrom") continue;
+      for (const alias of pythonNodes(statement.names)) {
+        if (alias.name === className && typeof alias.asname === "string") constructors.add(alias.asname);
+      }
+    }
+
+    function visit(node: PythonAstNode, scope?: PythonAstNode, statements: PythonAstNode[] = [], index = -1): void {
+      if (["FunctionDef", "AsyncFunctionDef"].includes(node._type)) scope = node;
+      if (node._type === "ClassDef") scope = undefined;
+      const func = node.func;
+      if (node._type === "Call" && pythonNode(func) && (
+        (func._type === "Name" && typeof func.id === "string" && constructors.has(func.id)) ||
+        (func._type === "Attribute" && func.attr === className)
+      )) {
+        const statement = statements[index];
+        const targets = statement ? assignedTargets(statement) : [];
+        const instance = targets.length === 1 && targets[0]._type === "Name" ? targets[0].id : undefined;
+        if (!receivesMockSession(scope) || statement?.value !== node || typeof instance !== "string" ||
+          !hasInjectionBeforeUse(statements, index, instance)) {
+          ctx.report.violation({
+            message: `${className} in a unit test must receive mock_aws_session before use in the same function or fixture.`,
+            file,
+            line: node.lineno,
+            fix: `Accept the mock_aws_session fixture and assign instance.session = mock_aws_session immediately after constructing ${className}.`,
+          });
+        }
+      }
+      for (const [key, value] of Object.entries(node)) {
+        if (Array.isArray(value)) {
+          const children = pythonNodes(value);
+          children.forEach((child, childIndex) => {
+            if (["body", "orelse", "finalbody"].includes(key)) visit(child, scope, children, childIndex);
+            else visit(child, scope, statements, index);
+          });
+        } else if (pythonNode(value)) visit(value, scope, statements, index);
+      }
+    }
+    visit(tree);
+  }
+}
+
 export default {
   rules: {
     "no-database-instance-in-endpoints": {
@@ -152,23 +250,16 @@ export default {
 
     "no-database-in-test-without-mock": {
       description:
-        "Unit tests must use MockDatabase/fakes, not real DynamoDb instances (except in integration tests)",
-      severity: "warning",
-      check: async (ctx) => {
-        const matches = await ctx.grepFiles(
-          /DynamoDb\s*\(/,
-          "tests/unittests/**/*.py",
-        );
-        for (const match of matches) {
-          ctx.report.warning({
-            message:
-              "DynamoDb instance in unit test — unit tests should use MockDatabase or fakes, not real database instances",
-            file: match.file,
-            line: match.line,
-            fix: "Use MockDatabase from tests/mockups/ or create a fake implementing BaseDatabase",
-          });
-        }
-      },
+        "DynamoDb instances in unit tests must receive the mock_aws_session fixture before use",
+      severity: "error",
+      check: async (ctx) => checkMockSessionInjection(ctx, "DynamoDb"),
+    },
+
+    "no-s3-in-test-without-mock": {
+      description:
+        "S3Client instances in unit tests must receive the mock_aws_session fixture before use",
+      severity: "error",
+      check: async (ctx) => checkMockSessionInjection(ctx, "S3Client"),
     },
 
     "no-infrastructure-imports-in-apis": {

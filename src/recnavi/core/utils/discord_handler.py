@@ -34,10 +34,10 @@ logger = logging.getLogger(__name__)
 HTTP_TIMEOUT = 8.0
 
 
-def post_discord(
+def _post_discord(
     *,
     title: str,
-    user_name: str = "Notifire",
+    user_name: str = "notifire",
     mention: bool = False,
     message: str,
     additional_content: str | None = None,
@@ -132,9 +132,9 @@ def post_notify_discord(
         files: attached file objects: {'file': ('FILENAME', io.BytesIO object),}
 
     """
-    post_discord(
+    _post_discord(
         title=title,
-        user_name="PaaRL Notification",
+        user_name="Notification",
         color="blue",
         mention=mention,
         message=message,
@@ -197,7 +197,7 @@ def post_error_discord(
     if additional_message:
         message += f"additional_message: {additional_message}\n"
 
-    post_discord(
+    _post_discord(
         title="Detected ERROR in system!",
         user_name="ERROR Alert!",
         mention=True,

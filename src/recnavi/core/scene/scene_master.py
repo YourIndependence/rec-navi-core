@@ -10,6 +10,7 @@
 """Scene master domain logic."""
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.scene_master import SceneMaster
 
 
@@ -18,3 +19,14 @@ async def get_scene_masters(scenes_db: BaseDatabase) -> list[SceneMaster]:
     result = await scenes_db.scan()
 
     return [SceneMaster.model_validate(item) for item in result.items]
+
+
+async def attach_scene_master_urls(
+    *,
+    scenes: list[SceneMaster],
+    storage: BaseObjectStorage,
+) -> list[SceneMaster]:
+    """Replace master image references with temporary URLs."""
+    return [
+        await scene.attach_presigned_url(storage=storage) for scene in scenes
+    ]

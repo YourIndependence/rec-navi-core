@@ -37,7 +37,6 @@ def test_create_project_returns_400_when_no_token(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_create_project_returns_good(
     client,
     auth_headers,

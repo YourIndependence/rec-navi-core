@@ -9,12 +9,15 @@
 
 """Project-related API schemas."""
 
+from pydantic import BaseModel
+from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import alias_generators
 
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
-from recnavi.core.types.project_view import ProjectView
+from recnavi.core.types.scene import Scene
 
 
 class GetProjectsResponse(BaseApiResponseModel):
@@ -39,7 +42,7 @@ class GetProjectRequest(BaseItemModel):
 class GetProjectResponse(BaseApiResponseModel):
     """Response for POST /getProject."""
 
-    project: ProjectView = Field(..., description="Project with all scenes")
+    project: Project = Field(..., description="Project with all scenes")
 
 
 class CreateProjectRequest(BaseItemModel):
@@ -60,4 +63,66 @@ class CreateProjectRequest(BaseItemModel):
 class CreateProjectResponse(BaseApiResponseModel):
     """Response for POST /createProject."""
 
-    project: ProjectView = Field(..., description="Created project")
+    project: Project = Field(..., description="Created project")
+
+
+class ProjectInput(BaseModel):
+    """Project input for update."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Project ID to update")
+    project_name: str = Field(..., description="Project name")
+    description: str = Field(..., description="Project description")
+    assigned_user_ids: list[str] = Field(
+        default_factory=list,
+        description="Staff assigned to project",
+    )
+    scenes: list[Scene] = Field(
+        default_factory=list,
+        description="Complete scene collection after the update. Omitted scenes are deleted; an empty list removes all scenes.",
+    )
+    version: int = Field(
+        ...,
+        description="Expected version for optimistic locking",
+    )
+
+
+class UpdateProjectRequest(BaseItemModel):
+    """Request payload for POST /updateProject."""
+
+    project: ProjectInput = Field(..., description="Project data to update")
+
+
+class UpdateProjectResponse(BaseApiResponseModel):
+    """Response for POST /updateProject."""
+
+    project: Project = Field(..., description="Updated project")
+
+
+class DeleteProjectRequest(BaseItemModel):
+    """Request payload for POST /deleteProject."""
+
+    project_id: str = Field(..., description="Project ID to delete")
+
+
+class DeleteProjectResponse(BaseApiResponseModel):
+    """Response for POST /deleteProject."""
+
+    project_id: str = Field(..., description="Deleted project ID")
+
+
+class DownloadProjectRequest(BaseItemModel):
+    """Request to archive an approved project."""
+
+    project_id: str = Field(..., min_length=1)
+
+
+class DownloadProjectResponse(BaseApiResponseModel):
+    """Time-limited archive download URL."""
+
+    download_url: str
+    expires_in_seconds: int
