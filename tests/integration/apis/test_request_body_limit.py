@@ -31,3 +31,22 @@ def test_request_body_within_limit_is_not_rejected(client):
     response = client.post("/getProject", json={"projectId": "proj-123"})
 
     assert response.status_code != 413
+
+
+def test_chunked_request_body_over_limit_returns_413(client):
+    response = client.post(
+        "/getProject",
+        content=iter([b"x" * MAX_REQUEST_BODY_BYTES, b"x"]),
+    )
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 413
+    assert response.json()["message"] == "Request body is too large"
+
+
+def test_request_body_at_exact_limit_reaches_authentication(client):
+    response = client.post(
+        "/getProject",
+        content=b"x" * MAX_REQUEST_BODY_BYTES,
+    )
+    assert response.status_code == 401
+    assert response.json()["message"] == "Authorization header is required."
