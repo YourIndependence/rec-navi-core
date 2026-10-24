@@ -1,0 +1,5 @@
+# Synthetic media object keys in PR #59 tests; these are not credentials.
+# Scope each exception to its exact commit, file, rule, and line.
+4721246599983647a25f861ff49b49d59b39a2d6:tests/integration/apis/test_staff_projects.py:generic-api-key:47
+4721246599983647a25f861ff49b49d59b39a2d6:tests/unittests/application/project/test_get_project.py:generic-api-key:31
+4721246599983647a25f861ff49b49d59b39a2d6:tests/unittests/application/project/test_get_projects.py:generic-api-key:29

@@ -40,12 +40,6 @@ class ClientRuntimeError(RuntimeError, BaseClientExceptionError):
     pass
 
 
-class ClientResourcesNotFoundError(ClientRuntimeError):
-    """Custom ResourcesNotFoundError for Client."""
-
-    pass
-
-
 class ClientTypeError(TypeError, BaseClientExceptionError):
     """Custom TypeError for Client."""
 
