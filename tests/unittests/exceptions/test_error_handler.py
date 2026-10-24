@@ -16,6 +16,8 @@ from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import logger
 from recnavi.exceptions.exceptions import BaseClientExceptionError
 from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientNotFoundError
+from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
 def make_request(
@@ -44,6 +46,8 @@ def response_content(response) -> dict[str, str]:
     ("exception", "status_code", "message"),
     [
         (ClientAuthorizationError("forbidden"), 403, "forbidden"),
+        (ClientNotFoundError("missing"), 404, "missing"),
+        (ClientUnprocessableEntityError("invalid"), 422, "invalid"),
         (BaseClientExceptionError("bad request"), 400, "bad request"),
         (TypeError("invalid type"), 400, "Invalid request parameter"),
         (RuntimeError("unexpected"), 500, "Unexpected Server Error"),

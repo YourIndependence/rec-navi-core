@@ -26,8 +26,8 @@ class UserRole(StrEnum):
     STAFF = "staff"
 
 
-class User(BaseModel):
-    """user"""
+class UserSummary(BaseModel):
+    """Public user information for member selection."""
 
     model_config = ConfigDict(
         alias_generator=alias_generators.to_camel,
@@ -38,6 +38,15 @@ class User(BaseModel):
     user_name: str = Field(..., description="Name shown to other members")
     role: UserRole = Field(..., description="What the user may do")
     group_id: str = Field(..., description="Tenant the user belongs to")
+    profile_image_uri: str | None = Field(
+        default=None,
+        description="S3 URI of the user's profile image",
+    )
+
+
+class User(UserSummary):
+    """User details and authorization context."""
+
     is_active: bool = Field(
         default=True,
         description="False once the user has left; the record is kept",
@@ -54,7 +63,12 @@ class User(BaseModel):
         default=None,
         description="Birthday in YYYY-MM-DD format",
     )
-    profile_image_uri: str | None = Field(
-        default=None,
-        description="S3 URI of the user's profile image",
-    )
+
+    def can_act_as(self, role: UserRole) -> bool:
+        """Return whether this user's role includes the requested role."""
+        role_rank = {
+            UserRole.STAFF: 1,
+            UserRole.OWNER: 2,
+            UserRole.ADMIN: 3,
+        }
+        return role_rank[self.role] >= role_rank[role]

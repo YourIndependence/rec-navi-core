@@ -13,6 +13,7 @@ from pydantic import Field
 
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.user import User
+from recnavi.core.types.user import UserSummary
 
 
 class GetMeResponse(BaseApiResponseModel):
@@ -27,7 +28,7 @@ class GetMeResponse(BaseApiResponseModel):
 class GetGroupUsersResponse(BaseApiResponseModel):
     """Response schema for GET /getGroupUsers endpoint."""
 
-    users: list[User] = Field(
+    users: list[UserSummary] = Field(
         ...,
         description="Active users in the authenticated user's group",
     )

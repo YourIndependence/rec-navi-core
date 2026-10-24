@@ -9,8 +9,13 @@
 
 """Tests for user listing domain logic."""
 
+from unittest.mock import AsyncMock
+from unittest.mock import call
+
 import pytest
 
+from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.types.database import DatabaseQueryResult
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.core.user.users import get_group_users
@@ -52,21 +57,44 @@ async def test_get_group_users_returns_all_users_in_group():
 
 @pytest.mark.asyncio
 async def test_get_group_users_handles_pagination():
-    """Test get_group_users handles pagination (2+ pages)."""
-    items = [
-        {
-            "userId": f"user-{i}",
-            "userName": f"User {i}",
-            "role": "staff",
-            "groupId": "group-big",
-        }
-        for i in range(120)
+    database = AsyncMock(spec=BaseDatabase)
+    first_key = {"userId": "user-1", "groupId": "group-big"}
+    second_key = {"userId": "user-2", "groupId": "group-big"}
+    database.query.side_effect = [
+        DatabaseQueryResult(
+            items=[
+                {
+                    "userId": "user-1",
+                    "userName": "First",
+                    "role": "staff",
+                    "groupId": "group-big",
+                },
+            ],
+            last_evaluated_key=first_key,
+        ),
+        DatabaseQueryResult(items=[], last_evaluated_key=second_key),
+        DatabaseQueryResult(
+            items=[
+                {
+                    "userId": "user-3",
+                    "userName": "Last",
+                    "role": "owner",
+                    "groupId": "group-big",
+                },
+            ],
+            last_evaluated_key={},
+        ),
     ]
-    database = MockDatabase(initial_items=items)
-
     users = await get_group_users(users_db=database, group_id="group-big")
-
-    assert len(users) == 120
+    assert [user.user_id for user in users] == ["user-1", "user-3"]
+    assert database.query.await_args_list == [
+        call(
+            key_condition={"groupId": "group-big"},
+            index="groupId-index",
+            exclusive_start_key=key,
+        )
+        for key in (None, first_key, second_key)
+    ]
 
 
 @pytest.mark.asyncio
@@ -208,3 +236,11 @@ def test_user_is_active_defaults_to_true_and_serializes_camel_case():
 
     assert user.is_active is True
     assert user.model_dump(by_alias=True)["isActive"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_group_users_propagates_database_error():
+    database = AsyncMock(spec=BaseDatabase)
+    database.query.side_effect = RuntimeError("query failed")
+    with pytest.raises(RuntimeError, match="query failed"):
+        await get_group_users(users_db=database, group_id="group-1")

@@ -11,11 +11,17 @@
 """Scene"""
 
 from enum import StrEnum
+from typing import Self
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import alias_generators
+
+from recnavi.core.storage.base_object_storage import BaseObjectStorage
+
+
+SCENE_URL_EXPIRATION_SECONDS = 3600
 
 
 class SceneStatus(StrEnum):
@@ -23,8 +29,15 @@ class SceneStatus(StrEnum):
 
     NOT_RECORDED = "not_recorded"
     PENDING = "pending"
-    REJECT = "reject"
-    APPROVE = "approve"
+    REJECTED = "rejected"
+    APPROVED = "approved"
+
+
+class ReviewSceneResult(StrEnum):
+    """Decision made when reviewing a scene recording."""
+
+    APPROVED = SceneStatus.APPROVED
+    REJECTED = SceneStatus.REJECTED
 
 
 class Scene(BaseModel):
@@ -46,10 +59,12 @@ class Scene(BaseModel):
     )
     video_key: str | None = Field(
         default=None,
+        exclude=True,
         description="Location of the recorded video",
     )
     thumbnail_key: str | None = Field(
         default=None,
+        exclude=True,
         description="Location of the thumbnail of the recorded video",
     )
     created_by: str | None = Field(
@@ -68,3 +83,59 @@ class Scene(BaseModel):
         default_factory=list,
         description="Identifiers of the staff who record the scene",
     )
+    reviewed_by: str | None = Field(
+        default=None,
+        description="Identifier of the owner who reviewed the scene",
+    )
+    reviewed_at: str | None = Field(
+        default=None,
+        description="Datetime the scene was reviewed",
+    )
+    review_comment: str | None = Field(
+        default=None,
+        description="Review comment from the owner",
+    )
+
+    video_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the recorded video. None if not recorded",
+    )
+    thumbnail_url: str | None = Field(
+        default=None,
+        description="Presigned URL of the thumbnail. None if not recorded",
+    )
+
+    async def attach_presigned_url(
+        self,
+        *,
+        storage: BaseObjectStorage,
+    ) -> Self:
+        """Refresh playback URLs on this scene and return self."""
+        self.video_url = (
+            await storage.generate_presigned_url(
+                object_key=self.video_key,
+                expiration=SCENE_URL_EXPIRATION_SECONDS,
+            )
+            if self.video_key is not None
+            else None
+        )
+        self.thumbnail_url = (
+            await storage.generate_presigned_url(
+                object_key=self.thumbnail_key,
+                expiration=SCENE_URL_EXPIRATION_SECONDS,
+            )
+            if self.thumbnail_key is not None
+            else None
+        )
+        return self
+
+    def to_storage_item(self) -> dict[str, object]:
+        """Serialize durable keys without temporary playback URLs."""
+        return {
+            **self.model_dump(
+                by_alias=True,
+                exclude={"video_url", "thumbnail_url"},
+            ),
+            "videoKey": self.video_key,
+            "thumbnailKey": self.thumbnail_key,
+        }
