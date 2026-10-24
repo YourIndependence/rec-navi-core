@@ -24,6 +24,7 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientPermissionError
 from tests.mockups.mock_database import MockDatabase
 
@@ -33,10 +34,11 @@ def auth_client() -> Iterator[TestClient]:
     """Expose the authentication dependency through a small HTTP route."""
     auth_app = FastAPI()
 
+    @auth_app.exception_handler(ClientAuthorizationError)
     @auth_app.exception_handler(ClientPermissionError)
     async def handle_permission_error(
         _request: Request,
-        exception: ClientPermissionError,
+        exception: ClientPermissionError | ClientAuthorizationError,
     ) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -107,3 +109,29 @@ def test_protected_route_resolves_user_from_decoded_token(
         user_id="user-123",
         user_database=auth_client.app.state.database[USERS_TABLE_NAME],
     )
+
+
+def test_protected_route_rejects_deactivated_user(auth_client):
+    user = User(
+        user_id="former",
+        user_name="Former",
+        role=UserRole.STAFF,
+        group_id="group",
+        is_active=False,
+    )
+    with (
+        patch(
+            "recnavi.apis.auth.auth.decode_token",
+            new=AsyncMock(return_value={"sub": "former"}),
+        ),
+        patch(
+            "recnavi.apis.auth.auth.get_user_by_id",
+            new=AsyncMock(return_value=user),
+        ),
+    ):
+        response = auth_client.get(
+            "/protected",
+            headers={"Authorization": "Bearer signed-token"},
+        )
+    assert response.status_code == 403
+    assert response.json() == {"detail": "User is deactivated"}
