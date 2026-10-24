@@ -15,8 +15,8 @@ from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.main import app
 
 
-def test_review_scene_returns_400_when_no_token(client):
-    """Test POST /reviewScene returns 400 when no authorization header."""
+def test_review_scene_returns_401_when_no_token(client):
+    """Test POST /reviewScene returns 401 when no authorization header."""
     response = client.post(
         "/reviewScene",
         json={
@@ -26,7 +26,7 @@ def test_review_scene_returns_400_when_no_token(client):
             "comment": "Looks good!",
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 

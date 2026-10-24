@@ -73,10 +73,10 @@ async def group_members(
             await database.delete_item(key={"userId": user.user_id})
 
 
-def test_get_group_users_returns_400_when_no_token(client):
+def test_get_group_users_returns_401_when_no_token(client):
     """Reject requests without authentication."""
     response = client.get("/getGroupUsers")
-    assert response.status_code == 400
+    assert response.status_code == 401
     assert response.json()["status"] == "error"
 
 

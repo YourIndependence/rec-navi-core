@@ -23,8 +23,8 @@ from recnavi.core.types.user import UserRole
 from recnavi.main import app
 
 
-def test_update_project_returns_400_when_no_token(client):
-    """Test POST /updateProject returns 400 when no authorization header."""
+def test_update_project_returns_401_when_no_token(client):
+    """Test POST /updateProject returns 401 when no authorization header."""
     response = client.post(
         "/updateProject",
         json={
@@ -38,7 +38,7 @@ def test_update_project_returns_400_when_no_token(client):
             },
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 
