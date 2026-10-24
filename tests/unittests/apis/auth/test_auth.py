@@ -24,7 +24,7 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthenticationError
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -33,13 +33,13 @@ def auth_client() -> Iterator[TestClient]:
     """Expose the authentication dependency through a small HTTP route."""
     auth_app = FastAPI()
 
-    @auth_app.exception_handler(ClientPermissionError)
+    @auth_app.exception_handler(ClientAuthenticationError)
     async def handle_permission_error(
         _request: Request,
-        exception: ClientPermissionError,
+        exception: ClientAuthenticationError,
     ) -> JSONResponse:
         return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             content={"detail": str(exception)},
         )
 
@@ -58,7 +58,7 @@ def test_protected_route_rejects_missing_authorization_header(
 ) -> None:
     response = auth_client.get("/protected")
 
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {"detail": "Authorization header is required."}
 
 
@@ -70,7 +70,7 @@ def test_protected_route_rejects_non_bearer_authorization_header(
         headers={"Authorization": "Basic token"},
     )
 
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json() == {
         "detail": "Authorization header must start with 'Bearer '",
     }

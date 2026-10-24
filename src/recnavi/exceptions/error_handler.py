@@ -26,7 +26,6 @@ from .exceptions import ClientAuthorizationError
 from .exceptions import ClientConflictError
 from .exceptions import ClientNotFoundError
 from .exceptions import ClientPayloadTooLargeError
-from .exceptions import ClientResourcesNotFoundError
 from .exceptions import ClientUnprocessableEntityError
 
 
@@ -39,7 +38,6 @@ CLIENT_ERROR_STATUS_CODES: dict[type[Exception], int] = {
     ClientAuthenticationError: 401,
     ClientAuthorizationError: 403,
     ClientNotFoundError: 404,
-    ClientResourcesNotFoundError: 404,
     ClientConflictError: 409,
     ClientPayloadTooLargeError: 413,
     ClientUnprocessableEntityError: 422,

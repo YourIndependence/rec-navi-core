@@ -20,7 +20,6 @@ from recnavi.exceptions.exceptions import ClientAuthorizationError
 from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientPayloadTooLargeError
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
@@ -52,7 +51,6 @@ def response_content(response) -> dict[str, str]:
         (ClientAuthenticationError("unauthenticated"), 401, "unauthenticated"),
         (ClientAuthorizationError("forbidden"), 403, "forbidden"),
         (ClientNotFoundError("missing"), 404, "missing"),
-        (ClientResourcesNotFoundError("no resource"), 404, "no resource"),
         (ClientConflictError("conflict"), 409, "conflict"),
         (ClientPayloadTooLargeError("too large"), 413, "too large"),
         (

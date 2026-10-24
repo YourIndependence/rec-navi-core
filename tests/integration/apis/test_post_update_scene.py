@@ -33,8 +33,8 @@ from recnavi.core.types.scene import Scene
 from recnavi.main import app
 
 
-def test_update_scene_returns_400_when_no_token(client):
-    """Test POST /updateScene returns 400 when no authorization header."""
+def test_update_scene_returns_401_when_no_token(client):
+    """Test POST /updateScene returns 401 when no authorization header."""
     response = client.post(
         "/updateScene",
         json={
@@ -44,7 +44,7 @@ def test_update_scene_returns_400_when_no_token(client):
             "thumbnail": "ZmFrZSB0aHVtYm5haWw=",
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 
