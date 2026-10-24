@@ -26,6 +26,18 @@ and only then explain _How_ if the implementation is non-obvious.
 
 ---
 
+## Delegated artifact mode
+
+When a workflow supplies explicit repository, base/head or commit range, finding
+references, validation evidence, and `output=artifact`, use that scope directly.
+This mode overrides the interactive scope-confirmation and screen-output rules
+below: do not ask again, do not print fenced drafts or Sample Commands. Generate
+an English title and body as separate artifacts and return their paths to the
+caller. Use the supplied base (including an original PR branch), never assume dev.
+Record limitations honestly. The caller owns authorization, commit, push, and PR
+creation; this skill remains text-only and never executes delivery operations.
+Without this complete delegated context, preserve the interactive workflow below.
+
 ## Step 0 -- Determine the Scope of Changes
 
 **Goal**: Resolve which commits and/or staged changes to include in the PR draft.

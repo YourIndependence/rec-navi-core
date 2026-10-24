@@ -7,7 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for POST /getProject endpoint."""
+"""Integration tests for staff project endpoints."""
 
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -40,7 +40,14 @@ async def project_data() -> AsyncIterator[dict[str, object]]:
         "updatedAt": "2026-09-21T00:00:00Z",
         "status": "in_progress",
         "version": 0,
-        "scenes": [],
+        "scenes": [
+            {
+                "sceneId": "opening",
+                "scenePrincipal": "opening",
+                "videoKey": "recording.mp4",
+                "thumbnailKey": "thumbnail.jpg",
+            },
+        ],
     }
     await database.put_item(item)
 
@@ -79,7 +86,6 @@ def test_get_project_returns_400_when_missing_project_id(client, auth_headers):
 
 
 @pytest.mark.asyncio
-@pytest.mark.real_aws
 async def test_get_projects_returns_injected_project(
     client,
     auth_headers,
@@ -91,7 +97,12 @@ async def test_get_projects_returns_injected_project(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    summary = {
+    project = next(
+        p
+        for p in data["projects"]
+        if p["projectId"] == project_data["projectId"]
+    )
+    assert project == {
         key: project_data[key]
         for key in (
             "projectId",
@@ -102,4 +113,35 @@ async def test_get_projects_returns_injected_project(
             "status",
         )
     }
-    assert summary in data["projects"]
+
+
+@pytest.mark.asyncio
+async def test_get_project_returns_playback_urls(
+    client,
+    auth_headers,
+    project_data,
+):
+    response = client.post(
+        "/getProject",
+        headers=auth_headers,
+        json={"projectId": project_data["projectId"]},
+    )
+    assert response.status_code == 200
+    scene = response.json()["project"]["scenes"][0]
+    assert scene["videoUrl"]
+    assert scene["thumbnailUrl"]
+    assert "videoKey" not in scene
+    assert "thumbnailKey" not in scene
+    database = app.state.database[PROJECTS_TABLE_NAME]
+    assert (
+        await database.get_item({"projectId": project_data["projectId"]})
+        == project_data
+    )
+
+
+def test_get_my_projects_returns_400_when_no_token(client):
+    """Test GET /getMyProjects returns 400 when no authorization header."""
+    response = client.get("/getMyProjects")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"

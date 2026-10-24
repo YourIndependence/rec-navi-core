@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Implements a new feature for the TRUST backend from a GitHub Issue through a 6-phase workflow: requirements, exploration, clarification, design, plan (with user approval gate), TDD implementation, and quality review with draft PR creation."
+description: "Implements a new feature for the rec-navi-core backend from a GitHub Issue through a 6-phase workflow: requirements, exploration, clarification, design, plan (with user approval gate), TDD implementation, and quality review with draft PR creation."
 targets: ["*"]
 claudecode:
   skills:
@@ -9,7 +9,6 @@ claudecode:
     - designing-feature
     - quality-gate
     - record-architectural-decision
-    - review-with-adrs
   allowed-tools: Read, Write, Edit, Bash(gh issue view *), Bash(gh issue list *), Bash(gh pr create *), Bash(gh repo view *), Bash(git add *), Bash(git commit *), Bash(git status *), Bash(git log *), Bash(git diff *), Bash(uv run pytest *), Bash(uv run ruff *), Bash(archgate *), Bash(grep *), Bash(find *), Bash(ls *), Bash(mkdir *)
   disable-model-invocation: true
 ---
@@ -87,8 +86,8 @@ Do not proceed until the user confirms the issue type and summary. _(Skipped in 
 Run **in parallel**:
 
 1. Apply **exploring-codebase**, focusing on the modules and feature areas mentioned in the issue.
-2. If the issue involves agents: Read `src/trust/core/agents/agent_registry.py` (dynamic agent management) and check existing agent metadata in DynamoDB.
-3. If the issue involves tools: Read `src/trust/core/tools/tool_registry.py` (auto-discovery mechanism) and scan `core/tools/*_tool.py` files.
+2. Trace the affected domain models, callers, database and object-storage interfaces in `src/recnavi/core/`.
+3. Check startup injection in `main.py`, API dependencies, media persistence and project authorization when relevant. Do not assume TRUST agent/tool registries exist.
 
 Present all reports. Identify conflicts or constraints the design must respect.
 
@@ -120,12 +119,12 @@ Produce the full plan. Present it and require explicit user approval before writ
 
 | File                          | Change Type     | Description |
 | ----------------------------- | --------------- | ----------- |
-| `src/trust/<layer>/<file>.py` | Create / Modify | <purpose>   |
+| `src/recnavi/<layer>/<file>.py` | Create / Modify | <purpose>   |
 
 **New Component Skeleton** (no real logic yet -- plan only):
 
 ```python
-# src/trust/<layer>/<file>.py
+# src/recnavi/<layer>/<file>.py
 class NewComponent:
     async def method(self, ...) -> ...:
         ...
@@ -169,61 +168,34 @@ c. Write the minimum implementation to pass the test
    -> uv run pytest tests/unittests/<path>/test_<name>.py -v  ->  🟢 GREEN
 d. Refactor if needed -> confirm still GREEN
 e. Repeat (b-d) for each remaining test case
-f. Run ruff on the changed file: uv run ruff check src/trust/<changed-file>.py
+f. Run ruff on the changed file: uv run ruff check src/recnavi/<changed-file>.py
 g. Mark the TODO item complete, then move to the next component
 ```
 
 **Do not move to the next component until the current one is GREEN and ruff is clean.**
 
-When adding agents, use **Dynamic Agent Registry (preferred)**:
-
-- Create agent metadata via CMS API endpoint `/cms/createAgent` with instruction, description, and tool names
-- Agent is stored in DynamoDB and instantiated at runtime via `AgentRegistry`
-- No code deployment required for agent CRUD operations
-
-For complex agents requiring static initialization, use **Static Agent Directory**:
-
-- `core/agents/<name>/agent.py` -- `get_<name>_agent() -> Agent`
-- `core/agents/<name>/prompts.py` -- `return_instruction()`, `return_description()`
-- `core/agents/<name>/tools.py` -- tool callables (`async def` for any I/O)
+Use the actual repository interfaces and startup injection rather than introducing
+TRUST-specific registries or CMS agent endpoints. Follow ARCH-012 for dependency
+injection, ARCH-002 for media persistence, and ARCH-013 for project authorization.
+Agent/framework additions require explicit design and current dependency evidence.
 
 ### Phase 7: Quality Review
 
-Apply **quality-gate** for the full suite. All three steps below are **mandatory** -- do not skip any.
+Apply **quality-gate** in implementation mode with the pinned checkout, diff/base,
+related-component scope, required test scope, and existing evidence. It owns Ruff,
+unit/integration checks, Archgate, and the delegated **review-with-adrs** all-ADR
+assessment. Do not run a second command checklist or ADR audit here.
 
-**Step 7a -- Format & Lint**
+Run affected-module tests first, then the full project-required unit suite.
+Targeted checks do not replace stricter project-required validation. Reuse results
+only for matching revision, working content and scope; supplement newly uncovered
+ADR scope through quality-gate. Record new architectural decisions before the
+final gate so the audit includes them.
 
-```bash
-uv run ruff format --check src/ tests/
-uv run ruff check src/ tests/
-```
-
-**Step 7b -- Targeted unit tests (affected module first)**
-
-```bash
-uv run pytest tests/unittests/<affected-module>/ -v
-```
-
-If cross-module impact is suspected, also run:
-
-```bash
-uv run pytest tests/unittests/ -n auto --dist loadscope -m "not libreoffice" -v
-```
-
-**Step 7c -- ADR compliance (required)**
-
-```bash
-archgate check
-```
-
-Report every violation as a blocking issue. The quality gate is **not passed** until `archgate check` exits with no errors.
-
-If any check fails:
-1. Fix the issue
-2. Re-run the failing check (and any subsequent checks)
-3. Repeat until all three steps pass
-
-**ADR compliance review**: Apply **review-with-adrs** to supplement the automated archgate results with a manual review of human-only ADR sections.
+Required checks and applicable ADR compliance must pass before delivery. Fix
+failures and rerun invalidated checks; disclose blocked/not-run evidence and do not
+claim a passing gate. Optional unavailable integration tests retain their explicit
+status under the skill's rules.
 
 **Architectural decisions**: If the implementation introduced a new design pattern not covered by any existing ADR, apply **record-architectural-decision** to capture it before creating the PR.
 
@@ -248,7 +220,7 @@ Resolves #<ISSUE_NUMBER>
 
 | File                  | Change           |
 | --------------------- | ---------------- |
-| `src/trust/<path>.py` | Added / Modified |
+| `src/recnavi/<path>.py` | Added / Modified |
 
 ## Test Plan
 
@@ -271,4 +243,4 @@ Report the PR URL to the user.
 - **Ask once**: Collect all clarifying questions in a single Phase 3 prompt.
 - **Minimal diff**: Only add what the issue requires. Do not refactor adjacent code.
 - **Bug redirect**: If the issue turns out to be a bug, stop and recommend `/fix`.
-- **ADR gate**: Before creating the PR, always run `review-with-adrs`. If the design introduces a new pattern, record it with `record-architectural-decision`.
+- **ADR gate**: Before creating the PR, require quality-gate's completed delegated `review-with-adrs` assessment; do not invoke a second audit. If the design introduces a new pattern, record it with `record-architectural-decision`.

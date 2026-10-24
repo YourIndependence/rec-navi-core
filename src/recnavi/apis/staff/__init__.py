@@ -7,4 +7,4 @@
 # For internal use only.
 # developer team.
 
-"""Public (staff-facing) API routers."""
+"""Staff-facing API routers."""
