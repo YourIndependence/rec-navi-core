@@ -15,7 +15,7 @@ from recnavi.core.project.project import get_project
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientAuthorizationError
-from recnavi.exceptions.exceptions import ClientResourcesNotFoundError
+from recnavi.exceptions.exceptions import ClientNotFoundError
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -108,7 +108,7 @@ async def test_get_project_raises_404_for_missing_project():
     )
 
     with pytest.raises(
-        ClientResourcesNotFoundError,
+        ClientNotFoundError,
         match="Project not found",
     ):
         await get_project(
@@ -119,8 +119,8 @@ async def test_get_project_raises_404_for_missing_project():
 
 
 @pytest.mark.asyncio
-async def test_get_project_raises_403_for_other_group():
-    """Test get_project raises 403 for other group's project."""
+async def test_get_project_allows_admin_for_other_group():
+    """Test admins may access projects from another group."""
     projects_db = MockDatabase(
         initial_items=[
             {
@@ -142,18 +142,15 @@ async def test_get_project_raises_403_for_other_group():
         user_id="user-bbb",
         user_name="User BBB",
         group_id="group-bbb",
-        role=UserRole.OWNER,
+        role=UserRole.ADMIN,
     )
 
-    with pytest.raises(
-        ClientAuthorizationError,
-        match="User does not have access",
-    ):
-        await get_project(
-            projects_db=projects_db,
-            project_id="proj-999",
-            user=user,
-        )
+    project = await get_project(
+        projects_db=projects_db,
+        project_id="proj-999",
+        user=user,
+    )
+    assert project.project_id == "proj-999"
 
 
 @pytest.mark.asyncio

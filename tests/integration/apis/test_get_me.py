@@ -7,13 +7,7 @@
 # For internal use only.
 # developer team.
 
-"""Integration tests for GET /getMe endpoint.
-
-These tests access real AWS DynamoDB and require proper credentials.
-Mark with @pytest.mark.real_aws to skip in CI without AWS access.
-"""
-
-import pytest
+"""Integration tests for GET /getMe with the shared auth override."""
 
 
 def test_get_me_returns_400_when_no_token(client):
@@ -25,15 +19,8 @@ def test_get_me_returns_400_when_no_token(client):
     assert data["status"] == "error"
 
 
-@pytest.mark.real_aws
-def test_get_me_with_real_aws(client, auth_headers):
-    """Test GET /getMe with real AWS credentials.
-
-    Prerequisites:
-    - DynamoDB users table must exist
-    - Valid user record with userId matching the token's sub claim
-    - USERS_TABLE_NAME environment variable set
-    """
+def test_get_me_returns_authenticated_user(client, auth_headers):
+    """Return the user provided by the shared authentication override."""
     response = client.get("/getMe", headers=auth_headers)
 
     assert response.status_code == 200
