@@ -12,6 +12,7 @@
 from uuid import uuid4
 
 import pytest
+from fastapi import Request
 
 from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import ENV
@@ -21,6 +22,20 @@ from recnavi.core.storage.image_urls import MEDIA_URL_EXPIRATION_SECONDS
 from recnavi.core.types.user import UserRole
 from recnavi.main import app
 from tests.mockups.mock_users import get_mock_x_user
+
+
+@pytest.fixture(scope="module", autouse=True)
+def admin_authentication(client):
+    previous = app.dependency_overrides[verify_user]
+
+    def admin_user(request: Request):
+        return previous(request).model_copy(update={"role": UserRole.ADMIN})
+
+    app.dependency_overrides[verify_user] = admin_user
+    try:
+        yield
+    finally:
+        app.dependency_overrides[verify_user] = previous
 
 
 def test_update_scene_master_returns_400_when_no_token(client):

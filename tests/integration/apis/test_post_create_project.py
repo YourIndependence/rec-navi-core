@@ -13,13 +13,10 @@ from contextlib import suppress
 from typing import cast
 
 import pytest
-from fastapi import Request
 
-from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.project import ProjectStatus
-from recnavi.core.types.user import UserRole
 from recnavi.main import app
 
 
@@ -49,12 +46,6 @@ async def test_create_project_returns_good(
         dict[str, BaseDatabase],
         app.state.database,
     )[PROJECTS_TABLE_NAME]
-    previous = app.dependency_overrides[verify_user]
-
-    def owner_user(request: Request):
-        return previous(request).model_copy(update={"role": UserRole.OWNER})
-
-    app.dependency_overrides[verify_user] = owner_user
     project_id = None
     try:
         response = client.post(
@@ -127,7 +118,6 @@ async def test_create_project_returns_good(
         assert project_recode["version"] == 0
 
     finally:
-        app.dependency_overrides[verify_user] = previous
         with suppress(Exception):
             await database.delete_item(
                 {"projectId": project_id},

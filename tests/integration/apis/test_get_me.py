@@ -32,4 +32,4 @@ def test_get_me_returns_authenticated_user(client, auth_headers):
     assert user["userId"] == "test-user-123"
     assert user["userName"] == "Test User"
     assert user["groupId"] == "it-group"
-    assert user["role"] == "admin"
+    assert user["role"] == "owner"
