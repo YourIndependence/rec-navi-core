@@ -33,7 +33,9 @@ async def delete_project(
     project = Project.model_validate(item)
 
     if not project.validate_permission(user=user, as_role=UserRole.OWNER):
-        raise ClientAuthorizationError("Only owners can delete projects")
+        raise ClientAuthorizationError(
+            "User does not have access permission to this project",
+        )
 
     await projects_db.delete_item(key={"projectId": project_id})
     await storage.delete_objects_by_prefix(prefix=f"projects/{project_id}/")

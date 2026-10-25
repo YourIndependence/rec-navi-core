@@ -15,7 +15,6 @@ from datetime import datetime
 from uuid import uuid4
 
 from recnavi.core.database.base_database import BaseDatabase
-from recnavi.core.project.scene_urls import attach_scene_urls
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
 from recnavi.core.types.scene import SceneStatus
@@ -107,7 +106,7 @@ async def update_scene(
 
     try:
         await projects_db.put_item(
-            project.model_dump(by_alias=True),
+            project.to_storage_item(),
             condition_expression=(
                 "attribute_not_exists(version) OR version = :previous_version"
             ),
@@ -131,10 +130,7 @@ async def update_scene(
             object_key=old_video_key.removesuffix(".mp4") + "_thumb.jpg",
         )
 
-    return await attach_scene_urls(
-        storage=storage,
-        project=project,
-    )
+    return await project.attach_presigned_url(storage=storage)
 
 
 async def _cleanup_new_shot(

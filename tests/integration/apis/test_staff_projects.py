@@ -40,7 +40,14 @@ async def project_data() -> AsyncIterator[dict[str, object]]:
         "updatedAt": "2026-09-21T00:00:00Z",
         "status": "in_progress",
         "version": 0,
-        "scenes": [],
+        "scenes": [
+            {
+                "sceneId": "opening",
+                "scenePrincipal": "opening",
+                "videoKey": "recording.mp4",
+                "thumbnailKey": "thumbnail.jpg",
+            },
+        ],
     }
     await database.put_item(item)
 
@@ -90,4 +97,36 @@ async def test_get_projects_returns_injected_project(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert project_data in data["projects"]
+    project = next(
+        p
+        for p in data["projects"]
+        if p["projectId"] == project_data["projectId"]
+    )
+    assert project["scenes"][0]["videoUrl"]
+    assert project["scenes"][0]["thumbnailUrl"]
+    assert "videoKey" not in project["scenes"][0]
+    assert "thumbnailKey" not in project["scenes"][0]
+
+
+@pytest.mark.asyncio
+async def test_get_project_returns_playback_urls(
+    client,
+    auth_headers,
+    project_data,
+):
+    response = client.post(
+        "/getProject",
+        headers=auth_headers,
+        json={"projectId": project_data["projectId"]},
+    )
+    assert response.status_code == 200
+    scene = response.json()["project"]["scenes"][0]
+    assert scene["videoUrl"]
+    assert scene["thumbnailUrl"]
+    assert "videoKey" not in scene
+    assert "thumbnailKey" not in scene
+    database = app.state.database[PROJECTS_TABLE_NAME]
+    assert (
+        await database.get_item({"projectId": project_data["projectId"]})
+        == project_data
+    )

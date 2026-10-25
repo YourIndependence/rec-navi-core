@@ -117,6 +117,16 @@ mockups, modules that only declare Pydantic schemas or core types, the modules
 This keeps the everyday development workflow fast and deterministic while preserving a place for real-cloud validation when it is intentionally requested.
 
 
+## Media URLs and persistence
+
+Follow [ARCH-002](adrs/ARCH-002-pydantic-first-type-system.md#media-models-and-temporary-urls).
+Use one domain type when the response differs only by temporary media URLs.
+Core models own async `attach_presigned_url()` methods updating themselves and returning `self`;
+application use cases call them after authorization and filtering.
+Normal serialization excludes durable URI/key fields. Database writes use
+`to_storage_item()`, including nested media in `Project`, and exclude URLs.
+Distinct contracts such as privacy-limited `UserSummary` remain separate.
+
 ## Application module naming
 
 Application module filenames use `<verb>_<noun>.py` without `_usecase`.
@@ -125,3 +135,13 @@ Use-case function names retain `_usecase`, for example
 Unit test filenames mirror the module: `test_review_scene.py`.
 See [ARCH-001](adrs/ARCH-001-clean-architecture.md#file-naming) for the decision
 and its automated enforcement.
+
+
+## Project authorization
+
+Follow [ARCH-013](adrs/ARCH-013-project-authorization.md). Existing-project
+operations use Project.validate_permission with the declared role and the
+canonical ClientAuthorizationError message. Do not add inline role, owner, or
+group policy. Authorize before mutation, storage access, or return. Keep the
+operation-role map current when adding or moving operations. Enforcement lives
+in the ADR's companion `.rules.ts` and runs through `archgate check`.

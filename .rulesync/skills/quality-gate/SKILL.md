@@ -1,113 +1,87 @@
 ---
 name: quality-gate
-description: Runs ruff (format + lint), pytest (unit + integration where available), and archgate for the affected module, reports results, and blocks PR creation if any check fails. Use after implementing any change.
+description: Own validation completeness and gate decisions for Ruff, tests, Archgate and delegated all-ADR compliance, with revision- and scope-bound evidence.
 ---
+# Quality gate
 
-# Running Quality Checks
+Inputs: revision/checkout, affected scope, mode (`review` or `implementation`),
+required unit scope, full diff/base, related-component scope, artifact destination,
+and existing evidence. Default mode is
+`implementation`. The caller's/project's stricter check requirements take precedence.
 
-Validates code quality before creating a PR.
+- `review`: check only; never autoformat, fix lint, edit sources, install tools,
+  create symlinks, or start services. Use the exact pinned checkout. With `onlocal`,
+  do not change git state; unavailable matching checkouts mean BLOCKED.
+- `implementation`: fixes are allowed in task-owned work only; rerun affected
+  checks after changes. Preserve original user changes.
+- Reuse results only for the same revision, working-tree content and checked scope,
+  with command, status, and output evidence. Changes invalidate affected results.
+  A scope-only expansion needs the missing ADR coverage, not repeated unchanged
+  automated commands. Return a clear scope boundary if context cannot be obtained.
 
-> **All steps are MANDATORY. Do NOT skip any step -- especially `archgate check`.
-> The quality gate is only passed when ALL steps report success.**
+## Required checks
 
-## Instructions
-
-### Step 1: Format & Lint
+Run sequentially, capturing logs. Continue independent checks after a failure.
 
 ```bash
 uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
+uv run pytest tests/unittests/ -v
 ```
 
-Fix any issues:
+Targeted tests may run first, but do not replace the full suite required by project
+instructions. Unit tests must not require LocalStack, real cloud/provider services,
+or secrets; report such dependencies as testing-boundary violations.
 
-```bash
-uv run ruff format src/ tests/
-uv run ruff check --fix src/ tests/
-```
+Run applicable integration tests only when required services/explicit guards are
+available. Consult `docs/ENVIRONMENTS.md` when present, otherwise the repository README,
+test configuration and integration runner; do not
+infer all providers are available from MySQL alone. Preserve `real_aws`/`ecs` guards.
+Use a repository integration runner only if present and applicable; never assume
+TRUST's LocalStack runner exists. This checkout's tests/integration/conftest.py
+provides in-memory infrastructure when ENV=CI. Use that documented profile for
+HTTP integration checks without real AWS. No unrequested service startup during
+review. Unavailable optional
+integration tests are NOT RUN with a reason, never PASS; they do not block delivery
+unless required for this change or by the caller. Real-provider tests require an
+explicitly authorized environment/profile.
 
-### Step 2: Run Unit Tests
+Run `archgate check`; if unavailable, use an installed executable or the repository's
+supported runner (`npx.cmd --yes archgate check` on Windows, `npx --yes archgate check`
+elsewhere). If dependencies/network/configuration are unavailable, report BLOCKED.
+Do not globally install tools or rewrite configuration as a fallback. Distinguish
+actual rule violations (FAIL) from execution/configuration errors (BLOCKED).
+In CI, verified dedicated-job results for the exact revision may be reused; merely
+being in CI is not a passing result.
 
-Targeted (default -- run this first):
+## Required ADR compliance
 
-```bash
-uv run pytest tests/unittests/<module-path>/ -v
-```
+Invoke `review-with-adrs` once with automated Archgate evidence, base/head and
+working-tree identity, complete related-component scope, and prior audit if any.
+It owns interpretation and every ADR's applicability/manual assessment. This skill
+owns ensuring that audit completed and incorporates its outcome into the gate.
+Archgate success alone does not satisfy this requirement. Do not report a passing
+gate with missing ADR rows, applicable manual failures, or blocked required evidence.
+An ADR-specific NOT APPLICABLE verdict needs a reason and is not a passing check.
 
-Full unit suite (run only if cross-module impact is suspected):
+When a reviewer returns an expanded component scope, supplement only the uncovered
+ADR evidence and return the merged complete matrix, noting scope/revision. Reuse
+unaffected rows only when the decision and component evidence still match. Required
+evidence that remains unavailable means BLOCKED. Changes to code or ADRs invalidate
+affected checks/audit; optional ADR creation remains a separate authorized action.
+Do not call reviewing-pr or its specialists from the gate: the dependency is one-way.
 
-```bash
-uv run pytest tests/unittests/ -n auto --dist loadscope -m "not libreoffice" -v
-```
+## Result contract
 
-Unit tests must not require LocalStack, real AWS, Microsoft 365, Box, Azure, Google APIs, or repository secrets. If a test needs those resources, it belongs in `tests/integration/` with explicit skip guards or markers.
+Return each command/check and ADR-audit outcome with revision, scope, PASS/FAIL/BLOCKED/NOT RUN, counts,
+concise evidence/reason, and private log path. Return a Japanese result table when
+requested; otherwise retain the caller's language/format. Never edit the aggregate
+review file or print detailed logs in artifact-only mode. Include the complete
+all-ADR matrix, violations with provenance, gaps, exceptions and scope boundaries.
+Preserve actual failures, including baseline failures; never relabel an automated
+failure as PASS because its cause predates this PR. Distinguish provenance from
+the gate's execution/compliance outcome and disclose both.
 
-### Step 3: Run Integration Tests (environment-dependent)
-
-First, determine whether services are available by probing MySQL:
-
-```bash
-nc -z mysql 3306 2>/dev/null && echo "reachable via docker network" \
-  || nc -z localhost 3306 2>/dev/null && echo "reachable on localhost" \
-  || echo "services not reachable"
-```
-
-**If services are reachable** (devcontainer / LOCAL_CONTAINER, or host with compose running):
-
-```bash
-bash scripts/run-integration-tests.sh
-```
-
-The script auto-detects endpoints (Docker-network hostnames or localhost), overrides `ENV=CI`, starts Docker Compose if needed, and runs the LocalStack-backed profile. Pass extra pytest flags after `--`:
-
-```bash
-bash scripts/run-integration-tests.sh -k test_greeting -v
-```
-
-When `AWS_ENDPOINT_URL` points to LocalStack, `tests/integration/conftest.py` skips `real_aws` tests automatically. From a credentialed environment such as an EC2 bastion, the default integration command includes real AWS tests:
-
-```bash
-uv run pytest -q tests/integration/
-uv run pytest -q -m "real_aws and ecs" tests/integration/task_runner/
-```
-
-**If services are NOT reachable** (ENV=LOCAL -- GitHub Codespaces, EC2 without compose):
-
-Integration tests will be auto-skipped via `testing_utils.skip_local()`. Report this as "Skipped (services unavailable)" in the results -- this is not a blocking failure.
-
-### Step 4: ADR Compliance (REQUIRED -- do not skip)
-
-```bash
-archgate check
-```
-
-This step is **not optional**. Run it every time. Report each violation as a blocking issue.
-
-### Step 5: Report Results
-
-```
-## Quality Gate
-
-### Ruff
-- Format: ✅ / ❌ <issues>
-- Lint:   ✅ / ❌ <issues>
-
-### Unit Tests (pytest)
-- Passed: <N>
-- Failed: <N> -- <list failures>
-
-### Integration Tests
-- Status: ✅ Passed / ❌ Failed / ⚠️ Skipped (services unavailable)
-- Passed: <N>
-- Failed: <N> -- <list failures>
-
-### Archgate
-- Rules:  <N> passed / <N> failed
-- Errors: <list rule violations>
-
-### Verdict
-✅ All checks passed -- ready for PR
-❌ Blocking issues -- fix before creating PR
-```
-
-Do not create a PR if any check fails. Skipped integration tests (due to unavailable services) are not a blocker.
+Required checks must all PASS before repair PR commit/push/creation. In review mode,
+failures block approval, not publication of an honest review report. Optional skipped
+integration tests must be disclosed. Do not claim CI passed from local results.

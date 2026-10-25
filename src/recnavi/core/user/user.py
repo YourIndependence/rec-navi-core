@@ -39,3 +39,9 @@ async def get_user_by_id(
         raise ClientAuthorizationError(f"Invalid role: {role}")
 
     return User.model_validate(item)
+
+
+def ensure_user_is_active(*, user: User) -> None:
+    """Raise ClientAuthorizationError when the user has been deactivated."""
+    if not user.is_active:
+        raise ClientAuthorizationError("User is deactivated")

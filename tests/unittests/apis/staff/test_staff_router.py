@@ -12,7 +12,6 @@ from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
-from recnavi.core.types.scene import SceneView
 from tests.mockups.mock_users import get_mock_x_user
 
 
@@ -55,6 +54,7 @@ def test_get_projects_parses_pagination_and_serializes_response(
     }
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
+        storage=staff_client.app.state.object_storage,
         user_id="test-user-123",
         group_id="it-group",
         limit=12,
@@ -85,6 +85,7 @@ def test_get_project_parses_request_and_serializes_response(
     }
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
+        storage=staff_client.app.state.object_storage,
         project_id="proj-123",
         user=get_mock_x_user(),
     )
@@ -102,7 +103,7 @@ def test_update_scene_parses_request_and_serializes_usecase_result(
         owner_user_id="test-user-123",
         created_at="2026-01-01T00:00:00Z",
         scenes=[
-            SceneView(
+            Scene(
                 scene_id="scene-456",
                 scene_principal="cooking",
                 video_key="private/video.mp4",

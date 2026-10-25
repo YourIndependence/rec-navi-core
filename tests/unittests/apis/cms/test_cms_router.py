@@ -15,6 +15,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -51,16 +52,28 @@ def _make_project() -> Project:
     )
 
 
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
 def test_get_scene_masters_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
     scene_master = SceneMaster(
         scene_principal="cooking",
         title="Cooking",
-        thumbnail_uri="s3://bucket/thumbnail.jpg",
-        guide_uri="s3://bucket/guide.png",
-        max_duration_seconds=60,
+        thumbnail_url="https://signed/thumbnail",
+        guide_url="https://signed/guide",
+        max_duration_seconds=5,
     )
     with patch(
         "recnavi.apis.cms.cms_router.get_scene_masters_usecase",
@@ -75,24 +88,40 @@ def test_get_scene_masters_calls_usecase_and_serializes_response(
             {
                 "scenePrincipal": "cooking",
                 "title": "Cooking",
-                "maxDurationSeconds": 60,
+                "maxDurationSeconds": 5,
+                "thumbnailUrl": "https://signed/thumbnail",
+                "guideUrl": "https://signed/guide",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         scenes_db=cms_client.app.state.database[SCENES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
 
 
-def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
+@pytest.mark.parametrize(
+    "role",
+    [UserRole.STAFF, UserRole.ADMIN, UserRole.OWNER],
+)
+def test_get_templates_calls_usecase_and_serializes_response(
     cms_client: TestClient,
     auth_headers: dict[str, str],
+    monkeypatch,
+    role: UserRole,
 ) -> None:
+    user = get_mock_x_user().model_copy(update={"role": role})
+    monkeypatch.setitem(
+        cms_client.app.dependency_overrides,
+        verify_user,
+        lambda: user,
+    )
     template = ScenesTemplate(
         template_id="template-123",
         title="Starter",
         scene_principals=["cooking"],
-        thumbnail_uri="s3://bucket/template.jpg",
+        thumbnail_url="https://signed/template",
     )
     with patch(
         "recnavi.apis.cms.cms_router.get_templates_usecase",
@@ -108,12 +137,21 @@ def test_get_templates_calls_usecase_and_excludes_thumbnail_uri(
                 "templateId": "template-123",
                 "title": "Starter",
                 "scenePrincipals": ["cooking"],
+                "thumbnailUrl": "https://signed/template",
             },
         ],
     }
     usecase.assert_awaited_once_with(
         templates_db=cms_client.app.state.database[TEMPLATES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
     )
+    assert response.headers["cache-control"] == "no-store"
+    schema = cms_client.get("/openapi.json").json()
+    properties = schema["components"]["schemas"]["ScenesTemplate"][
+        "properties"
+    ]
+    assert "thumbnailUri" not in properties
+    assert "thumbnailUrl" in properties
 
 
 def test_create_project_parses_request_and_serializes_response(
@@ -335,3 +373,76 @@ def test_review_scene_rejects_invalid_result(
         )
     assert response.status_code == 422
     usecase.assert_not_awaited()
+
+
+def test_download_project_delegates_to_usecase(cms_client, auth_headers):
+    archive = _make_project()
+    archive.download_url = "https://example.org/archive"
+    with patch(
+        "recnavi.apis.cms.cms_router.download_project_usecase",
+        new=AsyncMock(return_value=archive),
+    ) as usecase:
+        response = cms_client.post(
+            "/downloadProject",
+            headers=auth_headers,
+            json={"projectId": "p"},
+        )
+    assert response.status_code == 200
+    assert response.json()["downloadUrl"] == archive.download_url
+    assert response.json()["expiresInSeconds"] == 3600
+    assert usecase.await_args.kwargs["project_id"] == "p"
+    assert (
+        usecase.await_args.kwargs["projects_db"]
+        is cms_client.app.state.database[PROJECTS_TABLE_NAME]
+    )
+    assert (
+        usecase.await_args.kwargs["storage"]
+        is cms_client.app.state.object_storage
+    )
+
+
+def test_update_scene_master_forwards_user_and_returns_signed_master(
+    cms_client,
+    auth_headers,
+):
+    master = SceneMaster(
+        scene_principal="shop_gaikan",
+        title="Shop",
+        max_duration_seconds=5,
+        thumbnail_url="https://signed/thumbnail",
+        guide_url="https://signed/guide",
+    )
+    with patch(
+        "recnavi.apis.cms.cms_router.update_scene_master_usecase",
+        new=AsyncMock(return_value=master),
+    ) as usecase:
+        response = cms_client.post(
+            "/updateSceneMaster",
+            headers=auth_headers,
+            json={
+                "scenePrincipal": "shop_gaikan",
+                "title": "Shop",
+                "maxDurationSeconds": 5,
+                "thumbnailImage": "ZXhhbXBsZQ==",
+                "guideImage": "Z3VpZGU=",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["sceneMaster"] == master.model_dump(by_alias=True)
+    assert usecase.call_args.kwargs["user"] == get_mock_x_user()
+    assert usecase.call_args.kwargs["scene_principal"] == "shop_gaikan"
+    assert usecase.call_args.kwargs["thumbnail_image"] == "ZXhhbXBsZQ=="
+    assert (
+        usecase.call_args.kwargs["storage"]
+        is cms_client.app.state.object_storage
+    )
+    assert (
+        usecase.call_args.kwargs["scenes_db"]
+        is cms_client.app.state.database[SCENES_TABLE_NAME]
+    )
+    schema = cms_client.get("/openapi.json").json()["components"]["schemas"][
+        "UpdateSceneMasterRequest"
+    ]
+    assert "scenePrincipal" in schema["required"]
+    assert schema["properties"]["scenePrincipal"]["type"] == "string"
+    assert "thumbnailImage" in schema["properties"]

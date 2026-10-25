@@ -16,6 +16,7 @@ import pytest
 
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.database import DatabaseQueryResult
+from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
 from recnavi.core.user.users import get_group_users
 from tests.mockups.mock_database import MockDatabase
@@ -186,6 +187,55 @@ async def test_get_group_users_includes_all_roles():
 
     roles = {u.role for u in users}
     assert roles == {UserRole.ADMIN, UserRole.OWNER, UserRole.STAFF}
+
+
+@pytest.mark.asyncio
+async def test_get_group_users_excludes_inactive_users():
+    """Test deactivated users are not returned but missing flag means active."""
+    database = MockDatabase(
+        initial_items=[
+            {
+                "userId": "user-1",
+                "userName": "Active",
+                "role": "staff",
+                "groupId": "group-1",
+                "isActive": True,
+            },
+            {
+                "userId": "user-2",
+                "userName": "Left",
+                "role": "staff",
+                "groupId": "group-1",
+                "isActive": False,
+            },
+            {
+                "userId": "user-3",
+                "userName": "Legacy",
+                "role": "staff",
+                "groupId": "group-1",
+            },
+        ],
+    )
+
+    users = await get_group_users(users_db=database, group_id="group-1")
+
+    assert {u.user_id for u in users} == {"user-1", "user-3"}
+    assert len(database.items) == 3
+
+
+def test_user_is_active_defaults_to_true_and_serializes_camel_case():
+    """Test the flag defaults to active and uses the isActive alias."""
+    user = User.model_validate(
+        {
+            "userId": "user-1",
+            "userName": "Alice",
+            "role": "staff",
+            "groupId": "group-1",
+        },
+    )
+
+    assert user.is_active is True
+    assert user.model_dump(by_alias=True)["isActive"] is True
 
 
 @pytest.mark.asyncio

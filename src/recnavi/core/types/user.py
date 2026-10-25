@@ -47,6 +47,10 @@ class UserSummary(BaseModel):
 class User(UserSummary):
     """User details and authorization context."""
 
+    is_active: bool = Field(
+        default=True,
+        description="False once the user has left; the record is kept",
+    )
     email: str | None = Field(
         default=None,
         description="Email address of the user",

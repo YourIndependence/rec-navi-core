@@ -9,9 +9,14 @@
 
 """Tests for Scene type."""
 
+from unittest.mock import AsyncMock
+
+import pytest
+
 from recnavi.core.types.scene import ReviewSceneResult
 from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
+from tests.mockups.mock_object_storage import MockObjectStorage
 
 
 def test_scene_has_optional_review_fields():
@@ -76,3 +81,47 @@ def test_review_results_share_scene_status_values() -> None:
     }
     for result in ReviewSceneResult:
         assert SceneStatus(result.value).name == result.name
+
+
+@pytest.mark.asyncio
+async def test_scene_urls_refresh_and_storage_round_trip_preserves_keys():
+    scene = Scene(
+        scene_id="scene",
+        scene_principal="opening",
+        video_key="video.mp4",
+        thumbnail_key="thumb.jpg",
+        assigned_user_ids=["staff"],
+    )
+    storage = MockObjectStorage(bucket_name="media")
+    storage.generate_presigned_url = AsyncMock(
+        side_effect=[
+            "https://signed/video-1",
+            "https://signed/thumb-1",
+            "https://signed/video-2",
+            "https://signed/thumb-2",
+        ],
+    )
+    first = await scene.attach_presigned_url(storage=storage)
+    assert first is scene
+    assert scene.video_url == "https://signed/video-1"
+    second = await scene.attach_presigned_url(storage=storage)
+    assert second is scene
+    assert scene.assigned_user_ids == ["staff"]
+    assert second.video_url == "https://signed/video-2"
+    restored = Scene.model_validate(first.to_storage_item())
+    assert restored.to_storage_item() == scene.to_storage_item()
+    assert restored.video_url is None
+    assert restored.thumbnail_url is None
+    assert first.to_storage_item()["videoKey"] == "video.mp4"
+    assert "videoUrl" not in first.to_storage_item()
+    assert "thumbnailUrl" not in first.to_storage_item()
+    assert "videoKey" not in first.model_dump(by_alias=True)
+    assert "thumbnailKey" not in first.model_dump(by_alias=True)
+
+
+def test_scene_response_schema_excludes_storage_keys():
+    properties = Scene.model_json_schema(mode="serialization")["properties"]
+    assert "videoKey" not in properties
+    assert "thumbnailKey" not in properties
+    assert "videoUrl" in properties
+    assert "thumbnailUrl" in properties

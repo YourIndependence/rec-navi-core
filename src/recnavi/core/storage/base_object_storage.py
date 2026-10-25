@@ -12,6 +12,9 @@
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import AsyncIterator
+from collections.abc import Sequence
+
+from recnavi.core.types.archive_entry import ArchiveEntry
 
 
 class BaseObjectStorage(ABC):
@@ -72,4 +75,14 @@ class BaseObjectStorage(ABC):
         expiration: int = 3600,
     ) -> str:
         """Generate a presigned download URL for an object."""
+        pass
+
+    @abstractmethod
+    async def create_archive(
+        self,
+        *,
+        object_key: str,
+        entries: Sequence[ArchiveEntry],
+    ) -> None:
+        """Store a ZIP from source objects and metadata with bounded memory."""
         pass

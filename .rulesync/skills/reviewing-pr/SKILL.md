@@ -1,110 +1,67 @@
 ---
 name: reviewing-pr
-description: >-
-  Reviews PR diff against 7 categories (Architecture, Type Safety, Async, ADK,
-  Security, Performance, Code Quality) and ADR compliance. Use this skill when
-  analyzing code changes in a pull request to identify issues introduced by the
-  current diff. Returns structured review report with confidence-scored issues
-  (80+ threshold).
+description: Orchestrate eight specialist PR reviews across related components, consolidate revision-bound quality and ADR evidence, and return per-area verdicts and deduplicated findings.
 ---
-# Reviewing PR
+# Orchestrate PR review
 
-Reviews PR diff and generates a structured report.
+Read [REVIEW-CONTRACT.md](REVIEW-CONTRACT.md) for shared scope, provenance, verdict,
+severity/confidence, and output rules. This skill owns review coordination, not
+quality-command execution, ADR auditing, source edits, or GitHub publication.
 
-**What it does**: Analyzes PR diff for issues across 7 review categories plus ADR compliance, scoring each finding by confidence (80-94: Important, 95-100: Critical).
+## 1. Prepare shared inputs
 
-**When to use it**: When analyzing code changes in a pull request to identify issues introduced by the current diff.
+Receive pinned base/head, complete diff/file list, exploration, existing threads,
+quality-gate evidence with its all-ADR matrix, and artifact destination. Read project
+coding rules and identify the related component scope. Reuse exploration; request
+`exploring-codebase` only for missing context. Never drop changed files for PR size.
+Missing validation does not prevent independent analysis, but remains explicit.
 
-**Input**: PR number, diff text, changed files list
+## 2. Delegate eight areas
 
-**Output**: Structured review report (Markdown format)
+Invoke all eight skills; Not applicable still needs a reason. The skill directories
+are siblings, not nested copies. Pass the shared input and requested scope to each.
 
----
+| Area | Skill | Primary ownership |
+|---|---|---|
+| Architecture | `reviewing-architecture` | Component consistency/uniformity, responsibilities, concern boundaries, DI and design fitness |
+| Type Safety | `reviewing-type-safety` | Types, models, validation and data contracts |
+| Async | `reviewing-async` | Async I/O, cancellation and resource/task lifecycle |
+| ADK | `reviewing-adk` | ADK-specific agent/tool/callback/session/Runner runtime contracts |
+| Security | `reviewing-security` | Authorization, isolation, trust boundaries and information protection |
+| Performance | `reviewing-performance` | I/O volume, concurrency, memory and execution cost |
+| Code Quality | `reviewing-code-quality` | Readability, naming, local complexity, error handling and maintainability |
+| Testing | `reviewing-testing` | Behavior-to-test coverage, assertions, test boundaries and regression evidence |
 
-## Instructions
+Use the existing reviewer/architect subagents as execution roles when available;
+they follow the assigned specialist contract rather than their own duplicated rules.
+Delegation need not mean one concurrent agent per skill. Merge artifact results in
+the parent; specialists never write the aggregate report. Architecture consumes the
+quality-gate ADR matrix, rather than invoking `review-with-adrs` itself.
 
-Use this checklist to execute the review workflow:
+## 3. Reconcile evidence and observations
 
-- [ ] Step 0: Load coding standards
-- [ ] Step 1: Load PR context
-- [ ] Step 2: Apply 7-category review
-- [ ] Step 3: ADR compliance check (archgate + manual)
-- [ ] Step 4: Generate structured report
+Validate scope, evidence, provenance, confidence and verdict for every area. Request
+missing analysis instead of inventing success. If specialist scope exceeds the ADR
+matrix, return the explicit delta to the caller for one quality-gate supplement,
+then propagate updated evidence to affected specialists. Missing supplementation
+means verification incomplete. Standalone callers likewise provide quality-gate
+results or receive unverified status; do not silently launch duplicate checks.
 
-### Step 0: Load Coding Standards
+Merge observations sharing a root cause into one R-NNN finding with one primary
+area and related-area references. Preserve all eight verdicts/evidence references,
+without counting or posting that finding twice. Use [CHECK-RULES.md](CHECK-RULES.md)
+for ownership boundaries. Existing debt is included for every area, not Architecture
+alone. Preserve accepted exceptions and actual check failures honestly.
 
-Before starting the review, read the project's coding standards:
+## 4. Return once complete
 
-```bash
-cat docs/CODING_RULES.md
-```
+Return eight verdict rows (area, verdict, Introduced/Worsened finding IDs,
+Pre-existing/Improvement IDs, limitations), canonical findings, architecture
+assessment, the supplied complete ADR matrix, Testing's detailed coverage matrix
+and counts, checked scope, blockers, and scope deltas.
 
-This document contains critical coding conventions that supplement the automated checks:
-- Comment minimalism (self-documenting code)
-- Error handling patterns (fail fast, never swallow)
-- Type system guidelines (Pydantic vs dict)
-- Function signature conventions (keyword-only arguments)
-- Code quality principles (no patches/workarounds)
-
-Many of these rules are NOT fully enforceable by archgate static analysis and require human judgment during review.
-
-### Step 1: Load PR Context
-
-Check PR basic information:
-- Changed layers (`apis/`, `application/`, `core/`, `infrastructure/`)
-- Lines added/deleted
-- New files vs existing file modifications
-
-### Step 2: Apply reviewer subagent
-
-Apply the 7-category review rules from [[CHECK-RULES.md]]:
-
-1. Architecture Violations
-2. Type Safety
-3. Async Correctness
-4. ADK Agent Pattern
-5. Security
-6. Performance
-7. Code Quality & Maintainability
-
-Score each finding by confidence (0-79: skip, 80-94: Important, 95-100: Critical).
-
-**Important**: Only report issues introduced in this change. Do not report existing code issues.
-
-### Step 3: Apply review-with-adrs skill
-
-Run ADR compliance check:
-
-```bash
-archgate check
-```
-
-If exit code is `1`, report violations as **Critical Issue**.
-
-For ADRs with `rules: false`, manual review:
-- Read `## Compliance` section of each ADR in `docs/adrs/`
-- For each **Don't** item: Search diff for prohibited patterns
-- For each **Do** item: Check if diff follows required patterns
-
-### Step 4: Generate Structured Review Report
-
-Generate report following the format in [[REPORT-FORMAT.md]].
-
-**Important**: In Critical/Important Issues sections, describe each issue in structured format:
-- **File**: File path (used for GitHub API posting)
-- **Line**: Line number (used for GitHub API posting)
-- **Category**: Category (used for review comment title)
-- **Description**: Detailed problem description
-- **Evidence**: Code snippet (optional)
-- **Fix**: Concrete fix instruction (used for suggestion generation)
-- **Confidence**: Confidence score
-
----
-
-## Output Format
-
-Report is returned in Markdown format and used by calling `/review` command to:
-1. Post summary to GitHub PR comment
-2. Post Critical/Important issues as individual review comments (including suggestions)
-3. Classify issues not addressable via suggestions by category and create refactor PRs
-
+Preserve [REPORT-FORMAT.md](REPORT-FORMAT.md) in its original English form. Its legacy
+confidence ranges are presentation examples; this contract's independent severity
+and confidence govern classification. Add provenance/related-area metadata without
+redefining the original fields. The caller owns report assembly, aggregate decision,
+comment URLs, publication, and repair delivery.

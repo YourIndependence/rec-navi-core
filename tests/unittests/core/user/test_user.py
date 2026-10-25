@@ -12,6 +12,7 @@
 import pytest
 
 from recnavi.core.types.user import User
+from recnavi.core.user.user import ensure_user_is_active
 from recnavi.core.user.user import get_user_by_id
 from recnavi.exceptions.exceptions import ClientAuthorizationError
 from tests.mockups.mock_database import MockDatabase
@@ -101,3 +102,50 @@ async def test_get_user_by_id_accepts_all_valid_roles():
         )
 
         assert result.role == role
+
+
+def test_ensure_user_is_active_raises_when_deactivated():
+    """Test ensure_user_is_active raises 403 error for a deactivated user."""
+    user = User(
+        user_id="user-1",
+        user_name="Former Employee",
+        role="staff",
+        group_id="group-1",
+        is_active=False,
+    )
+
+    with pytest.raises(ClientAuthorizationError, match="User is deactivated"):
+        ensure_user_is_active(user=user)
+
+
+def test_ensure_user_is_active_passes_when_active():
+    """Test ensure_user_is_active returns None for an active user."""
+    user = User(
+        user_id="user-1",
+        user_name="Current Employee",
+        role="staff",
+        group_id="group-1",
+        is_active=True,
+    )
+
+    assert ensure_user_is_active(user=user) is None
+
+
+@pytest.mark.asyncio
+async def test_missing_is_active_flag_counts_as_active():
+    """Test a stored user without isActive is treated as active."""
+    mock_db = MockDatabase(
+        initial_items=[
+            {
+                "userId": "user-1",
+                "userName": "Legacy User",
+                "role": "staff",
+                "groupId": "group-1",
+            },
+        ],
+    )
+
+    user = await get_user_by_id(user_id="user-1", user_database=mock_db)
+
+    assert user.is_active is True
+    assert ensure_user_is_active(user=user) is None
