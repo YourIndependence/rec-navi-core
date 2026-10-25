@@ -446,3 +446,20 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
     assert "scenePrincipal" in schema["required"]
     assert schema["properties"]["scenePrincipal"]["type"] == "string"
     assert "thumbnailImage" in schema["properties"]
+
+
+def test_get_projects_forwards_caller_and_pagination(cms_client):
+    with patch(
+        "recnavi.apis.cms.cms_router.get_projects_usecase",
+        new=AsyncMock(return_value=([], "next")),
+    ) as usecase:
+        response = cms_client.get("/getProjects?limit=12&cursor=previous")
+    assert response.status_code == 200
+    assert response.json()["projects"] == []
+    assert response.json()["nextCursor"] == "next"
+    usecase.assert_awaited_once_with(
+        projects_db=cms_client.app.state.database[PROJECTS_TABLE_NAME],
+        user=get_mock_x_user(),
+        limit=12,
+        cursor="previous",
+    )

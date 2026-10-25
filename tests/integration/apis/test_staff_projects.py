@@ -16,9 +16,12 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from fastapi import Request
 
+from recnavi.apis.auth.auth import verify_user
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.types.user import UserRole
 from recnavi.main import app
 
 
@@ -145,3 +148,56 @@ def test_get_my_projects_returns_400_when_no_token(client):
     assert response.status_code == 400
     data = response.json()
     assert data["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_get_my_projects_filters_ownership_assignment_and_group(
+    client,
+    auth_headers,
+    project_data,
+):
+    database = app.state.database[PROJECTS_TABLE_NAME]
+    other = {
+        **project_data,
+        "projectId": f"it_other_{uuid4().hex}",
+        "groupId": "other-group",
+        "assignedUserIds": ["test-user-123"],
+    }
+    await database.put_item(other)
+    try:
+        response = client.get("/getMyProjects", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["projects"] == []
+        await database.put_item(
+            {**project_data, "assignedUserIds": ["test-user-123"]},
+        )
+        response = client.get("/getMyProjects", headers=auth_headers)
+        assert response.status_code == 200
+        summaries = response.json()["projects"]
+        assert [item["projectId"] for item in summaries] == [
+            project_data["projectId"],
+        ]
+        assert set(summaries[0]) == {
+            "projectId",
+            "projectName",
+            "description",
+            "ownerUserId",
+            "createdAt",
+            "status",
+        }
+    finally:
+        await database.delete_item({"projectId": other["projectId"]})
+
+
+def test_staff_cannot_list_group_projects(client, auth_headers):
+    previous = app.dependency_overrides[verify_user]
+
+    def staff_user(request: Request):
+        return previous(request).model_copy(update={"role": UserRole.STAFF})
+
+    app.dependency_overrides[verify_user] = staff_user
+    try:
+        response = client.get("/getProjects", headers=auth_headers)
+        assert response.status_code == 403
+    finally:
+        app.dependency_overrides[verify_user] = previous
