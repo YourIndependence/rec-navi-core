@@ -9,7 +9,6 @@ claudecode:
     - investigating-bugs
     - quality-gate
     - record-architectural-decision
-    - review-with-adrs
   allowed-tools: Read, Write, Edit, Bash(gh issue view *), Bash(gh issue list *), Bash(gh pr create *), Bash(gh repo view *), Bash(git add *), Bash(git commit *), Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git checkout *), Bash(git push *), Bash(git branch *), Bash(uv run pytest *), Bash(uv run ruff *), Bash(archgate *), Bash(grep *), Bash(find *), Bash(ls *)
   disable-model-invocation: true
 ---
@@ -106,7 +105,7 @@ Run **in parallel**:
 1. Apply **exploring-codebase** focused on the modules mentioned in the error.
 2. Search for the error in the codebase:
    ```bash
-   grep -r "<ErrorClass or key phrase>" src/trust --include="*.py" -n
+   grep -r "<ErrorClass or key phrase>" src/recnavi --include="*.py" -n
    ```
 
 Then apply **investigating-bugs** using the issue summary and context report.
@@ -160,7 +159,7 @@ Based on the investigation and clarifications:
 | Targeted smoke    | `uv run pytest tests/unittests/<path>/ -v -k smoke` | No failures |
 | Regression test   | `uv run pytest tests/unittests/<new-test>.py -v` | Passes          |
 | Core user journey | <manual or automated test>                       | Verified        |
-| Ruff clean        | `uv run ruff check src/trust/<file>.py`          | No issues       |
+| Ruff clean        | `uv run ruff check src/recnavi/<file>.py`          | No issues       |
 
 Present the solution, rollback plan, monitoring plan, and test plan. Wait for user confirmation before proceeding. _(In `--auto` mode, select the primary fix and note the choice under `## Assumptions`.)_
 
@@ -172,7 +171,7 @@ Produce the precise, minimal plan. Present it and require explicit user approval
 
 | File                  | Location            | Before      | After     |
 | --------------------- | ------------------- | ----------- | --------- |
-| `src/trust/<path>.py` | `<function>:<line>` | `<current>` | `<fixed>` |
+| `src/recnavi/<path>.py` | `<function>:<line>` | `<current>` | `<fixed>` |
 
 Show before/after snippet:
 
@@ -272,7 +271,7 @@ Refactor the fix for clarity if the minimum change is hard to read. Run tests ag
 **Step 5 -- Lint**
 
 ```bash
-uv run ruff check src/trust/<changed-file>.py
+uv run ruff check src/recnavi/<changed-file>.py
 ```
 
 Fix any issues before proceeding to Quality Review.
@@ -281,41 +280,18 @@ Do not rename, refactor, or clean up code outside the approved scope.
 
 ### Phase 7: Quality Review & PR Creation
 
-Apply **quality-gate** for the affected module (targeted for speed). All three steps below are **mandatory** -- do not skip any.
+Apply **quality-gate** in implementation mode with the pinned checkout, diff/base,
+related-component scope, affected module, Phase 1 baseline, and existing evidence.
+It owns Ruff, required unit/integration checks, Archgate, and the delegated
+**review-with-adrs** all-ADR assessment. Do not run a second command checklist or
+audit here. Targeted checks do not replace stricter project requirements.
 
-**Step 7a -- Format & Lint**
-
-```bash
-uv run ruff format --check src/ tests/
-uv run ruff check src/ tests/
-```
-
-**Step 7b -- Targeted test suite**
-
-```bash
-uv run pytest tests/unittests/<affected-module>/ -v
-```
-
-Compare against the Phase 1 baseline:
-
-- The specific error must no longer appear
-- No new failures introduced in affected modules
-- Core functionality verified
-
-**Step 7c -- ADR compliance (required)**
-
-```bash
-archgate check
-```
-
-Report every violation as a blocking issue. The quality gate is **not passed** until `archgate check` exits with no errors.
-
-If any check fails:
-1. Fix the issue
-2. Re-run the failing check (and any subsequent checks)
-3. Repeat until all three steps pass
-
-**ADR compliance review**: Apply **review-with-adrs** to supplement the automated archgate results with a manual review of human-only ADR sections.
+Confirm the original error is gone, no new failures appear, and core functionality
+remains verified. Reuse only matching revision/content/scope evidence. Record any
+new architectural decisions before the final gate. Required checks and applicable
+ADR compliance must pass before delivery; fix failures and rerun invalidated checks.
+Disclose blocked/not-run evidence rather than claiming success. Optional integration
+skips follow the quality-gate contract.
 
 **Architectural decisions**: If the fix reveals an unwritten architectural rule, apply **record-architectural-decision** to capture it before creating the PR.
 
@@ -380,7 +356,7 @@ Remind the user:
 - **Monitoring plan**: Post-deployment impact monitoring is critical
 - **Stakeholder notification**: Do not forget to notify affected teams and users
 - **Feature redirect**: If the issue is a feature request, stop and recommend `/build`.
-- **ADR gate**: Before creating the PR, always run `review-with-adrs`. If the fix reveals an unwritten architectural rule, record it with `record-architectural-decision`.
+- **ADR gate**: Before creating the PR, require quality-gate's completed delegated `review-with-adrs` assessment; do not invoke a second audit. If the fix reveals an unwritten architectural rule, record it with `record-architectural-decision`.
 
 ## Differences from `/fix`
 
