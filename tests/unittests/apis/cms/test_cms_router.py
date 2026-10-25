@@ -446,3 +446,39 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
     assert "scenePrincipal" in schema["required"]
     assert schema["properties"]["scenePrincipal"]["type"] == "string"
     assert "thumbnailImage" in schema["properties"]
+
+
+def test_create_user_forwards_identity_and_returns_users(cms_client):
+    from recnavi.core.types.user import User
+    from recnavi.core.types.user import UserRole
+
+    provider = object()
+    cms_client.app.state.identity_provider = provider
+    created = User(
+        user_id="new",
+        user_name="New",
+        role=UserRole.STAFF,
+        group_id="group",
+    )
+    with patch(
+        "recnavi.apis.cms.cms_router.create_user_usecase",
+        new=AsyncMock(return_value=[created]),
+    ) as usecase:
+        response = cms_client.post(
+            "/createUser",
+            json={
+                "email": "new@example.com",
+                "userName": "New",
+                "role": "staff",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["users"][0]["userId"] == "new"
+    usecase.assert_awaited_once_with(
+        users_db=cms_client.app.state.database[USERS_TABLE_NAME],
+        identity_provider=provider,
+        caller=get_mock_x_user(),
+        email="new@example.com",
+        user_name="New",
+        role=UserRole.STAFF,
+    )
