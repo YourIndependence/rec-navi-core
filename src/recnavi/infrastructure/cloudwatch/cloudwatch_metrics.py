@@ -12,6 +12,7 @@
 import logging
 
 import aioboto3
+from botocore.exceptions import BotoCoreError
 from botocore.exceptions import ClientError
 
 from recnavi.config.variables import ENV
@@ -73,7 +74,7 @@ class CloudWatchMetricsPublisher(BaseMetricsPublisher):
                     Namespace=METRIC_NAMESPACE,
                     MetricData=build_metric_data(stats),
                 )
-        except ClientError:
+        except (ClientError, BotoCoreError):
             logger.warning(
                 "failed to put getMyProjects metrics",
                 exc_info=True,
