@@ -54,8 +54,13 @@ responses. There are no per-asset or generic streaming endpoints for media.
   extension is not `.jpg`, `.jpeg`, or `.png`. It then calls
   `BaseObjectStorage.generate_presigned_url`.
 - Scene videos and thumbnails use `storage.generate_presigned_url` directly in
-  `Scene.attach_presigned_url` (keys are written by the application, not given
-  by users; missing keys yield `None`).
+  `Scene.attach_presigned_url`; missing keys yield `None`. This method trusts
+  stored references. The current `ProjectInput.scenes` also accepts storage
+  keys from request payloads, and `update_project` saves them without checking
+  their project ownership. Therefore these keys are not necessarily
+  server-generated. This is an existing security gap: a caller who knows a
+  foreign key can cause it to be signed through an owned project. Closing that
+  write boundary requires a separate security change and regression tests.
 - Expiry is 3600 seconds: `MEDIA_URL_EXPIRATION_SECONDS` (masters, templates),
   `SCENE_URL_EXPIRATION_SECONDS` (scene media), and
   `DOWNLOAD_URL_EXPIRATION_SECONDS` (archive). URLs are regenerated on every
@@ -97,8 +102,10 @@ of routers and avoids a duplicate response type that must track every field.
 - **Positive**: One type per concept; field changes happen in one place.
 - **Positive**: Bytes flow directly from object storage to the client.
 - **Negative**: A URL is a bearer link until it expires; anyone holding it can
-  fetch the object for up to one hour. Responses must not be cached
-  (`Cache-Control: no-store`).
+  fetch the object for up to one hour. Master/template list responses currently
+  set `Cache-Control: no-store`. Other media-bearing responses do not
+  consistently set that header. Extending cache protection to those paths is
+  follow-up work; this ADR does not claim repository-wide no-store compliance.
 - **Negative**: Clients must refetch the resource when a URL expires.
 - **Negative**: Every code path that returns a media-bearing type must remember
   to call `attach_presigned_url`; there is no Archgate rule for this
@@ -145,8 +152,11 @@ of routers and avoids a duplicate response type that must track every field.
 **Don't:**
 - Add endpoints that stream or proxy stored media bytes.
 - Add a `HogeView` type only to carry temporary URLs.
-- Generate presigned URLs in routers or in `infrastructure/`, or hardcode
-  expiry values at call sites.
+- Select media, authorize access, or choose signing lifetimes in routers or
+  concrete infrastructure adapters. Domain/application code makes those
+  decisions through `BaseObjectStorage`; the infrastructure `S3Client` must
+  implement the actual SDK signing operation. Do not hardcode expiry values
+  at policy call sites.
 - Return `*_uri` / `*_key` storage references to the client.
 - Add another media bucket setting.
 
