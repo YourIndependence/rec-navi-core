@@ -29,6 +29,7 @@ from recnavi.core.types.user import UserRole
 from recnavi.exceptions.exceptions import ClientPermissionError
 from recnavi.main import app
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_identity_provider import MockIdentityProvider
 from tests.mockups.mock_object_storage import MockObjectStorage
 
 
@@ -66,6 +67,7 @@ def mock_infrastracture_injection_when_ci(app: FastAPI) -> None:
         SCENES_TABLE_NAME: MockDatabase(key_names=("scenePrincipal",)),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
+    app.state.identity_provider = MockIdentityProvider()
     app.state.object_storage = MockObjectStorage(
         bucket_name=MEDIA_BUCKET_NAME,
     )
