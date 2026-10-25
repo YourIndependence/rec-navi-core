@@ -37,7 +37,7 @@ async def _send(notifier: SesNotifier) -> None:
         to_email="owner@example.com",
         project_name="Spring Menu",
         staff_name="Hanako",
-        review_url="http://localhost:5173/projects/p1/review",
+        review_url="http://localhost:5173/project/p1",
     )
 
 
@@ -55,7 +55,7 @@ async def test_send_project_submitted_sends_email_through_ses():
     assert "Spring Menu" in simple["Subject"]["Data"]
     body = simple["Body"]["Text"]["Data"]
     assert "Hanako" in body
-    assert "http://localhost:5173/projects/p1/review" in body
+    assert "http://localhost:5173/project/p1" in body
 
 
 @pytest.mark.asyncio

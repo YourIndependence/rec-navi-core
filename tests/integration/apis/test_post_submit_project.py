@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
@@ -57,7 +58,7 @@ async def test_submit_project_notifies_owner(
         assigned_user_ids=["test-user-123"],
         created_at="2026-01-01T00:00:00Z",
     )
-    await projects_db.put_item(project.model_dump(by_alias=True))
+    await projects_db.put_item(project.to_storage_item())
     await users_db.put_item(
         {
             "userId": owner_id,
@@ -77,6 +78,9 @@ async def test_submit_project_notifies_owner(
         assert response.json() == {"status": "ok", "message": None}
         assert len(notifier.sent) == 1
         assert notifier.sent[0]["to_email"] == "owner@example.com"
+        assert notifier.sent[0]["review_url"] == (
+            f"{FRONTEND_BASE_URL.rstrip('/')}/project/{project.project_id}"
+        )
     finally:
         await projects_db.delete_item({"projectId": project.project_id})
         await users_db.delete_item({"userId": owner_id})

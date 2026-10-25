@@ -19,8 +19,7 @@ from recnavi.exceptions.exceptions import ClientNotFoundError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
-# Placeholder: the frontend must confirm the actual review screen path.
-REVIEW_PATH_TEMPLATE = "/projects/{project_id}/review"
+REVIEW_PATH_TEMPLATE = "/project/{project_id}"
 
 
 def build_review_url(*, base_url: str, project_id: str) -> str:

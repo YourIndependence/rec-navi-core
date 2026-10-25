@@ -83,7 +83,7 @@ def test_build_review_url_joins_base_url_and_project_id():
     """Test trailing slashes on the base URL are normalized."""
     assert (
         build_review_url(base_url="https://example.com/", project_id="p1")
-        == "https://example.com/projects/p1/review"
+        == "https://example.com/project/p1"
     )
 
 
@@ -107,7 +107,7 @@ async def test_submit_project_assigned_staff_notifies_owner():
             "to_email": "owner@example.com",
             "project_name": "Spring Menu",
             "staff_name": "Name staff-1",
-            "review_url": "https://example.com/projects/proj-1/review",
+            "review_url": "https://example.com/project/proj-1",
         },
     ]
 
