@@ -21,6 +21,9 @@ from recnavi.exceptions.exceptions import ClientNotFoundError
 _DEFAULT_KEY_FIELDS = ("projectId", "userId", "sceneId", "templateId")
 
 
+CREATED_AT_INDEX = "groupId-createdAt-index"
+
+
 class MockDatabase(BaseDatabase):
     """In-memory mock database for unit testing."""
 
@@ -148,7 +151,9 @@ class MockDatabase(BaseDatabase):
         Args:
             key_condition: Key condition for the query.
             filter_expression: Optional filter expression.
-            index: Optional index name (ignored in mock).
+            index: Optional index name. Querying through the
+                ``groupId-createdAt-index`` GSI orders results by
+                ``createdAt`` ascending, like DynamoDB does by default.
             limit: Maximum number of items to return.
             exclusive_start_key: Primary key to start from (for pagination).
 
@@ -157,6 +162,8 @@ class MockDatabase(BaseDatabase):
 
         """
         results = self._filter_items(key_condition, filter_expression)
+        if index == CREATED_AT_INDEX:
+            results = sorted(results, key=lambda i: i.get("createdAt", ""))
         return self._paginate_results(results, limit, exclusive_start_key)
 
     def _filter_items(
