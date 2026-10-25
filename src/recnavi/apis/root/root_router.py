@@ -44,4 +44,4 @@ async def get_me(
     user: User = Depends(verify_user),
 ) -> GetMeResponse:
     """Get current authenticated user."""
-    return GetMeResponse(user=user)
+    return GetMeResponse(user=user, group_id=user.group_id)

@@ -16,7 +16,7 @@ from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from tests.mockups.mock_database import MockDatabase
 
 
@@ -220,7 +220,7 @@ async def test_create_project_raises_403_for_staff(projects_db: MockDatabase):
     )
 
     with pytest.raises(
-        ClientPermissionError,
+        ClientAuthorizationError,
         match="Only owners can create projects",
     ):
         await create_project(
@@ -243,11 +243,15 @@ async def test_create_project_raises_403_for_admin(projects_db: MockDatabase):
         group_id="group-123",
     )
 
-    await create_project(
-        projects_db=projects_db,
-        project_name="Test Project",
-        description="",
-        scene_principals=["opening"],
-        assigned_user_ids=[],
-        owner=admin,
-    )
+    with pytest.raises(
+        ClientAuthorizationError,
+        match="Only owners can create projects",
+    ):
+        await create_project(
+            projects_db=projects_db,
+            project_name="Test Project",
+            description="",
+            scene_principals=["opening"],
+            assigned_user_ids=[],
+            owner=admin,
+        )

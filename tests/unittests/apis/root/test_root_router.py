@@ -44,5 +44,6 @@ def test_get_me_returns_authenticated_user(
     assert response.json() == {
         "status": "ok",
         "message": None,
+        "groupId": get_mock_x_user().group_id,
         "user": get_mock_x_user().model_dump(by_alias=True, mode="json"),
     }

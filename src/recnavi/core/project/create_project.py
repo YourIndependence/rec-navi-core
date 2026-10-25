@@ -20,7 +20,7 @@ from recnavi.core.types.scene import Scene
 from recnavi.core.types.scene import SceneStatus
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 
 
 async def create_project(
@@ -33,8 +33,8 @@ async def create_project(
     owner: User,
 ) -> Project:
     """Create a new project with scenes."""
-    if owner.role not in [UserRole.OWNER, UserRole.ADMIN]:
-        raise ClientPermissionError("Only owners can create projects")
+    if owner.role != UserRole.OWNER:
+        raise ClientAuthorizationError("Only owners can create projects")
 
     project_id = str(uuid4())
     now = datetime.now(UTC).isoformat()

@@ -23,6 +23,10 @@ class GetMeResponse(BaseApiResponseModel):
         ...,
         description="Current authenticated user information",
     )
+    group_id: str = Field(
+        ...,
+        description="Group ID the current user belongs to",
+    )
 
 
 class GetGroupUsersResponse(BaseApiResponseModel):
