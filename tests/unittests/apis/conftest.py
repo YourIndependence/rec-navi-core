@@ -27,6 +27,7 @@ from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
 from tests.mockups.mock_database import MockDatabase
+from tests.mockups.mock_metrics_publisher import MockMetricsPublisher
 from tests.mockups.mock_object_storage import MockObjectStorage
 from tests.mockups.mock_users import get_mock_x_user
 
@@ -42,6 +43,7 @@ def _client_for_router(router: APIRouter) -> Iterator[TestClient]:
         SCENES_TABLE_NAME: MockDatabase(),
         TEMPLATES_TABLE_NAME: MockDatabase(),
     }
+    api_app.state.metrics_publisher = MockMetricsPublisher()
     api_app.state.object_storage = MockObjectStorage(bucket_name="unit-media")
     with TestClient(api_app) as test_client:
         yield test_client

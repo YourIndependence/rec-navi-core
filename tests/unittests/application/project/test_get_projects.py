@@ -82,6 +82,7 @@ async def test_get_projects_preserves_filtered_results_and_cursor():
         group_id="group",
         limit=12,
         cursor="previous-page",
+        metrics=None,
     )
     project.attach_presigned_url.assert_awaited_once_with(storage=storage)
     assert result == expected_output

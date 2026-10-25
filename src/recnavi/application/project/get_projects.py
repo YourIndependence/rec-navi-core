@@ -10,6 +10,7 @@
 """List the projects visible to a group."""
 
 from recnavi.core.database.base_database import BaseDatabase
+from recnavi.core.metrics.base_metrics_publisher import BaseMetricsPublisher
 from recnavi.core.project.projects import get_projects
 from recnavi.core.storage.base_object_storage import BaseObjectStorage
 from recnavi.core.types.project import Project
@@ -23,6 +24,7 @@ async def get_projects_usecase(
     group_id: str,
     limit: int = 64,
     cursor: str | None,
+    metrics: BaseMetricsPublisher | None = None,
 ) -> tuple[list[Project], str | None]:
     """List the projects a group can see, newest first.
 
@@ -36,6 +38,7 @@ async def get_projects_usecase(
         group_id=group_id,
         limit=limit,
         cursor=cursor,
+        metrics=metrics,
     )
     return (
         [
