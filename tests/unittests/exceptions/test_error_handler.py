@@ -15,8 +15,11 @@ import pytest
 from recnavi.exceptions.error_handler import custom_exception_handler
 from recnavi.exceptions.error_handler import logger
 from recnavi.exceptions.exceptions import BaseClientExceptionError
+from recnavi.exceptions.exceptions import ClientAuthenticationError
 from recnavi.exceptions.exceptions import ClientAuthorizationError
+from recnavi.exceptions.exceptions import ClientConflictError
 from recnavi.exceptions.exceptions import ClientNotFoundError
+from recnavi.exceptions.exceptions import ClientPayloadTooLargeError
 from recnavi.exceptions.exceptions import ClientUnprocessableEntityError
 
 
@@ -45,9 +48,16 @@ def response_content(response) -> dict[str, str]:
 @pytest.mark.parametrize(
     ("exception", "status_code", "message"),
     [
+        (ClientAuthenticationError("unauthenticated"), 401, "unauthenticated"),
         (ClientAuthorizationError("forbidden"), 403, "forbidden"),
         (ClientNotFoundError("missing"), 404, "missing"),
-        (ClientUnprocessableEntityError("invalid"), 422, "invalid"),
+        (ClientConflictError("conflict"), 409, "conflict"),
+        (ClientPayloadTooLargeError("too large"), 413, "too large"),
+        (
+            ClientUnprocessableEntityError("unprocessable"),
+            422,
+            "unprocessable",
+        ),
         (BaseClientExceptionError("bad request"), 400, "bad request"),
         (TypeError("invalid type"), 400, "Invalid request parameter"),
         (RuntimeError("unexpected"), 500, "Unexpected Server Error"),

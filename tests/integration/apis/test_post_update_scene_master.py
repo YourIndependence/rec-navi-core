@@ -23,8 +23,8 @@ from recnavi.main import app
 from tests.mockups.mock_users import get_mock_x_user
 
 
-def test_update_scene_master_returns_400_when_no_token(client):
-    """Test POST /updateSceneMaster returns 400 when no authorization header."""
+def test_update_scene_master_returns_401_when_no_token(client):
+    """Test POST /updateSceneMaster returns 401 when no authorization header."""
     response = client.post(
         "/updateSceneMaster",
         json={
@@ -35,7 +35,7 @@ def test_update_scene_master_returns_400_when_no_token(client):
             "guideImage": "ZmFrZSBndWlkZQ==",
         },
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 

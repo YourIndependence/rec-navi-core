@@ -100,9 +100,9 @@ async def downloadable_project() -> AsyncIterator[Project]:
             )
 
 
-def test_download_project_returns_400_when_no_token(client):
+def test_download_project_returns_401_when_no_token(client):
     response = client.post("/downloadProject", json={"projectId": "unknown"})
-    assert response.status_code == 400
+    assert response.status_code == 401
 
 
 @pytest.mark.asyncio

@@ -26,7 +26,7 @@ from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.exceptions.exceptions import ClientPermissionError
+from recnavi.exceptions.exceptions import ClientAuthenticationError
 from recnavi.main import app
 from tests.mockups.mock_database import MockDatabase
 from tests.mockups.mock_object_storage import MockObjectStorage
@@ -98,9 +98,9 @@ def get_mock_x_user() -> User:
 def mock_verify_user(request: Request) -> User:
     authorization = request.headers.get("authorization")
     if not authorization:
-        raise ClientPermissionError("Authorization header is required.")
+        raise ClientAuthenticationError("Authorization header is required.")
     if not authorization.startswith("Bearer "):
-        raise ClientPermissionError(
+        raise ClientAuthenticationError(
             "Authorization header must start with 'Bearer '",
         )
     return get_mock_x_user()

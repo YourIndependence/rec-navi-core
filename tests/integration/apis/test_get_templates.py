@@ -48,11 +48,11 @@ async def template_data() -> AsyncIterator[dict[str, object]]:
             )
 
 
-def test_get_templates_returns_400_when_no_token(client):
-    """Test GET /getTemplates returns 400 when no authorization header."""
+def test_get_templates_returns_401_when_no_token(client):
+    """Test GET /getTemplates returns 401 when no authorization header."""
     response = client.get("/getTemplates")
 
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 

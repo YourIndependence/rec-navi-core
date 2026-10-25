@@ -19,13 +19,13 @@ from recnavi.core.database.base_database import BaseDatabase
 from recnavi.main import app
 
 
-def test_delete_project_returns_400_when_no_token(client):
-    """Test POST /deleteProject returns 400 when no authorization header."""
+def test_delete_project_returns_401_when_no_token(client):
+    """Test POST /deleteProject returns 401 when no authorization header."""
     response = client.post(
         "/deleteProject",
         json={"projectId": "proj-123"},
     )
-    assert response.status_code == 400
+    assert response.status_code == 401
     data = response.json()
     assert data["status"] == "error"
 

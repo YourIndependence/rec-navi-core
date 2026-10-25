@@ -16,6 +16,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.errors import ServerErrorMiddleware
 
 from recnavi.apis.cms.cms_router import cms_router
@@ -39,6 +40,9 @@ BASE_DIR = Path(__file__).resolve().parent
 API_DESCRIPTION_PATH = BASE_DIR / "apis" / "api_description.md"
 
 logger = logging.getLogger(__name__)
+
+# API Gateway payload limit.
+MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024
 
 
 @asynccontextmanager
@@ -102,10 +106,31 @@ app.include_router(cms_router)
 app.include_router(staff_router)
 
 
+def is_body_too_large(request: Request) -> bool:
+    """Check the declared Content-Length against the body size limit."""
+    content_length = request.headers.get("content-length", "")
+    return (
+        content_length.isdigit()
+        and int(content_length) > MAX_REQUEST_BODY_BYTES
+    )
+
+
+def build_payload_too_large_response() -> JSONResponse:
+    """Build the standard 413 error response."""
+    return JSONResponse(
+        status_code=413,
+        content={"status": "error", "message": "Request body is too large"},
+    )
+
+
 @app.middleware("http")
 async def cache_request_body(request: Request, call_next):
     """Cache request body."""
+    if is_body_too_large(request):
+        return build_payload_too_large_response()
     body_bytes = await request.body()
+    if len(body_bytes) > MAX_REQUEST_BODY_BYTES:
+        return build_payload_too_large_response()
     request.state.body = body_bytes
     response = await call_next(request)
     return response
