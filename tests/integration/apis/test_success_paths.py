@@ -27,6 +27,7 @@ from uuid import uuid4
 import pytest
 import pytest_asyncio
 
+from recnavi.config.variables import MEDIA_BUCKET_NAME
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
 from recnavi.config.variables import TEMPLATES_TABLE_NAME
@@ -50,6 +51,7 @@ PROJECT_KEYS = {
     "createdAt",
     "updatedAt",
     "version",
+    "downloadUrl",
 }
 
 
@@ -156,9 +158,9 @@ async def scene_master(
     item = {
         "scenePrincipal": f"it_{uuid4()}",
         "title": "Integration Test Scene",
-        "thumbnailUri": "s3://it-test/thumbnail.jpg",
-        "guideUri": "s3://it-test/guide.png",
-        "maxDurationSeconds": 30,
+        "thumbnailUri": f"s3://{MEDIA_BUCKET_NAME}/thumbnail.jpg",
+        "guideUri": f"s3://{MEDIA_BUCKET_NAME}/guide.png",
+        "maxDurationSeconds": 5,
     }
     await db.put_item(item)
     try:
@@ -178,11 +180,17 @@ async def test_get_scene_masters_returns_seeded_scene(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert {
-        "scenePrincipal": scene_master["scenePrincipal"],
-        "title": "Integration Test Scene",
-        "maxDurationSeconds": 30,
-    } in data["scenes"]
+    scene = next(
+        item
+        for item in data["scenes"]
+        if item["scenePrincipal"] == scene_master["scenePrincipal"]
+    )
+    assert scene["title"] == "Integration Test Scene"
+    assert scene["maxDurationSeconds"] == 5
+    assert scene["thumbnailUrl"]
+    assert scene["guideUrl"]
+    assert "thumbnailUri" not in scene
+    assert "guideUri" not in scene
 
 
 @pytest_asyncio.fixture
@@ -194,7 +202,7 @@ async def template(
         "templateId": f"it_{uuid4()}",
         "title": "Integration Test Template",
         "scenePrincipals": ["cooking", "exterior"],
-        "thumbnailUri": "s3://it-test/template.jpg",
+        "thumbnailUri": f"s3://{MEDIA_BUCKET_NAME}/template.jpg",
     }
     await db.put_item(item)
     try:
@@ -214,11 +222,15 @@ async def test_get_templates_returns_seeded_template(
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert {
-        "templateId": template["templateId"],
-        "title": "Integration Test Template",
-        "scenePrincipals": ["cooking", "exterior"],
-    } in data["templates"]
+    result = next(
+        item
+        for item in data["templates"]
+        if item["templateId"] == template["templateId"]
+    )
+    assert result["title"] == "Integration Test Template"
+    assert result["scenePrincipals"] == ["cooking", "exterior"]
+    assert result["thumbnailUrl"]
+    assert "thumbnailUri" not in result
 
 
 @pytest.mark.asyncio
@@ -315,9 +327,9 @@ async def test_get_project_returns_project_for_owner_and_assigned_staff(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("group_id", "user_id"),
-    [(OTHER_GROUP, "owner-1"), (GROUP, "stranger")],
+    [(OTHER_GROUP, "stranger"), (GROUP, "stranger")],
 )
-async def test_get_project_rejects_tenant_or_membership_mismatch(
+async def test_get_project_rejects_non_owner_regardless_of_group(
     client,
     auth_headers,
     as_user: Callable[..., User],
@@ -334,7 +346,7 @@ async def test_get_project_rejects_tenant_or_membership_mismatch(
         json={"projectId": project["projectId"]},
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 403
     assert response.json()["status"] == "error"
 
 
