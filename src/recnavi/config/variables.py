@@ -13,7 +13,7 @@ import os
 
 
 # general
-# main, staging, dev, LOCAL, LOCAL_CONTAINER, CI
+# service, dev, LOCAL, LOCAL_CONTAINER, CI
 ENV = os.environ.get("ENV", "LOCAL")
 REGION = "ap-northeast-1"
 
@@ -36,20 +36,26 @@ MEDIA_BUCKET_NAME = os.environ.get(
     "rec-navi-dev-media",
 )
 
-APP_DOMAINS = "rec-navi.com"
+APP_DOMAINS = ("rec-navi.com",)
+
+_LOCAL_ENVS = ("LOCAL", "LOCAL_CONTAINER", "CI")
 
 
-def _get_cors_origins() -> list[str]:
+def _get_cors_origins(*, env: str, domains: tuple[str, ...]) -> list[str]:
+    """Build allowed CORS origins.
+
+    The frontend is served at https://{env}.{domain} for deployed
+    environments (e.g. dev, service).
+    """
     origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
-    origins.extend(f"https://{ENV}.{domain}" for domain in APP_DOMAINS)
-    if ENV == "main":
-        origins.extend(f"https://service.{domain}" for domain in APP_DOMAINS)
+    if env not in _LOCAL_ENVS:
+        origins.extend(f"https://{env}.{domain}" for domain in domains)
     return origins
 
 
-CORS_ORIGINS = _get_cors_origins()
+CORS_ORIGINS = _get_cors_origins(env=ENV, domains=APP_DOMAINS)
 
 LOG_BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "rec-navi-dev-log-data")
