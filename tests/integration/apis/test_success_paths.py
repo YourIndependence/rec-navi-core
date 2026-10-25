@@ -19,7 +19,6 @@ same ``as_user`` / ``databases`` helpers once merged.
 
 import base64
 import json
-import warnings
 from collections.abc import AsyncIterator
 from collections.abc import Callable
 from uuid import uuid4
@@ -34,7 +33,6 @@ from recnavi.config.variables import TEMPLATES_TABLE_NAME
 from recnavi.core.database.base_database import BaseDatabase
 from recnavi.core.types.user import User
 from recnavi.core.types.user import UserRole
-from recnavi.main import app
 
 
 GROUP = "it-group"
@@ -278,16 +276,20 @@ async def test_get_projects_paginates_with_cursor(
     )
     as_user(UserRole.OWNER, "pager-group", "pager")
 
-    page1 = client.get("/getProjects?limit=1", headers=auth_headers).json()
+    response = client.get("/getProjects?limit=1", headers=auth_headers)
+    assert response.status_code == 200
+    page1 = response.json()
     assert [p["projectId"] for p in page1["projects"]] == [first["projectId"]]
     assert page1["nextCursor"] is not None
     json.loads(base64.b64decode(page1["nextCursor"]))  # opaque but valid
 
-    page2 = client.get(
+    response = client.get(
         "/getProjects",
         params={"limit": 1, "cursor": page1["nextCursor"]},
         headers=auth_headers,
-    ).json()
+    )
+    assert response.status_code == 200
+    page2 = response.json()
     assert [p["projectId"] for p in page2["projects"]] == [
         second["projectId"],
     ]
@@ -432,24 +434,12 @@ def test_openapi_json_is_generated(client):
         assert path in schema["paths"]
 
 
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "GET /getProjects is registered by both cms_router and pub_router, "
-        "producing a duplicate operationId; routing is fixed in another PR."
-    ),
-)
 def test_openapi_operation_ids_are_unique(client):
-    # openapi.json merges duplicate routes into one path item, so the
-    # duplicates are only visible as a FastAPI warning during generation.
-    app.openapi_schema = None
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        app.openapi()
-    duplicates = [
-        str(w.message)
-        for w in caught
-        if "Duplicate Operation ID" in str(w.message)
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    operation_ids = [
+        operation["operationId"]
+        for path in response.json()["paths"].values()
+        for operation in path.values()
     ]
-
-    assert not duplicates, f"duplicate operationIds: {duplicates}"
+    assert len(operation_ids) == len(set(operation_ids))
