@@ -11,65 +11,119 @@
 
 import pytest
 
-from recnavi.core.project.projects import get_projects
+from recnavi.core.project.projects import get_group_projects
+from recnavi.core.project.projects import get_my_projects
+from recnavi.core.types.user import User
+from recnavi.core.types.user import UserRole
+from recnavi.exceptions.exceptions import ClientAuthorizationError
 from tests.mockups.mock_database import MockDatabase
 
 
-@pytest.mark.asyncio
-async def test_get_projects_returns_projects_for_group():
-    """Test get_projects returns only projects for the specified group."""
-    mock_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-1",
-                "groupId": "group-123",
-                "projectName": "Project 1",
-                "ownerUserId": "user-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "Description 1",
-                "status": "in_progress",
-                "assignedUserIds": [
-                    "test-user-id",
-                ],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-2",
-                "groupId": "group-456",
-                "projectName": "Project 2",
-                "ownerUserId": "user-2",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "Description 2",
-                "status": "submitted",
-                "assignedUserIds": [],
-                "scenes": [],
-            },
-        ],
-    )
+def _item(
+    project_id: str,
+    *,
+    group_id: str = "group-123",
+    owner: str = "owner-1",
+    assigned: list[str] | None = None,
+    day: int = 1,
+) -> dict[str, object]:
+    """Build a raw project item."""
+    return {
+        "projectId": project_id,
+        "groupId": group_id,
+        "projectName": f"Name {project_id}",
+        "ownerUserId": owner,
+        "createdAt": f"2026-09-{day:02d}T00:00:00Z",
+        "updatedAt": f"2026-09-{day:02d}T00:00:00Z",
+        "description": "",
+        "status": "in_progress",
+        "assignedUserIds": assigned or [],
+        "scenes": [],
+    }
 
-    projects, next_cursor = await get_projects(
-        projects_db=mock_db,
-        user_id="test-user-id",
+
+def _user(role: UserRole, *, user_id: str = "owner-1") -> User:
+    """Build a caller in group-123."""
+    return User(
+        user_id=user_id,
+        user_name="name",
+        role=role,
         group_id="group-123",
     )
 
-    assert len(projects) == 1
-    assert projects[0].project_id == "proj-1"
-    assert projects[0].group_id == "group-123"
+
+@pytest.mark.asyncio
+async def test_get_group_projects_returns_all_projects_of_group():
+    """Owner sees every project of the group regardless of assignment."""
+    mock_db = MockDatabase(
+        initial_items=[
+            _item("proj-1", assigned=["staff-1"], day=1),
+            _item("proj-2", owner="owner-2", day=2),
+            _item("proj-other", group_id="group-456", day=3),
+        ],
+    )
+
+    projects, next_cursor = await get_group_projects(
+        projects_db=mock_db,
+        user=_user(UserRole.OWNER),
+    )
+
+    assert {p.project_id for p in projects} == {"proj-1", "proj-2"}
     assert next_cursor is None
 
 
 @pytest.mark.asyncio
-async def test_get_projects_returns_empty_list_for_empty_group():
-    """Test get_projects returns empty list when no projects exist."""
-    mock_db = MockDatabase(initial_items=[])
+async def test_get_group_projects_returns_summaries_without_scenes():
+    """Items are ProjectSummary and carry status but no scenes."""
+    mock_db = MockDatabase(initial_items=[_item("proj-1")])
 
-    projects, next_cursor = await get_projects(
+    projects, _ = await get_group_projects(
         projects_db=mock_db,
-        user_id="test-user-id",
-        group_id="group-empty",
+        user=_user(UserRole.OWNER),
+    )
+
+    dumped = projects[0].model_dump(by_alias=True)
+    assert set(dumped) == {
+        "projectId",
+        "projectName",
+        "description",
+        "ownerUserId",
+        "createdAt",
+        "status",
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_group_projects_allows_admin():
+    """Admin may list the group projects."""
+    mock_db = MockDatabase(initial_items=[_item("proj-1")])
+
+    projects, _ = await get_group_projects(
+        projects_db=mock_db,
+        user=_user(UserRole.ADMIN),
+    )
+
+    assert len(projects) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_group_projects_rejects_staff():
+    """Staff gets an authorization error."""
+    mock_db = MockDatabase(initial_items=[_item("proj-1")])
+
+    with pytest.raises(ClientAuthorizationError):
+        await get_group_projects(
+            projects_db=mock_db,
+            user=_user(UserRole.STAFF, user_id="staff-1"),
+        )
+
+
+@pytest.mark.asyncio
+async def test_get_group_projects_returns_empty_for_empty_group():
+    """No projects gives an empty list and no cursor."""
+    projects, next_cursor = await get_group_projects(
+        projects_db=MockDatabase(),
+        user=_user(UserRole.OWNER),
     )
 
     assert projects == []
@@ -77,383 +131,159 @@ async def test_get_projects_returns_empty_list_for_empty_group():
 
 
 @pytest.mark.asyncio
-async def test_get_projects_paginates_correctly():
-    """Test get_projects handles pagination across multiple pages."""
+async def test_get_group_projects_paginates_across_pages():
+    """Following next_cursor visits every project exactly once."""
     mock_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": f"proj-{i}",
-                "groupId": "group-123",
-                "projectName": f"Project {i}",
-                "ownerUserId": "test-user-id",
-                "createdAt": f"2026-09-{i:02d}T00:00:00Z",
-                "updatedAt": f"2026-09-{i:02d}T00:00:00Z",
-                "description": f"Description {i}",
-                "status": "in_progress",
-                "assignedUserIds": [],
-                "scenes": [],
-            }
-            for i in range(1, 6)  # 5 projects
-        ],
+        initial_items=[_item(f"proj-{i}", day=i) for i in range(1, 6)],
     )
+    owner = _user(UserRole.OWNER)
 
-    # Page 1: limit=2
-    page1_projects, page1_cursor = await get_projects(
-        projects_db=mock_db,
-        user_id="test-user-id",
-        group_id="group-123",
-        limit=2,
-    )
+    seen: list[str] = []
+    cursor = None
+    for _ in range(5):
+        projects, cursor = await get_group_projects(
+            projects_db=mock_db,
+            user=owner,
+            limit=2,
+            cursor=cursor,
+        )
+        seen.extend(p.project_id for p in projects)
+        if cursor is None:
+            break
 
-    assert len(page1_projects) == 2
-    assert page1_cursor is not None
-
-    # Page 2: use cursor
-    page2_projects, page2_cursor = await get_projects(
-        projects_db=mock_db,
-        user_id="test-user-id",
-        group_id="group-123",
-        limit=2,
-        cursor=page1_cursor,
-    )
-
-    assert len(page2_projects) == 2
-    assert page2_cursor is not None
-
-    # Page 3: last page
-    page3_projects, page3_cursor = await get_projects(
-        projects_db=mock_db,
-        user_id="test-user-id",
-        group_id="group-123",
-        limit=2,
-        cursor=page2_cursor,
-    )
-
-    assert len(page3_projects) == 1  # Only 1 item left
-    assert page3_cursor is None  # No more pages
+    assert sorted(seen) == [f"proj-{i}" for i in range(1, 6)]
+    assert cursor is None
 
 
 @pytest.mark.asyncio
-async def test_get_projects_does_not_mix_groups():
-    """Test get_projects does not return projects from other groups."""
+async def test_get_my_projects_returns_only_assigned_projects():
+    """Only projects assigned to the user come back."""
     mock_db = MockDatabase(
         initial_items=[
-            {
-                "projectId": "proj-g1-1",
-                "groupId": "group-123",
-                "projectName": "G1 Project 1",
-                "ownerUserId": "test-user-id",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": [],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-g2-1",
-                "groupId": "group-456",
-                "projectName": "G2 Project 1",
-                "ownerUserId": "user-2",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": [],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-g1-2",
-                "groupId": "group-123",
-                "projectName": "G1 Project 2",
-                "ownerUserId": "test-user-id",
-                "createdAt": "2026-09-03T00:00:00Z",
-                "updatedAt": "2026-09-03T00:00:00Z",
-                "description": "",
-                "status": "submitted",
-                "assignedUserIds": [],
-                "scenes": [],
-            },
+            _item("proj-a", assigned=["staff-1", "staff-2"], day=1),
+            _item("proj-b", assigned=["staff-2"], day=2),
+            _item("proj-c", assigned=["staff-1"], day=3),
         ],
     )
 
-    projects, _ = await get_projects(
+    projects, next_cursor = await get_my_projects(
         projects_db=mock_db,
-        user_id="test-user-id",
-        group_id="group-123",
-    )
-
-    assert len(projects) == 2
-    assert all(p.group_id == "group-123" for p in projects)
-    project_ids = {p.project_id for p in projects}
-    assert project_ids == {"proj-g1-1", "proj-g1-2"}
-
-
-@pytest.mark.asyncio
-async def test_get_projects_filters_by_assigned_user():
-    """Test get_projects returns only projects where user is assigned."""
-    from recnavi.core.project.projects import get_projects
-
-    mock_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-assigned-1",
-                "groupId": "group-123",
-                "projectName": "Assigned Project 1",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1", "staff-2"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-not-assigned",
-                "groupId": "group-123",
-                "projectName": "Not Assigned Project",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-2"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-assigned-2",
-                "groupId": "group-123",
-                "projectName": "Assigned Project 2",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-03T00:00:00Z",
-                "updatedAt": "2026-09-03T00:00:00Z",
-                "description": "",
-                "status": "submitted",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
-        ],
-    )
-
-    projects, next_cursor = await get_projects(
-        projects_db=mock_db,
-        group_id="group-123",
         user_id="staff-1",
+        group_id="group-123",
     )
 
-    assert len(projects) == 2
-    project_ids = {p.project_id for p in projects}
-    assert project_ids == {"proj-assigned-1", "proj-assigned-2"}
+    assert {p.project_id for p in projects} == {"proj-a", "proj-c"}
     assert next_cursor is None
 
 
 @pytest.mark.asyncio
-async def test_get_projects_returns_empty_when_no_assignment():
-    """Test get_projects returns empty list when all projects filtered out."""
-    from recnavi.core.project.projects import get_projects
-
+async def test_get_my_projects_excludes_owned_but_unassigned():
+    """Being the owner alone does not make a project show up."""
     mock_db = MockDatabase(
-        initial_items=[
-            {
-                "projectId": "proj-1",
-                "groupId": "group-123",
-                "projectName": "Project 1",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-2", "staff-3"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-2",
-                "groupId": "group-123",
-                "projectName": "Project 2",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": [],
-                "scenes": [],
-            },
-        ],
+        initial_items=[_item("proj-1", owner="user_1", assigned=[])],
     )
 
-    projects, next_cursor = await get_projects(
+    projects, _ = await get_my_projects(
         projects_db=mock_db,
+        user_id="user_1",
         group_id="group-123",
-        user_id="staff-1",
     )
 
     assert projects == []
-    assert next_cursor is None
 
 
 @pytest.mark.asyncio
-async def test_get_projects_does_not_return_other_group():
-    """Test get_projects excludes assigned projects from other groups."""
-    from recnavi.core.project.projects import get_projects
-
+async def test_get_my_projects_does_not_match_id_substrings():
+    """user_1 must not match user_10 as owner or as assignee."""
     mock_db = MockDatabase(
         initial_items=[
-            {
-                "projectId": "proj-my-group",
-                "groupId": "group-123",
-                "projectName": "My Group Project",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-other-group",
-                "groupId": "group-456",
-                "projectName": "Other Group Project",
-                "ownerUserId": "owner-2",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
+            _item("proj-1", owner="user_10", assigned=["user_10"]),
         ],
     )
 
-    projects, _ = await get_projects(
+    projects, _ = await get_my_projects(
         projects_db=mock_db,
+        user_id="user_1",
         group_id="group-123",
-        user_id="staff-1",
     )
 
-    assert len(projects) == 1
-    assert projects[0].project_id == "proj-my-group"
-    assert projects[0].group_id == "group-123"
+    assert projects == []
 
 
 @pytest.mark.asyncio
-async def test_get_projects_pagination_with_filtering():
-    """Test get_projects pagination returns nextCursor even with filtering.
-
-    Important: limit is the number of items to QUERY, not RETURN.
-    nextCursor may be present even when returned items < limit.
-    """
-    from recnavi.core.project.projects import get_projects
-
+async def test_get_my_projects_does_not_return_other_group():
+    """Assigned projects of another group are excluded."""
     mock_db = MockDatabase(
         initial_items=[
-            {
-                "projectId": "proj-1",
-                "groupId": "group-123",
-                "projectName": "Project 1",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-2",
-                "groupId": "group-123",
-                "projectName": "Project 2",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-2"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-3",
-                "groupId": "group-123",
-                "projectName": "Project 3",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-03T00:00:00Z",
-                "updatedAt": "2026-09-03T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
+            _item("proj-mine", assigned=["staff-1"], day=1),
+            _item(
+                "proj-other",
+                group_id="group-456",
+                assigned=["staff-1"],
+                day=2,
+            ),
         ],
     )
 
-    projects, next_cursor = await get_projects(
+    projects, _ = await get_my_projects(
         projects_db=mock_db,
-        group_id="group-123",
         user_id="staff-1",
+        group_id="group-123",
+    )
+
+    assert [p.project_id for p in projects] == ["proj-mine"]
+
+
+@pytest.mark.asyncio
+async def test_get_my_projects_limit_counts_examined_items():
+    """limit is the number examined, so fewer may be returned with a cursor."""
+    mock_db = MockDatabase(
+        initial_items=[
+            _item("proj-1", assigned=["staff-1"], day=1),
+            _item("proj-2", assigned=["staff-2"], day=2),
+            _item("proj-3", assigned=["staff-1"], day=3),
+        ],
+    )
+
+    projects, next_cursor = await get_my_projects(
+        projects_db=mock_db,
+        user_id="staff-1",
+        group_id="group-123",
         limit=2,
     )
 
-    assert len(projects) == 1
-    assert projects[0].project_id == "proj-1"
+    assert [p.project_id for p in projects] == ["proj-1"]
     assert next_cursor is not None
 
 
 @pytest.mark.asyncio
-async def test_get_projects_returns_cursor_even_when_all_filtered():
-    """Test nextCursor is present even when all queried items are filtered out.
-
-    Scenario: limit=2 queries 2 items, but both are filtered out (not assigned).
-    The nextCursor should still be present because more data exists in DynamoDB.
-    """
-    from recnavi.core.project.projects import get_projects
-
+async def test_get_my_projects_returns_cursor_on_empty_page():
+    """An all-filtered page is empty but still carries a cursor."""
     mock_db = MockDatabase(
         initial_items=[
-            {
-                "projectId": "proj-1",
-                "groupId": "group-123",
-                "projectName": "Project 1",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-01T00:00:00Z",
-                "updatedAt": "2026-09-01T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-2"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-2",
-                "groupId": "group-123",
-                "projectName": "Project 2",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-02T00:00:00Z",
-                "updatedAt": "2026-09-02T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-2"],
-                "scenes": [],
-            },
-            {
-                "projectId": "proj-3",
-                "groupId": "group-123",
-                "projectName": "Project 3",
-                "ownerUserId": "owner-1",
-                "createdAt": "2026-09-03T00:00:00Z",
-                "updatedAt": "2026-09-03T00:00:00Z",
-                "description": "",
-                "status": "in_progress",
-                "assignedUserIds": ["staff-1"],
-                "scenes": [],
-            },
+            _item("proj-1", assigned=["staff-2"], day=1),
+            _item("proj-2", assigned=["staff-2"], day=2),
+            _item("proj-3", assigned=["staff-1"], day=3),
         ],
     )
 
-    projects, next_cursor = await get_projects(
+    projects, next_cursor = await get_my_projects(
         projects_db=mock_db,
-        group_id="group-123",
         user_id="staff-1",
+        group_id="group-123",
         limit=2,
     )
 
     assert projects == []
     assert next_cursor is not None
+
+    next_projects, last_cursor = await get_my_projects(
+        projects_db=mock_db,
+        user_id="staff-1",
+        group_id="group-123",
+        limit=2,
+        cursor=next_cursor,
+    )
+
+    assert [p.project_id for p in next_projects] == ["proj-3"]
+    assert last_cursor is None

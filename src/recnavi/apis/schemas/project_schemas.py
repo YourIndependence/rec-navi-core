@@ -17,19 +17,33 @@ from pydantic import alias_generators
 from recnavi.apis.schemas.base_request_schemas import BaseItemModel
 from recnavi.apis.schemas.base_response_schemas import BaseApiResponseModel
 from recnavi.core.types.project import Project
+from recnavi.core.types.project import ProjectSummary
 from recnavi.core.types.scene import Scene
 
 
 class GetProjectsResponse(BaseApiResponseModel):
     """Response for GET /getProjects."""
 
-    projects: list[Project] = Field(
+    projects: list[ProjectSummary] = Field(
         ...,
-        description="Projects in descending order by creation date",
+        description="Projects of the caller's group",
     )
     next_cursor: str | None = Field(
         None,
         description="Opaque pagination cursor. None if last page.",
+    )
+
+
+class GetMyProjectsResponse(BaseApiResponseModel):
+    """Response for GET /getMyProjects."""
+
+    projects: list[ProjectSummary] = Field(
+        ...,
+        description="Projects assigned to the caller",
+    )
+    next_cursor: str | None = Field(
+        None,
+        description="Opaque pagination cursor. May be set on an empty page.",
     )
 
 

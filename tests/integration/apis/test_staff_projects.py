@@ -102,10 +102,17 @@ async def test_get_projects_returns_injected_project(
         for p in data["projects"]
         if p["projectId"] == project_data["projectId"]
     )
-    assert project["scenes"][0]["videoUrl"]
-    assert project["scenes"][0]["thumbnailUrl"]
-    assert "videoKey" not in project["scenes"][0]
-    assert "thumbnailKey" not in project["scenes"][0]
+    assert project == {
+        key: project_data[key]
+        for key in (
+            "projectId",
+            "projectName",
+            "description",
+            "ownerUserId",
+            "createdAt",
+            "status",
+        )
+    }
 
 
 @pytest.mark.asyncio
@@ -130,3 +137,11 @@ async def test_get_project_returns_playback_urls(
         await database.get_item({"projectId": project_data["projectId"]})
         == project_data
     )
+
+
+def test_get_my_projects_returns_400_when_no_token(client):
+    """Test GET /getMyProjects returns 400 when no authorization header."""
+    response = client.get("/getMyProjects")
+    assert response.status_code == 400
+    data = response.json()
+    assert data["status"] == "error"

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
+from recnavi.core.types.project import ProjectSummary
 from recnavi.core.types.scene import Scene
 from tests.mockups.mock_users import get_mock_x_user
 
@@ -31,17 +32,17 @@ def _make_project() -> Project:
     )
 
 
-def test_get_projects_parses_pagination_and_serializes_response(
+def test_get_my_projects_parses_pagination_and_serializes_response(
     staff_client: TestClient,
     auth_headers: dict[str, str],
 ) -> None:
-    project = _make_project()
+    project = ProjectSummary.model_validate(_make_project().model_dump())
     with patch(
-        "recnavi.apis.staff.staff_router.get_projects_usecase",
+        "recnavi.apis.staff.staff_router.get_my_projects_usecase",
         new=AsyncMock(return_value=([project], "next-page")),
     ) as usecase:
         response = staff_client.get(
-            "/getProjects?limit=12&cursor=previous-page",
+            "/getMyProjects?limit=12&cursor=previous-page",
             headers=auth_headers,
         )
 
@@ -54,7 +55,6 @@ def test_get_projects_parses_pagination_and_serializes_response(
     }
     usecase.assert_awaited_once_with(
         projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
-        storage=staff_client.app.state.object_storage,
         user_id="test-user-123",
         group_id="it-group",
         limit=12,

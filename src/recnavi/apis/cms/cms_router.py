@@ -11,6 +11,7 @@
 
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import Query
 from fastapi import Request
 from fastapi import Response
 
@@ -21,6 +22,7 @@ from recnavi.apis.schemas.project_schemas import DeleteProjectRequest
 from recnavi.apis.schemas.project_schemas import DeleteProjectResponse
 from recnavi.apis.schemas.project_schemas import DownloadProjectRequest
 from recnavi.apis.schemas.project_schemas import DownloadProjectResponse
+from recnavi.apis.schemas.project_schemas import GetProjectsResponse
 from recnavi.apis.schemas.project_schemas import UpdateProjectRequest
 from recnavi.apis.schemas.project_schemas import UpdateProjectResponse
 from recnavi.apis.schemas.scene_schemas import GetSceneMastersResponse
@@ -35,6 +37,7 @@ from recnavi.application.project.delete_project import delete_project_usecase
 from recnavi.application.project.download_project import (
     download_project_usecase,
 )
+from recnavi.application.project.get_projects import get_projects_usecase
 from recnavi.application.project.update_project import update_project_usecase
 from recnavi.application.scene.get_scene_masters import (
     get_scene_masters_usecase,
@@ -253,3 +256,25 @@ async def update_scene_master_endpoint(
     )
 
     return UpdateSceneMasterResponse(scene_master=scene_master)
+
+
+@cms_router.get("/getProjects")
+async def get_projects_endpoint(
+    request: Request,
+    user: User = Depends(verify_user),
+    limit: int = Query(default=20, ge=1, le=100),
+    cursor: str | None = Query(default=None),
+) -> GetProjectsResponse:
+    """List all projects of the authenticated owner's group."""
+    projects_db = request.app.state.database[PROJECTS_TABLE_NAME]
+    projects, next_cursor = await get_projects_usecase(
+        projects_db=projects_db,
+        user=user,
+        limit=limit,
+        cursor=cursor,
+    )
+
+    return GetProjectsResponse(
+        projects=projects,
+        next_cursor=next_cursor,
+    )

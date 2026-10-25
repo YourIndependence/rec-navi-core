@@ -43,6 +43,34 @@ class ProjectStatus(StrEnum):
     SUBMITTED = "submitted"
 
 
+class ProjectSummary(BaseModel):
+    """A project without scenes, used by list endpoints."""
+
+    model_config = ConfigDict(
+        alias_generator=alias_generators.to_camel,
+        populate_by_name=True,
+    )
+
+    project_id: str = Field(..., description="Identifier of the project")
+    project_name: str = Field(..., description="Name shown to the members")
+    description: str = Field(
+        default="",
+        description="Free text of date, place, shop name and notes",
+    )
+    owner_user_id: str = Field(
+        ...,
+        description="Identifier of the account owner who created it",
+    )
+    created_at: str = Field(
+        ...,
+        description="Datetime the project was created",
+    )
+    status: ProjectStatus = Field(
+        default=ProjectStatus.IN_PROGRESS,
+        description="How far the project has progressed",
+    )
+
+
 class Project(BaseModel):
     """A shooting job an account owner hands to staff."""
 
