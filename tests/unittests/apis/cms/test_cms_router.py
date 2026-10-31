@@ -446,3 +446,40 @@ def test_update_scene_master_forwards_user_and_returns_signed_master(
     assert "scenePrincipal" in schema["required"]
     assert schema["properties"]["scenePrincipal"]["type"] == "string"
     assert "thumbnailImage" in schema["properties"]
+
+
+def test_update_template_forwards_flat_input_and_returns_signed_template(
+    cms_client,
+    auth_headers,
+):
+    template = ScenesTemplate(
+        template_id="starter",
+        title="Starter",
+        thumbnail_url="https://signed/template",
+    )
+    with patch(
+        "recnavi.apis.cms.cms_router.update_template_usecase",
+        new=AsyncMock(return_value=template),
+    ) as usecase:
+        response = cms_client.post(
+            "/updateTemplate",
+            headers=auth_headers,
+            json={
+                "templateId": "starter",
+                "title": "Starter",
+                "scenePrincipals": [],
+                "thumbnailImage": "bmV3",
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["template"] == template.model_dump(by_alias=True)
+    usecase.assert_awaited_once_with(
+        templates_db=cms_client.app.state.database[TEMPLATES_TABLE_NAME],
+        scenes_db=cms_client.app.state.database[SCENES_TABLE_NAME],
+        storage=cms_client.app.state.object_storage,
+        user=get_mock_x_user(),
+        template_id="starter",
+        title="Starter",
+        scene_principals=[],
+        thumbnail_image="bmV3",
+    )

@@ -29,6 +29,8 @@ from recnavi.apis.schemas.scene_schemas import ReviewSceneResponse
 from recnavi.apis.schemas.scene_schemas import UpdateSceneMasterRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneMasterResponse
 from recnavi.apis.schemas.template_schemas import GetTemplatesResponse
+from recnavi.apis.schemas.template_schemas import UpdateTemplateRequest
+from recnavi.apis.schemas.template_schemas import UpdateTemplateResponse
 from recnavi.apis.schemas.user_schemas import GetGroupUsersResponse
 from recnavi.application.project.create_project import create_project_usecase
 from recnavi.application.project.delete_project import delete_project_usecase
@@ -44,6 +46,7 @@ from recnavi.application.scene.review_scene import review_scene_usecase
 from recnavi.application.scene.update_scene_master import (
     update_scene_master_usecase,
 )
+from recnavi.application.scene.update_template import update_template_usecase
 from recnavi.application.user.get_group_users import get_group_users_usecase
 from recnavi.config.variables import PROJECTS_TABLE_NAME
 from recnavi.config.variables import SCENES_TABLE_NAME
@@ -140,6 +143,33 @@ async def create_project_endpoint(
     )
 
     return CreateProjectResponse(project=project)
+
+
+@cms_router.post(
+    "/updateTemplate",
+    response_model=UpdateTemplateResponse,
+)
+async def update_template_endpoint(
+    request: Request,
+    item: UpdateTemplateRequest,
+    user: User = Depends(verify_user),
+) -> UpdateTemplateResponse:
+    """Create or update template (admin-only)."""
+    templates_db = request.app.state.database[TEMPLATES_TABLE_NAME]
+    scenes_db = request.app.state.database[SCENES_TABLE_NAME]
+
+    template = await update_template_usecase(
+        templates_db=templates_db,
+        scenes_db=scenes_db,
+        template_id=item.template_id,
+        title=item.title,
+        scene_principals=item.scene_principals,
+        thumbnail_image=item.thumbnail_image,
+        user=user,
+        storage=request.app.state.object_storage,
+    )
+
+    return UpdateTemplateResponse(template=template)
 
 
 @cms_router.post("/reviewScene")

@@ -3,7 +3,7 @@ id: ARCH-002
 title: Pydantic-First Type System (core/types/ as SSOT)
 domain: architecture
 status: active
-date: 2026-10-20
+date: 2026-10-21
 rules: true
 files:
   - 'src/**/*.py'
@@ -71,6 +71,32 @@ Distinct contracts still warrant separate types: `UserSummary` deliberately
 omits personal information and remains separate. Template images in dependent
 PR #60 should follow this contract when adding presigned URLs; this decision
 does not change the template endpoint in #59.
+
+### Template thumbnail replacement
+
+`ScenesTemplate` owns thumbnail validation, upload keys and persistence via
+`save(*, templates_db)`. Template updates use a client-supplied readable key,
+partial metadata updates and a single model response, matching scene master
+management. Storage owns the bucket; callers pass only object keys.
+
+For templates, publish image references within a scoped replacement:
+
+```python
+async with template.update_thumbnail(storage=storage, thumbnail_image=image):
+    await template.save(templates_db=templates_db)
+```
+
+A unique key avoids overwriting the committed image. Successful scope exit
+removes the previous image after the database write. Failed upload or save
+removes the replacement and restores the model references. Cleanup failures
+propagate; database and storage do not form a distributed transaction. A crash
+or concurrent update may still leave an orphan image. Scene masters retain
+their existing `update_images()` lifecycle; this decision does not change it.
+
+Manual compliance: verify failure cleanup, legacy S3 URI replacement, exact-key
+deletion and durable-reference round trips with regression tests. Do not
+replace a template thumbnail at a fixed key or delete the old image before
+saving its replacement reference.
 
 ## Rationale
 
