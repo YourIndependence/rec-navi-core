@@ -63,6 +63,8 @@ async def test_submit_project_notifies_owner(
         {
             "userId": owner_id,
             "userName": "Owner",
+            "groupId": "it-group",
+            "role": "owner",
             "email": "owner@example.com",
         },
     )

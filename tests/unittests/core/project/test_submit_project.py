@@ -46,7 +46,12 @@ def _project_db() -> MockDatabase:
 
 
 def _users_db(*, email: str | None = "owner@example.com") -> MockDatabase:
-    owner = {"userId": "owner-1", "userName": "Owner", "groupId": "group-1"}
+    owner = {
+        "userId": "owner-1",
+        "userName": "Owner",
+        "groupId": "group-1",
+        "role": "owner",
+    }
     if email is not None:
         owner["email"] = email
     return MockDatabase(initial_items=[owner], key_names=("userId",))

@@ -55,7 +55,8 @@ async def submit_project(
         )
 
     owner_item = await users_db.get_item(key={"userId": project.owner_user_id})
-    owner_email = owner_item.get("email") if owner_item else None
+    owner = User.model_validate(owner_item) if owner_item else None
+    owner_email = owner.email if owner else None
     if not owner_email:
         raise ClientUnprocessableEntityError("Owner has no email address")
 
