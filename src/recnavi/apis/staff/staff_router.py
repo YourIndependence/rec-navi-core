@@ -18,12 +18,17 @@ from recnavi.apis.auth.auth import verify_user
 from recnavi.apis.schemas.project_schemas import GetProjectRequest
 from recnavi.apis.schemas.project_schemas import GetProjectResponse
 from recnavi.apis.schemas.project_schemas import GetProjectsResponse
+from recnavi.apis.schemas.project_schemas import SubmitProjectRequest
+from recnavi.apis.schemas.project_schemas import SubmitProjectResponse
 from recnavi.apis.schemas.scene_schemas import UpdateSceneRequest
 from recnavi.apis.schemas.scene_schemas import UpdateSceneResponse
 from recnavi.application.project.get_project import get_project_usecase
 from recnavi.application.project.get_projects import get_projects_usecase
+from recnavi.application.project.submit_project import submit_project_usecase
 from recnavi.application.scene.update_scene import update_scene_usecase
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.user import User
 
 
@@ -91,3 +96,22 @@ async def update_scene_endpoint(
     )
 
     return UpdateSceneResponse(project=updated_project)
+
+
+@staff_router.post("/submitProject")
+async def submit_project_endpoint(
+    request: Request,
+    payload: SubmitProjectRequest,
+    user: User = Depends(verify_user),
+) -> SubmitProjectResponse:
+    """Notify the owner by email that staff finished shooting (staff only)."""
+    await submit_project_usecase(
+        projects_db=request.app.state.database[PROJECTS_TABLE_NAME],
+        users_db=request.app.state.database[USERS_TABLE_NAME],
+        notifier=request.app.state.notifier,
+        base_url=FRONTEND_BASE_URL,
+        project_id=payload.project_id,
+        user=user,
+    )
+
+    return SubmitProjectResponse()

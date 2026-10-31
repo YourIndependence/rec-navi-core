@@ -7,6 +7,7 @@ const POLICIES: Record<string, Record<string, string>> = {
   "core/project/download_project.py": { create_project_archive: "UserRole.OWNER" },
   "core/scene/review_scene.py": { review_scene: "UserRole.OWNER" },
   "core/scene/update_scene.py": { update_scene: "UserRole.STAFF" },
+  "core/project/submit_project.py": { submit_project: "UserRole.STAFF" },
 };
 const DENIED = "User does not have access permission to this project";
 

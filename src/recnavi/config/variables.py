@@ -52,4 +52,10 @@ def _get_cors_origins() -> list[str]:
 
 CORS_ORIGINS = _get_cors_origins()
 
+SES_SENDER_EMAIL = os.environ.get("SES_SENDER_EMAIL", "no-reply@rec-navi.com")
+FRONTEND_BASE_URL = os.environ.get(
+    "FRONTEND_BASE_URL",
+    f"https://{ENV}.{APP_DOMAINS}",
+)
+
 LOG_BUCKET_NAME = os.environ.get("LOG_BUCKET_NAME", "rec-navi-dev-log-data")

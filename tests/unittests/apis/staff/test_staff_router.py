@@ -8,7 +8,9 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
+from recnavi.config.variables import FRONTEND_BASE_URL
 from recnavi.config.variables import PROJECTS_TABLE_NAME
+from recnavi.config.variables import USERS_TABLE_NAME
 from recnavi.core.types.project import Project
 from recnavi.core.types.project import ProjectStatus
 from recnavi.core.types.scene import Scene
@@ -171,5 +173,42 @@ def test_update_scene_rejects_missing_fields_without_calling_usecase(
         new=AsyncMock(),
     ) as usecase:
         response = staff_client.post("/updateScene", json=payload)
+    assert response.status_code == 422
+    usecase.assert_not_awaited()
+
+
+def test_submit_project_parses_request_and_returns_base_response(
+    staff_client: TestClient,
+    auth_headers: dict[str, str],
+) -> None:
+    """Delegate notification with app-state dependencies and return base response."""
+    with patch(
+        "recnavi.apis.staff.staff_router.submit_project_usecase",
+        new=AsyncMock(return_value=None),
+    ) as usecase:
+        response = staff_client.post(
+            "/submitProject",
+            headers=auth_headers,
+            json={"projectId": "proj-123"},
+        )
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "message": None}
+    usecase.assert_awaited_once_with(
+        projects_db=staff_client.app.state.database[PROJECTS_TABLE_NAME],
+        users_db=staff_client.app.state.database[USERS_TABLE_NAME],
+        notifier=staff_client.app.state.notifier,
+        base_url=FRONTEND_BASE_URL,
+        project_id="proj-123",
+        user=get_mock_x_user(),
+    )
+
+
+def test_submit_project_rejects_missing_project_id(staff_client):
+    """Validate the payload before invoking the use case."""
+    with patch(
+        "recnavi.apis.staff.staff_router.submit_project_usecase",
+        new=AsyncMock(),
+    ) as usecase:
+        response = staff_client.post("/submitProject", json={})
     assert response.status_code == 422
     usecase.assert_not_awaited()

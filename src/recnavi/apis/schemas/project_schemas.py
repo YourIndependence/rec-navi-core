@@ -66,6 +66,19 @@ class CreateProjectResponse(BaseApiResponseModel):
     project: Project = Field(..., description="Created project")
 
 
+class SubmitProjectRequest(BaseItemModel):
+    """Request payload for POST /submitProject."""
+
+    project_id: str = Field(
+        ...,
+        description="Project ID to notify about",
+    )
+
+
+class SubmitProjectResponse(BaseApiResponseModel):
+    """Response for POST /submitProject (no extra fields)."""
+
+
 class ProjectInput(BaseModel):
     """Project input for update."""
 

@@ -44,6 +44,7 @@ User.can_act_as is used only inside Project.validate_permission.
 | core/project/download_project.py:create_project_archive | UserRole.OWNER |
 | core/scene/review_scene.py:review_scene | UserRole.OWNER |
 | core/scene/update_scene.py:update_scene | UserRole.STAFF |
+| core/project/submit_project.py:submit_project | UserRole.STAFF |
 
 Preserve the shared role hierarchy: OWNER operations require ownership even
 when ADMIN acts as OWNER. No additional group validation is required. Scene
